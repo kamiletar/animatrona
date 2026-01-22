@@ -1,0 +1,203 @@
+# Конфигурация Electron Builder для Animatrona
+# Используем Next.js standalone output
+
+appId: com.lena.animatrona
+productName: Animatrona
+copyright: Copyright 2025 Lena
+electronVersion: 39.2.7
+
+# Публикация на GitHub Releases
+# kamiletar/animatrona - публичный репозиторий для Open Source релизов
+publish:
+  provider: github
+  owner: kamiletar
+  repo: animatrona
+  releaseType: release
+  private: false
+  # GH_TOKEN берётся автоматически из переменной среды
+
+# Отключаем npm install - используем standalone
+# Main process зависимости (electron-updater, sql.js, zustand) бандлятся webpack'ом
+npmRebuild: false
+buildDependenciesFromSource: false
+nodeGypRebuild: false
+
+# Директории
+directories:
+  output: dist
+  buildResources: resources
+
+# Файлы для включения в app
+# ВАЖНО: Все зависимости main process бандлятся webpack'ом в app/background.js
+# Исключаем node_modules — они НЕ нужны (экономит ~700 МБ!)
+files:
+  - from: .
+    filter:
+      - package.json
+      - app
+      - "!node_modules"
+      - "!node_modules/**/*"
+
+extraMetadata:
+  main: app/background.js
+
+# Отключаем упаковку asar для избежания проблем с symlinks
+# В production можно включить обратно после решения проблем с symlinks
+asar: false
+
+# Windows конфигурация
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+  extraResources:
+    - from: resources/ffmpeg/win
+      to: ffmpeg
+      filter:
+        - ffmpeg.exe
+        - ffprobe.exe
+    # ntsuspend — пауза процессов на Windows (native addon)
+    - from: ../../node_modules/ntsuspend
+      to: node_modules/ntsuspend
+      filter:
+        - '*.node'
+        - '*.cjs'
+        - '*.mjs'
+        - '*.d.ts'
+        - package.json
+    # fts5-sql-bundle для main процесса (миграции БД с FTS5)
+    - from: ../../node_modules/fts5-sql-bundle
+      to: node_modules/fts5-sql-bundle
+      filter:
+        - '**/*'
+
+# NSIS installer — кастомный брендинг
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Animatrona
+  # Кастомные изображения
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerSidebar: resources/installer-sidebar.bmp
+  installerHeader: resources/installer-header.bmp
+  # Юникод для русского языка
+  unicode: true
+  # Запустить приложение после установки
+  runAfterFinish: true
+  # Удалять данные приложения при удалении
+  deleteAppDataOnUninstall: false
+
+# Linux конфигурация
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: resources/icon.png
+  category: Video
+  extraResources:
+    - from: resources/ffmpeg/linux
+      to: ffmpeg
+      filter:
+        - ffmpeg
+        - ffprobe
+    # fts5-sql-bundle для main процесса (миграции БД с FTS5)
+    - from: ../../node_modules/fts5-sql-bundle
+      to: node_modules/fts5-sql-bundle
+      filter:
+        - '**/*'
+
+# macOS конфигурация
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: resources/icon.icns
+  category: public.app-category.video
+
+# Next.js standalone и ресурсы как extraResources
+extraResources:
+  # Prisma миграции (SQL файлы для автоматического применения при старте)
+  - from: prisma/migrations
+    to: migrations
+    filter:
+      - '**/*.sql'
+  # FFmpeg с SVT-AV1 (скачивается скриптом download-ffmpeg.ts --platform all)
+  # Структура: resources/ffmpeg/win/, resources/ffmpeg/linux/
+  # electron-builder автоматически выбирает нужную папку по платформе
+  # ZenStack schema (импортируется из enhance.ts как '../../../schema')
+  - from: schema.ts
+    to: standalone/apps/animatrona/schema.ts
+  # fts5-sql-bundle WASM (требуется для миграций БД с FTS5)
+  - from: ../../node_modules/fts5-sql-bundle/dist/sql-wasm.wasm
+    to: sql-wasm.wasm
+  # ZenStack ORM зависимости (Next.js standalone не включает их автоматически)
+  # fts5-sql-bundle - используется enhance.ts через require('fts5-sql-bundle/dist/sql-asm.js')
+  - from: ../../node_modules/fts5-sql-bundle
+    to: standalone/node_modules/fts5-sql-bundle
+    filter:
+      - '**/*'
+  # kysely - SQL query builder
+  - from: ../../node_modules/kysely
+    to: standalone/node_modules/kysely
+    filter:
+      - '**/*'
+  # kysely-wasm - WASM адаптер для kysely
+  - from: ../../node_modules/kysely-wasm
+    to: standalone/node_modules/kysely-wasm
+    filter:
+      - '**/*'
+  # kysely-generic-sqlite - SQLite диалект для kysely
+  - from: ../../node_modules/kysely-generic-sqlite
+    to: standalone/node_modules/kysely-generic-sqlite
+    filter:
+      - '**/*'
+  # @zenstackhq/orm - ZenStack ORM core
+  - from: ../../node_modules/@zenstackhq/orm
+    to: standalone/node_modules/@zenstackhq/orm
+    filter:
+      - '**/*'
+  # @zenstackhq/plugin-policy - ZenStack access control
+  - from: ../../node_modules/@zenstackhq/plugin-policy
+    to: standalone/node_modules/@zenstackhq/plugin-policy
+    filter:
+      - '**/*'
+  # Splash screen
+  - from: resources/splash.html
+    to: splash.html
+  # Иконки
+  - from: resources/icon.ico
+    to: icon.ico
+  - from: resources/icon.png
+    to: icon.png
+  # Template БД со схемой (копируется при первом запуске)
+  - from: resources/template.db
+    to: template.db
+  # node_modules из standalone (electron-builder игнорирует node_modules по умолчанию)
+  - from: renderer/.next/standalone/node_modules
+    to: standalone/node_modules
+    filter:
+      - '**/*'
+  # Apps директория из standalone
+  - from: renderer/.next/standalone/apps
+    to: standalone/apps
+    filter:
+      - '**/*'
+  # Статические файлы Next.js (рядом с server.js)
+  - from: renderer/.next/static
+    to: standalone/apps/animatrona/renderer/.next/static
+    filter:
+      - '**/*'
+  # Public папка (рядом с server.js)
+  - from: renderer/public
+    to: standalone/apps/animatrona/renderer/public
+    filter:
+      - '**/*'

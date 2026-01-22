@@ -1,0 +1,13 @@
+# База данных (локальные данные)
+prisma/data/
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+
+# Electron build (корневая папка)
+/app/
+dist/
+out/
+
+# FFmpeg binaries (скачиваются скриптом download-ffmpeg.ts)
+resources/ffmpeg/
