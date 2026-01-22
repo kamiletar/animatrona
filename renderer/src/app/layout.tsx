@@ -2,6 +2,8 @@ import { AppShell } from '@/components/layout/AppShell'
 import { ImportQueueProcessor } from '@/components/transcode'
 import { Provider } from '@/components/ui/provider'
 import { Toaster } from '@/components/ui/toaster'
+import { UpdateDrawer, UpdateProgressIndicator } from '@/components/update'
+import { UpdateNotificationManager } from '@/components/update/UpdateNotificationManager'
 import type { Metadata } from 'next'
 import Script from 'next/script'
 
@@ -19,6 +21,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Provider>
           {/* Координатор обработки очереди — живёт всегда, не зависит от навигации */}
           <ImportQueueProcessor />
+          {/* Менеджер уведомлений об обновлениях */}
+          <UpdateNotificationManager />
+          {/* Глобальный индикатор прогресса загрузки */}
+          <UpdateProgressIndicator />
+          {/* Drawer с деталями обновления */}
+          <UpdateDrawer />
           <AppShell>{children}</AppShell>
           <Toaster />
         </Provider>

@@ -15,7 +15,7 @@ const nextConfig = {
   },
 
   // Транспиляция shared библиотек из монорепо
-  transpilePackages: ['@lena/ui', '@lena/chakra-provider'],
+  transpilePackages: ['@lena/ui', '@lena/chakra-provider', '@lena/form-components', '@lena/query-provider'],
 
   // TypeScript проверка
   typescript: {
@@ -46,9 +46,13 @@ const nextConfig = {
       './node_modules/@zenstackhq/**/*',
       './node_modules/kysely/**/*',
       './node_modules/kysely-wasm/**/*',
-      './node_modules/kysely-generic-sqlite/**/*',
       // Prisma client (fallback)
       './apps/animatrona/renderer/src/generated/prisma/**/*',
+      // @lena монорепо библиотеки
+      './libs/ui/**/*',
+      './libs/form-components/**/*',
+      './libs/query-provider/**/*',
+      './libs/chakra-provider/**/*',
     ],
   },
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { UpdateBadge } from '@/components/update'
 import { Box, Flex, HStack, Icon, Kbd, Text } from '@chakra-ui/react'
 import { LuSearch } from 'react-icons/lu'
 
@@ -52,8 +53,12 @@ export function Header({ title, onOpenSearch }: HeaderProps) {
         {title}
       </Text>
 
-      {/* Кнопка поиска */}
+      {/* Правая панель: UpdateBadge + Поиск */}
       <HStack gap={2} style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {/* Badge обновлений */}
+        <UpdateBadge />
+
+        {/* Кнопка поиска */}
         <Flex
           as="button"
           align="center"

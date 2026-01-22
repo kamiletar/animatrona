@@ -18,9 +18,9 @@ import {
   ThemeSettingsCard,
   TranscodingSettingsCard,
   TraySettingsCard,
-  UpdateSettingsCard,
   useSettings,
 } from './_settings'
+import { UpdateSettingsCardNew } from './_settings/UpdateSettingsCardNew'
 
 // Отключаем статическую генерацию для страницы настроек
 export const dynamic = 'force-dynamic'
@@ -114,13 +114,7 @@ export default function SettingsPage() {
             <VStack gap={6} align="stretch" maxW="800px" py={6}>
               <ThemeSettingsCard />
               <TraySettingsCard settings={settings} onSaveWithTray={handleSaveWithTray} />
-              <UpdateSettingsCard
-                appVersion={appVersion}
-                updateStatus={updateStatus}
-                onCheckUpdates={handleCheckUpdates}
-                onDownloadUpdate={handleDownloadUpdate}
-                onInstallUpdate={handleInstallUpdate}
-              />
+              <UpdateSettingsCardNew />
             </VStack>
           </Tabs.Content>
         </Tabs.Root>

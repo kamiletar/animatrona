@@ -11,3 +11,4 @@ out/
 
 # FFmpeg binaries (скачиваются скриптом download-ffmpeg.ts)
 resources/ffmpeg/
+build.log

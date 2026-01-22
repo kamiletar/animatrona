@@ -3,7 +3,7 @@
  */
 
 import { app, ipcMain } from 'electron'
-import { checkForUpdates, downloadUpdate, getUpdateStatus, installUpdate } from '../updater'
+import { checkForUpdates, downloadUpdate, fetchChangelog, getUpdateStatus, installUpdate } from '../updater'
 
 /**
  * Регистрирует IPC handlers для управления обновлениями
@@ -54,6 +54,20 @@ export function registerUpdaterHandlers(): void {
       return { success: true }
     } catch (error) {
       console.error('[IPC] updater:install error:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+  })
+
+  // Получить changelog из GitHub Releases
+  ipcMain.handle('updater:getChangelog', async (_, version: string) => {
+    try {
+      const changelog = await fetchChangelog(version)
+      return { success: true, changelog }
+    } catch (error) {
+      console.error('[IPC] updater:getChangelog error:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),

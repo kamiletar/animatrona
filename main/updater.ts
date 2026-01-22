@@ -3,10 +3,13 @@
  *
  * Использует electron-updater для автоматического обновления приложения.
  * Поддерживает GitHub Releases как источник обновлений.
+ *
+ * Улучшенная версия: без блокирующих диалогов, с changelog из GitHub API
  */
 
 import type { BrowserWindow } from 'electron'
-import { app, dialog } from 'electron'
+import { app } from 'electron'
+import { net } from 'electron'
 import { autoUpdater, type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
 
 // Настройки автообновления
@@ -44,11 +47,75 @@ let updateStatus: UpdateStatus = {
 // Ссылка на главное окно для IPC
 let mainWindowRef: BrowserWindow | null = null
 
+// Кэш changelog для текущей версии
+let changelogCache: { version: string; changelog: string } | null = null
+
 /**
  * Получить текущий статус обновления
  */
 export function getUpdateStatus(): UpdateStatus {
   return { ...updateStatus }
+}
+
+/**
+ * Получить changelog из GitHub Releases
+ */
+export async function fetchChangelog(version: string): Promise<string | null> {
+  // Проверяем кэш
+  if (changelogCache && changelogCache.version === version) {
+    return changelogCache.changelog
+  }
+
+  try {
+    const url = `https://api.github.com/repos/kamiletar/animatrona/releases/tags/v${version}`
+    const request = net.request({
+      url,
+      method: 'GET',
+    })
+
+    // Устанавливаем User-Agent (GitHub требует)
+    request.setHeader('User-Agent', 'Animatrona-Update-Client')
+
+    return await new Promise<string>((resolve, reject) => {
+      let data = ''
+
+      request.on('response', (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`HTTP ${response.statusCode}`))
+          return
+        }
+
+        response.on('data', (chunk) => {
+          data += chunk.toString()
+        })
+
+        response.on('end', () => {
+          try {
+            const release = JSON.parse(data)
+            const changelog = release.body || 'Нет описания'
+            // Кэшируем
+            changelogCache = { version, changelog }
+            resolve(changelog)
+          } catch (error) {
+            reject(error)
+          }
+        })
+
+        response.on('error', (error) => {
+          reject(error)
+        })
+      })
+
+      request.on('error', (error) => {
+        reject(error)
+      })
+
+      request.end()
+    })
+  } catch (error) {
+    console.error('[Updater] Ошибка получения changelog:', error)
+    return null
+  }
 }
 
 /**
@@ -87,21 +154,15 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     mainWindow.webContents.send('updater:available', info)
     notifyRenderer()
 
-    // Показываем диалог с предложением обновиться
-    dialog
-      .showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Доступно обновление',
-        message: `Доступна новая версия ${info.version}`,
-        detail: 'Хотите скачать и установить обновление сейчас?',
-        buttons: ['Обновить', 'Позже'],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then((result) => {
-        if (result.response === 0) {
-          autoUpdater.downloadUpdate()
+    // Fetch changelog асинхронно и отправляем в renderer
+    fetchChangelog(info.version)
+      .then((changelog) => {
+        if (changelog) {
+          mainWindow.webContents.send('updater:changelog', { version: info.version, changelog })
         }
+      })
+      .catch((error) => {
+        console.error('[Updater] Не удалось загрузить changelog:', error)
       })
   })
 
@@ -138,22 +199,8 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     mainWindow.webContents.send('updater:downloaded', info)
     notifyRenderer()
 
-    // Показываем диалог с предложением перезапустить
-    dialog
-      .showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Обновление готово',
-        message: `Версия ${info.version} готова к установке`,
-        detail: 'Приложение будет перезапущено для установки обновления.',
-        buttons: ['Перезапустить', 'Позже'],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then((result) => {
-        if (result.response === 0) {
-          autoUpdater.quitAndInstall(false, true)
-        }
-      })
+    // НЕ показываем блокирующий диалог - renderer покажет toast уведомление
+    // Пользователь сам решит когда устанавливать через UI
   })
 
   autoUpdater.on('error', (error) => {

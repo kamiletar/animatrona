@@ -59,14 +59,11 @@ win:
         - ffmpeg.exe
         - ffprobe.exe
     # ntsuspend — пауза процессов на Windows (native addon)
-    - from: ../../node_modules/ntsuspend
+    # Bun хранит пакеты в .bun/ с версией и вложенной структурой
+    - from: ../../node_modules/.bun/ntsuspend@1.0.2/node_modules/ntsuspend
       to: node_modules/ntsuspend
       filter:
-        - '*.node'
-        - '*.cjs'
-        - '*.mjs'
-        - '*.d.ts'
-        - package.json
+        - '**/*'
     # fts5-sql-bundle для main процесса (миграции БД с FTS5)
     - from: ../../node_modules/fts5-sql-bundle
       to: node_modules/fts5-sql-bundle
@@ -155,11 +152,6 @@ extraResources:
     to: standalone/node_modules/kysely-wasm
     filter:
       - '**/*'
-  # kysely-generic-sqlite - SQLite диалект для kysely
-  - from: ../../node_modules/kysely-generic-sqlite
-    to: standalone/node_modules/kysely-generic-sqlite
-    filter:
-      - '**/*'
   # @zenstackhq/orm - ZenStack ORM core
   - from: ../../node_modules/@zenstackhq/orm
     to: standalone/node_modules/@zenstackhq/orm
@@ -181,11 +173,9 @@ extraResources:
   # Template БД со схемой (копируется при первом запуске)
   - from: resources/template.db
     to: template.db
-  # node_modules из standalone (electron-builder игнорирует node_modules по умолчанию)
-  - from: renderer/.next/standalone/node_modules
-    to: standalone/node_modules
-    filter:
-      - '**/*'
+  # НЕ копируем standalone/node_modules полностью (вызывает Out of Memory из-за .bun symlinks)
+  # Вместо этого нужные пакеты копируются вручную выше (kysely, kysely-wasm, @zenstackhq)
+  # Next.js standalone будет искать их в standalone/node_modules благодаря extraResources
   # Apps директория из standalone
   - from: renderer/.next/standalone/apps
     to: standalone/apps

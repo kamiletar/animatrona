@@ -15,7 +15,11 @@
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@lena/ui": ["../../../libs/ui/src/index.ts"],
+      "@lena/form-components": ["../../../libs/form-components/src/index.ts"],
+      "@lena/query-provider": ["../../../libs/query-provider/src/index.ts"],
+      "@lena/chakra-provider": ["../../../libs/chakra-provider/src/index.ts"]
     },
     "plugins": [
       {

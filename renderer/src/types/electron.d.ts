@@ -779,7 +779,7 @@ export interface ElectronAPI {
     scanFolder: (
       folderPath: string,
       recursive?: boolean,
-      mediaTypes?: ('video' | 'audio')[]
+      mediaTypes?: ('video' | 'audio')[],
     ) => Promise<{ success: boolean; files: MediaFileInfo[] }>
     /** Удалить файл или папку (по умолчанию в корзину) */
     delete: (targetPath: string, moveToTrash?: boolean) => Promise<{ success: boolean; error?: string }>
@@ -792,12 +792,12 @@ export interface ElectronAPI {
     /** Сканировать внешние субтитры (Rus Sub/, Eng Sub/ и т.д.) */
     scanExternalSubtitles: (
       videoFolderPath: string,
-      videoFiles: Array<{ path: string; episodeNumber: number }>
+      videoFiles: Array<{ path: string; episodeNumber: number }>,
     ) => Promise<ExternalSubtitleScanResult>
     /** Сканировать внешние аудио (Rus Sound/, Audio/ и т.д.) */
     scanExternalAudio: (
       videoFolderPath: string,
-      videoFiles: Array<{ path: string; episodeNumber: number }>
+      videoFiles: Array<{ path: string; episodeNumber: number }>,
     ) => Promise<ExternalAudioScanResult>
     /** Получить метаданные изображения (размеры, blur placeholder) */
     getImageMetadata: (filePath: string) => Promise<{
@@ -824,7 +824,7 @@ export interface ElectronAPI {
     previewShift: (
       inputPath: string,
       offsetMs: number,
-      limit?: number
+      limit?: number,
     ) => Promise<{
       events: Array<{ start: string; end: string; text: string }>
       total: number
@@ -862,7 +862,7 @@ export interface ElectronAPI {
     downloadPoster: (
       posterUrl: string,
       animeId: string,
-      options?: { fileName?: string; savePath?: string }
+      options?: { fileName?: string; savePath?: string },
     ) => Promise<{
       success: boolean
       localPath?: string
@@ -936,7 +936,7 @@ export interface ElectronAPI {
         videoPath: string
         outputDir: string
         animeInfo: ManifestInfo
-      }
+      },
     ) => Promise<{
       success: boolean
       manifestPath?: string
@@ -955,7 +955,7 @@ export interface ElectronAPI {
       navigation: {
         nextEpisode?: { id: string; manifestPath: string }
         prevEpisode?: { id: string; manifestPath: string }
-      }
+      },
     ) => Promise<{ success: boolean; error?: string }>
     /** Обновить thumbnails в манифесте */
     updateThumbnails: (
@@ -963,7 +963,7 @@ export interface ElectronAPI {
       thumbnails: {
         vttPath: string
         spritePath: string
-      }
+      },
     ) => Promise<{ success: boolean; error?: string }>
   }
 
@@ -983,7 +983,7 @@ export interface ElectronAPI {
     transcodeAudioVBR: (
       input: string,
       output: string,
-      options: AudioTranscodeVBROptions
+      options: AudioTranscodeVBROptions,
     ) => Promise<AudioTranscodeResult>
     /** Кодирование тестового сэмпла */
     encodeSample: (options: {
@@ -999,7 +999,7 @@ export interface ElectronAPI {
       inputPath: string,
       outputDir: string,
       duration: number,
-      options: ScreenshotOptions
+      options: ScreenshotOptions,
     ) => Promise<ScreenshotResult>
     /** Генерация thumbnail sprite sheet для hover preview */
     generateThumbnailSprite: (
@@ -1012,7 +1012,7 @@ export interface ElectronAPI {
         frameHeight?: number
         columns?: number
         quality?: number
-      }
+      },
     ) => Promise<{
       success: boolean
       spritePath: string
@@ -1034,7 +1034,7 @@ export interface ElectronAPI {
     calculate: (
       encoded: string,
       original: string,
-      options?: VmafOptions
+      options?: VmafOptions,
     ) => Promise<{ success: boolean; data?: VmafResult; error?: string }>
 
     /** Поиск оптимального CQ для целевого VMAF */
@@ -1043,7 +1043,7 @@ export interface ElectronAPI {
       videoOptions: Omit<VideoTranscodeOptions, 'cq'>,
       options?: Partial<CqSearchOptions>,
       preferCpu?: boolean,
-      itemId?: string
+      itemId?: string,
     ) => Promise<{ success: boolean; data?: CqSearchResult; error?: string }>
 
     /** Подписка на прогресс поиска CQ */
@@ -1055,7 +1055,7 @@ export interface ElectronAPI {
     /** Добавить файл в очередь */
     addToQueue: (
       filePath: string,
-      settings?: PerFileTranscodeSettings
+      settings?: PerFileTranscodeSettings,
     ) => Promise<{ success: boolean; id?: string; error?: string }>
 
     /** Удалить из очереди */
@@ -1200,8 +1200,8 @@ export interface ElectronAPI {
           ffmpegCommand?: string
           transcodeDurationMs?: number
           activeGpuWorkers?: number
-        }
-      ) => void
+        },
+      ) => void,
     ) => () => void
 
     /** Подписка на завершение аудиодорожки */
@@ -1209,7 +1209,7 @@ export interface ElectronAPI {
 
     /** Подписка на завершение элемента (видео + все аудио готовы) */
     onItemCompleted: (
-      callback: (itemId: string, episodeId: string, success: boolean, errorMessage?: string) => void
+      callback: (itemId: string, episodeId: string, success: boolean, errorMessage?: string) => void,
     ) => () => void
 
     /** Подписка на ошибку батча */
@@ -1281,8 +1281,8 @@ export interface ElectronAPI {
     onVideoLogEntry: (
       callback: (
         taskId: string,
-        entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string }
-      ) => void
+        entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string },
+      ) => void,
     ) => () => void
   }
 
@@ -1366,7 +1366,7 @@ export interface ElectronAPI {
     updateStatus: (
       itemId: string,
       status: ImportQueueStatus,
-      error?: string
+      error?: string,
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Обновить прогресс item */
@@ -1375,13 +1375,13 @@ export interface ElectronAPI {
       progress: number,
       currentFileName?: string,
       currentStage?: string,
-      detailProgress?: ImportQueueDetailProgress
+      detailProgress?: ImportQueueDetailProgress,
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Обновить VMAF прогресс */
     updateVmafProgress: (
       itemId: string,
-      vmafProgress: ImportQueueVmafProgress
+      vmafProgress: ImportQueueVmafProgress,
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Установить результат VMAF */
@@ -1397,7 +1397,7 @@ export interface ElectronAPI {
 
     /** Подписка на изменение статуса item */
     onItemStatus: (
-      callback: (data: { itemId: string; status: ImportQueueStatus; error?: string }) => void
+      callback: (data: { itemId: string; status: ImportQueueStatus; error?: string }) => void,
     ) => () => void
 
     /** Подписка на изменение прогресса item */
@@ -1409,7 +1409,7 @@ export interface ElectronAPI {
         currentStage?: string
         detailProgress?: ImportQueueDetailProgress
         vmafProgress?: ImportQueueVmafProgress
-      }) => void
+      }) => void,
     ) => () => void
   }
 
@@ -1427,7 +1427,7 @@ export interface ElectronAPI {
     /** Обновить шаблон */
     update: (
       id: string,
-      data: ImportTemplateUpdateData
+      data: ImportTemplateUpdateData,
     ) => Promise<{ success: boolean; data?: ImportTemplate; error?: string }>
 
     /** Удалить шаблон */
@@ -1481,7 +1481,7 @@ export interface ElectronAPI {
         shikimoriId?: number | null
         isBdRemux?: boolean
         fallbackInfo?: { name: string; originalName?: string; year?: number }
-      }
+      },
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Прочитать anime.meta.json */
@@ -1528,21 +1528,21 @@ export interface ElectronAPI {
       libraryPath: string,
       animeFolderPath: string,
       watchStatus: WatchStatusMeta,
-      watchedAt?: string | null
+      watchedAt?: string | null,
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Обновить оценку аниме */
     updateUserRating: (
       libraryPath: string,
       animeFolderPath: string,
-      userRating: number | null
+      userRating: number | null,
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Обновить предпочтения дорожек */
     updateTrackPreferences: (
       libraryPath: string,
       animeFolderPath: string,
-      trackPreferences: TrackPreferences
+      trackPreferences: TrackPreferences,
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Обновить прогресс эпизода */
@@ -1561,20 +1561,20 @@ export interface ElectronAPI {
     readEpisodeProgress: (
       libraryPath: string,
       animeFolderPath: string,
-      episodeFolderPath: string
+      episodeFolderPath: string,
     ) => Promise<{ success: boolean; data?: UserEpisodeData | null; error?: string }>
 
     /** Прочитать данные аниме пользователя */
     readAnimeData: (
       libraryPath: string,
-      animeFolderPath: string
+      animeFolderPath: string,
     ) => Promise<{ success: boolean; data?: UserAnimeData | null; error?: string }>
 
     /** Удалить прогресс эпизода */
     deleteEpisodeProgress: (
       libraryPath: string,
       animeFolderPath: string,
-      episodeFolderPath: string
+      episodeFolderPath: string,
     ) => Promise<{ success: boolean; error?: string }>
 
     /** Удалить все данные аниме */
@@ -1605,14 +1605,19 @@ export interface ElectronAPI {
     getStatus: () => Promise<UpdateStatus>
     /** Получить версию приложения */
     getVersion: () => Promise<string>
+    /** Получить changelog из GitHub Releases */
+    getChangelog: (version: string) => Promise<{ success: boolean; changelog?: string | null; error?: string }>
     /** Подписка на изменение статуса обновления */
     onStatusChange: (callback: (status: UpdateStatus) => void) => () => void
+    /** Подписка на получение changelog */
+    onChangelog: (callback: (data: { version: string; changelog: string }) => void) => () => void
   }
 }
 
 declare global {
   interface Window {
     electronAPI?: ElectronAPI
+    electron?: ElectronAPI
   }
 }
 

@@ -96,7 +96,7 @@ const electronAPI = {
 
     /** Получить информацию о диске */
     getDiskInfo: (
-      targetPath?: string
+      targetPath?: string,
     ): Promise<{ total: number; free: number; used: number; usedPercent: number } | null> =>
       ipcRenderer.invoke('app:getDiskInfo', targetPath),
 
@@ -154,7 +154,7 @@ const electronAPI = {
     getPlatform: (): Promise<'win32' | 'darwin' | 'linux'> => ipcRenderer.invoke('window:getPlatform'),
 
     /** Подписка на изменение состояния maximize */
-    onMaximizeChanged: (callback: (isMaximized: boolean) => void): (() => void) => {
+    onMaximizeChanged: (callback: (isMaximized: boolean) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, isMaximized: boolean) => callback(isMaximized)
       ipcRenderer.on('window:maximizeChanged', handler)
       return () => ipcRenderer.removeListener('window:maximizeChanged', handler)
@@ -190,7 +190,7 @@ const electronAPI = {
     scanFolder: (
       folderPath: string,
       recursive?: boolean,
-      mediaTypes?: ('video' | 'audio')[]
+      mediaTypes?: ('video' | 'audio')[],
     ): Promise<{ success: boolean; files: Array<{ path: string; name: string; size: number; extension: string }> }> =>
       ipcRenderer.invoke('fs:scanFolder', folderPath, recursive ?? true, mediaTypes ?? ['video']),
 
@@ -212,19 +212,19 @@ const electronAPI = {
     /** Сканировать внешние субтитры (папки Rus Sub/, Subs/ и т.д.) */
     scanExternalSubtitles: (
       videoFolderPath: string,
-      videoFiles: Array<{ path: string; episodeNumber: number }>
+      videoFiles: Array<{ path: string; episodeNumber: number }>,
     ): Promise<ExternalSubtitleScanResult> =>
       ipcRenderer.invoke('fs:scanExternalSubtitles', videoFolderPath, videoFiles),
 
     /** Сканировать внешние аудио (папки Rus Sound/, Audio/ и т.д.) */
     scanExternalAudio: (
       videoFolderPath: string,
-      videoFiles: Array<{ path: string; episodeNumber: number }>
+      videoFiles: Array<{ path: string; episodeNumber: number }>,
     ): Promise<ExternalAudioScanResult> => ipcRenderer.invoke('fs:scanExternalAudio', videoFolderPath, videoFiles),
 
     /** Получить метаданные изображения (размеры, blur placeholder) */
     getImageMetadata: (
-      filePath: string
+      filePath: string,
     ): Promise<{
       success: boolean
       width?: number
@@ -254,7 +254,7 @@ const electronAPI = {
     previewShift: (
       inputPath: string,
       offsetMs: number,
-      limit?: number
+      limit?: number,
     ): Promise<{
       events: Array<{ start: string; end: string; text: string }>
       total: number
@@ -303,7 +303,7 @@ const electronAPI = {
 
     /** Получить детали аниме по Shikimori ID */
     getDetails: (
-      shikimoriId: number
+      shikimoriId: number,
     ): Promise<{
       success: boolean
       data?: ShikimoriAnimeDetails
@@ -314,7 +314,7 @@ const electronAPI = {
     downloadPoster: (
       posterUrl: string,
       animeId: string,
-      options?: { fileName?: string; savePath?: string }
+      options?: { fileName?: string; savePath?: string },
     ): Promise<{
       success: boolean
       localPath?: string
@@ -335,7 +335,7 @@ const electronAPI = {
 
     /** Получить аниме со связанными */
     getWithRelated: (
-      shikimoriId: number
+      shikimoriId: number,
     ): Promise<{
       success: boolean
       data?: ShikimoriAnimeWithRelated
@@ -344,7 +344,7 @@ const electronAPI = {
 
     /** Получить расширенные метаданные (v0.5.1) */
     getExtended: (
-      shikimoriId: number
+      shikimoriId: number,
     ): Promise<{
       success: boolean
       data?: ShikimoriAnimeExtended
@@ -356,7 +356,7 @@ const electronAPI = {
   franchise: {
     /** Получить связанные аниме из Shikimori (GraphQL) */
     fetchRelated: (
-      shikimoriId: number
+      shikimoriId: number,
     ): Promise<{
       success: boolean
       data?: {
@@ -368,7 +368,7 @@ const electronAPI = {
 
     /** Получить граф франшизы из REST API Shikimori */
     fetchGraph: (
-      shikimoriId: number
+      shikimoriId: number,
     ): Promise<{
       success: boolean
       data?: {
@@ -402,7 +402,7 @@ const electronAPI = {
           episodeNumber: number
           episodeName?: string
         }
-      }
+      },
     ): Promise<{
       success: boolean
       manifestPath?: string
@@ -412,7 +412,7 @@ const electronAPI = {
 
     /** Прочитать существующий манифест */
     read: (
-      manifestPath: string
+      manifestPath: string,
     ): Promise<{
       success: boolean
       data?: EpisodeManifest
@@ -425,7 +425,7 @@ const electronAPI = {
       navigation: {
         nextEpisode?: { id: string; manifestPath: string }
         prevEpisode?: { id: string; manifestPath: string }
-      }
+      },
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('manifest:updateNavigation', manifestPath, navigation),
 
@@ -435,7 +435,7 @@ const electronAPI = {
       thumbnails: {
         vttPath: string
         spritePath: string
-      }
+      },
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('manifest:updateThumbnails', manifestPath, thumbnails),
   },
@@ -466,7 +466,7 @@ const electronAPI = {
     transcodeAudioVBR: (
       input: string,
       output: string,
-      options: AudioTranscodeVBROptions
+      options: AudioTranscodeVBROptions,
     ): Promise<OperationResult & { outputPath?: string }> =>
       ipcRenderer.invoke('ffmpeg:transcodeAudioVBR', input, output, options),
 
@@ -493,7 +493,7 @@ const electronAPI = {
         fullWidth?: number
         quality?: number
         skipStartPercent?: number
-      }
+      },
     ): Promise<{
       success: boolean
       thumbnails: string[]
@@ -512,7 +512,7 @@ const electronAPI = {
         frameHeight?: number
         columns?: number
         quality?: number
-      }
+      },
     ): Promise<{
       success: boolean
       spritePath: string
@@ -523,8 +523,8 @@ const electronAPI = {
 
     /** Подписка на прогресс FFmpeg операций */
     onProgress: (
-      callback: (data: TranscodeProgress & { type: string; profileName?: string }) => void
-    ): (() => void) => {
+      callback: (data: TranscodeProgress & { type: string; profileName?: string }) => void,
+    ): () => void => {
       const handler = (_event: unknown, data: TranscodeProgress & { type: string; profileName?: string }) =>
         callback(data)
       ipcRenderer.on('ffmpeg:progress', handler)
@@ -544,7 +544,7 @@ const electronAPI = {
     /** Добавить файл в очередь */
     addToQueue: (
       filePath: string,
-      settings?: PerFileTranscodeSettings
+      settings?: PerFileTranscodeSettings,
     ): Promise<{ success: boolean; id?: string; error?: string }> =>
       ipcRenderer.invoke('transcode:addToQueue', filePath, settings),
 
@@ -607,7 +607,7 @@ const electronAPI = {
       ipcRenderer.invoke('transcode:setLibraryPath', libraryPath),
 
     /** Подписка на прогресс элемента */
-    onProgress: (callback: (id: string, progress: TranscodeProgressExtended) => void): (() => void) => {
+    onProgress: (callback: (id: string, progress: TranscodeProgressExtended) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, id: string, progress: TranscodeProgressExtended) =>
         callback(id, progress)
       ipcRenderer.on('transcode:progress', handler)
@@ -615,7 +615,7 @@ const electronAPI = {
     },
 
     /** Подписка на изменение статуса */
-    onStatusChange: (callback: (id: string, status: QueueItemStatus, error?: string) => void): (() => void) => {
+    onStatusChange: (callback: (id: string, status: QueueItemStatus, error?: string) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, id: string, status: QueueItemStatus, error?: string) =>
         callback(id, status, error)
       ipcRenderer.on('transcode:statusChange', handler)
@@ -623,21 +623,21 @@ const electronAPI = {
     },
 
     /** Подписка на изменение очереди */
-    onQueueChange: (callback: (queue: QueueItem[]) => void): (() => void) => {
+    onQueueChange: (callback: (queue: QueueItem[]) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, queue: QueueItem[]) => callback(queue)
       ipcRenderer.on('transcode:queueChange', handler)
       return () => ipcRenderer.removeListener('transcode:queueChange', handler)
     },
 
     /** Подписка на начало обработки */
-    onProcessingStarted: (callback: () => void): (() => void) => {
+    onProcessingStarted: (callback: () => void): () => void => {
       const handler = () => callback()
       ipcRenderer.on('transcode:processingStarted', handler)
       return () => ipcRenderer.removeListener('transcode:processingStarted', handler)
     },
 
     /** Подписка на завершение обработки */
-    onProcessingCompleted: (callback: () => void): (() => void) => {
+    onProcessingCompleted: (callback: () => void): () => void => {
       const handler = () => callback()
       ipcRenderer.on('transcode:processingCompleted', handler)
       return () => ipcRenderer.removeListener('transcode:processingCompleted', handler)
@@ -717,14 +717,14 @@ const electronAPI = {
     // === Подписки на события ===
 
     /** Подписка на агрегированный прогресс */
-    onAggregatedProgress: (callback: (progress: AggregatedProgress) => void): (() => void) => {
+    onAggregatedProgress: (callback: (progress: AggregatedProgress) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, progress: AggregatedProgress) => callback(progress)
       ipcRenderer.on('parallelTranscode:aggregatedProgress', handler)
       return () => ipcRenderer.removeListener('parallelTranscode:aggregatedProgress', handler)
     },
 
     /** Подписка на прогресс видео */
-    onVideoProgress: (callback: (taskId: string, progress: TranscodeProgressExtended) => void): (() => void) => {
+    onVideoProgress: (callback: (taskId: string, progress: TranscodeProgressExtended) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, taskId: string, progress: TranscodeProgressExtended) =>
         callback(taskId, progress)
       ipcRenderer.on('parallelTranscode:videoProgress', handler)
@@ -732,7 +732,7 @@ const electronAPI = {
     },
 
     /** Подписка на прогресс аудио */
-    onAudioProgress: (callback: (taskId: string, progress: TranscodeProgressExtended) => void): (() => void) => {
+    onAudioProgress: (callback: (taskId: string, progress: TranscodeProgressExtended) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, taskId: string, progress: TranscodeProgressExtended) =>
         callback(taskId, progress)
       ipcRenderer.on('parallelTranscode:audioProgress', handler)
@@ -749,9 +749,9 @@ const electronAPI = {
           ffmpegCommand?: string
           transcodeDurationMs?: number
           activeGpuWorkers?: number
-        }
-      ) => void
-    ): (() => void) => {
+        },
+      ) => void,
+    ): () => void => {
       const handler = (
         _event: Electron.IpcRendererEvent,
         itemId: string,
@@ -761,7 +761,7 @@ const electronAPI = {
           ffmpegCommand?: string
           transcodeDurationMs?: number
           activeGpuWorkers?: number
-        }
+        },
       ) => callback(itemId, episodeId, outputPath, meta)
       ipcRenderer.on('parallelTranscode:videoCompleted', handler)
       return () => ipcRenderer.removeListener('parallelTranscode:videoCompleted', handler)
@@ -769,8 +769,8 @@ const electronAPI = {
 
     /** Подписка на завершение аудиодорожки */
     onAudioTrackCompleted: (
-      callback: (trackId: string, outputPath: string, episodeId: string) => void
-    ): (() => void) => {
+      callback: (trackId: string, outputPath: string, episodeId: string) => void,
+    ): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, trackId: string, outputPath: string, episodeId: string) =>
         callback(trackId, outputPath, episodeId)
       ipcRenderer.on('parallelTranscode:audioTrackCompleted', handler)
@@ -779,28 +779,28 @@ const electronAPI = {
 
     /** Подписка на завершение элемента (видео + все аудио готовы) */
     onItemCompleted: (
-      callback: (itemId: string, episodeId: string, success: boolean, errorMessage?: string) => void
-    ): (() => void) => {
+      callback: (itemId: string, episodeId: string, success: boolean, errorMessage?: string) => void,
+    ): () => void => {
       const handler = (
         _event: Electron.IpcRendererEvent,
         itemId: string,
         episodeId: string,
         success: boolean,
-        errorMessage?: string
+        errorMessage?: string,
       ) => callback(itemId, episodeId, success, errorMessage)
       ipcRenderer.on('parallelTranscode:itemCompleted', handler)
       return () => ipcRenderer.removeListener('parallelTranscode:itemCompleted', handler)
     },
 
     /** Подписка на ошибку батча */
-    onBatchError: (callback: (error: string) => void): (() => void) => {
+    onBatchError: (callback: (error: string) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, error: string) => callback(error)
       ipcRenderer.on('parallelTranscode:batchError', handler)
       return () => ipcRenderer.removeListener('parallelTranscode:batchError', handler)
     },
 
     /** Подписка на добавление элемента */
-    onItemAdded: (callback: (itemId: string, episodeId: string) => void): (() => void) => {
+    onItemAdded: (callback: (itemId: string, episodeId: string) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, itemId: string, episodeId: string) =>
         callback(itemId, episodeId)
       ipcRenderer.on('parallelTranscode:itemAdded', handler)
@@ -808,7 +808,7 @@ const electronAPI = {
     },
 
     /** Подписка на ошибку элемента */
-    onItemError: (callback: (itemId: string, episodeId: string, error: string) => void): (() => void) => {
+    onItemError: (callback: (itemId: string, episodeId: string, error: string) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, itemId: string, episodeId: string, error: string) =>
         callback(itemId, episodeId, error)
       ipcRenderer.on('parallelTranscode:itemError', handler)
@@ -816,7 +816,7 @@ const electronAPI = {
     },
 
     /** Подписка на ошибку задачи */
-    onTaskError: (callback: (taskId: string, type: 'video' | 'audio', error: string) => void): (() => void) => {
+    onTaskError: (callback: (taskId: string, type: 'video' | 'audio', error: string) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, taskId: string, type: 'video' | 'audio', error: string) =>
         callback(taskId, type, error)
       ipcRenderer.on('parallelTranscode:taskError', handler)
@@ -824,21 +824,21 @@ const electronAPI = {
     },
 
     /** Подписка на паузу */
-    onPaused: (callback: () => void): (() => void) => {
+    onPaused: (callback: () => void): () => void => {
       const handler = () => callback()
       ipcRenderer.on('parallelTranscode:paused', handler)
       return () => ipcRenderer.removeListener('parallelTranscode:paused', handler)
     },
 
     /** Подписка на возобновление */
-    onResumed: (callback: () => void): (() => void) => {
+    onResumed: (callback: () => void): () => void => {
       const handler = () => callback()
       ipcRenderer.on('parallelTranscode:resumed', handler)
       return () => ipcRenderer.removeListener('parallelTranscode:resumed', handler)
     },
 
     /** Подписка на завершение batch */
-    onBatchCompleted: (callback: (batchId: string, success: boolean) => void): (() => void) => {
+    onBatchCompleted: (callback: (batchId: string, success: boolean) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, batchId: string, success: boolean) =>
         callback(batchId, success)
       ipcRenderer.on('parallelTranscode:batchCompleted', handler)
@@ -856,7 +856,7 @@ const electronAPI = {
       ipcRenderer.invoke('parallelTranscode:getAllVmafProgress'),
 
     /** Подписка на VMAF прогресс */
-    onVmafProgress: (callback: (itemId: string, progress: unknown) => void): (() => void) => {
+    onVmafProgress: (callback: (itemId: string, progress: unknown) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, itemId: string, progress: unknown) =>
         callback(itemId, progress)
       ipcRenderer.on('parallelTranscode:vmafProgress', handler)
@@ -888,7 +888,7 @@ const electronAPI = {
 
     /** Получить логи конкретной видео-задачи */
     getVideoTaskLogs: (
-      taskId: string
+      taskId: string,
     ): Promise<{
       success: boolean
       data?: Array<{ timestamp: number; taskId: string; level: 'info' | 'warning' | 'error'; message: string }>
@@ -907,13 +907,13 @@ const electronAPI = {
     onVideoLogEntry: (
       callback: (
         taskId: string,
-        entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string }
-      ) => void
-    ): (() => void) => {
+        entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string },
+      ) => void,
+    ): () => void => {
       const handler = (
         _event: Electron.IpcRendererEvent,
         taskId: string,
-        entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string }
+        entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string },
       ) => callback(taskId, entry)
       ipcRenderer.on('parallelTranscode:videoLogEntry', handler)
       return () => ipcRenderer.removeListener('parallelTranscode:videoLogEntry', handler)
@@ -935,11 +935,11 @@ const electronAPI = {
 
     /** Подписка на изменение настроек трея из main process (например, из контекстного меню) */
     onSettingsChanged: (
-      callback: (settings: { minimizeToTray: boolean; closeToTray: boolean; showTrayNotification: boolean }) => void
-    ): (() => void) => {
+      callback: (settings: { minimizeToTray: boolean; closeToTray: boolean; showTrayNotification: boolean }) => void,
+    ): () => void => {
       const handler = (
         _event: Electron.IpcRendererEvent,
-        settings: { minimizeToTray: boolean; closeToTray: boolean; showTrayNotification: boolean }
+        settings: { minimizeToTray: boolean; closeToTray: boolean; showTrayNotification: boolean },
       ) => callback(settings)
       ipcRenderer.on('tray:settingsChanged', handler)
       return () => ipcRenderer.removeListener('tray:settingsChanged', handler)
@@ -961,21 +961,21 @@ const electronAPI = {
     isActive: (): Promise<boolean> => ipcRenderer.invoke('export:isActive'),
 
     /** Подписка на прогресс экспорта */
-    onProgress: (callback: (progress: SeriesExportProgress) => void): (() => void) => {
+    onProgress: (callback: (progress: SeriesExportProgress) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, progress: SeriesExportProgress) => callback(progress)
       ipcRenderer.on('export:progress', handler)
       return () => ipcRenderer.removeListener('export:progress', handler)
     },
 
     /** Подписка на завершение экспорта */
-    onCompleted: (callback: (result: ExportResult) => void): (() => void) => {
+    onCompleted: (callback: (result: ExportResult) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, result: ExportResult) => callback(result)
       ipcRenderer.on('export:completed', handler)
       return () => ipcRenderer.removeListener('export:completed', handler)
     },
 
     /** Подписка на ошибку экспорта */
-    onError: (callback: (error: string) => void): (() => void) => {
+    onError: (callback: (error: string) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, error: string) => callback(error)
       ipcRenderer.on('export:error', handler)
       return () => ipcRenderer.removeListener('export:error', handler)
@@ -988,14 +988,14 @@ const electronAPI = {
     calculate: (
       encoded: string,
       original: string,
-      options?: VmafOptions
+      options?: VmafOptions,
     ): Promise<{ success: boolean; data?: VmafResult; error?: string }> =>
       ipcRenderer.invoke('vmaf:calculate', encoded, original, options),
 
     /** Пакетный расчёт VMAF для нескольких пар */
     calculateBatch: (
       pairs: Array<[string, string]>,
-      options?: VmafOptions
+      options?: VmafOptions,
     ): Promise<{ success: boolean; data?: VmafResult[]; error?: string }> =>
       ipcRenderer.invoke('vmaf:calculateBatch', pairs, options),
 
@@ -1010,7 +1010,7 @@ const electronAPI = {
       videoOptions: Omit<VideoTranscodeOptions, 'cq'>,
       options?: Partial<CqSearchOptions>,
       preferCpu?: boolean,
-      itemId?: string
+      itemId?: string,
     ): Promise<{ success: boolean; data?: CqSearchResult; error?: string }> =>
       ipcRenderer.invoke('vmaf:findOptimalCQ', inputPath, videoOptions, options, preferCpu ?? false, itemId),
 
@@ -1018,7 +1018,7 @@ const electronAPI = {
     extractSamples: (
       inputPath: string,
       outputDir: string,
-      config?: Partial<SampleConfig>
+      config?: Partial<SampleConfig>,
     ): Promise<{ success: boolean; data?: string[]; error?: string }> =>
       ipcRenderer.invoke('vmaf:extractSamples', inputPath, outputDir, config),
 
@@ -1027,7 +1027,7 @@ const electronAPI = {
       ipcRenderer.invoke('vmaf:cleanup', sampleDir),
 
     /** Подписка на прогресс поиска CQ */
-    onProgress: (callback: (progress: CqSearchProgress) => void): (() => void) => {
+    onProgress: (callback: (progress: CqSearchProgress) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, progress: CqSearchProgress) => callback(progress)
       ipcRenderer.on('vmaf:progress', handler)
       return () => ipcRenderer.removeListener('vmaf:progress', handler)
@@ -1096,7 +1096,7 @@ const electronAPI = {
     updateStatus: (
       itemId: string,
       status: ImportQueueStatus,
-      error?: string
+      error?: string,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('import-queue:update-status', itemId, status, error),
 
@@ -1106,7 +1106,7 @@ const electronAPI = {
       progress: number,
       currentFileName?: string,
       currentStage?: string,
-      detailProgress?: ImportQueueDetailProgress
+      detailProgress?: ImportQueueDetailProgress,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(
         'import-queue:update-progress',
@@ -1114,13 +1114,13 @@ const electronAPI = {
         progress,
         currentFileName,
         currentStage,
-        detailProgress
+        detailProgress,
       ),
 
     /** Обновить VMAF прогресс */
     updateVmafProgress: (
       itemId: string,
-      vmafProgress: ImportQueueVmafProgress
+      vmafProgress: ImportQueueVmafProgress,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('import-queue:update-vmaf-progress', itemId, vmafProgress),
 
@@ -1135,7 +1135,7 @@ const electronAPI = {
     // === Подписки на события (main → renderer) ===
 
     /** Подписка на изменение состояния очереди */
-    onStateChanged: (callback: (state: ImportQueueState) => void): (() => void) => {
+    onStateChanged: (callback: (state: ImportQueueState) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, state: ImportQueueState) => callback(state)
       ipcRenderer.on('import-queue:state-changed', handler)
       return () => ipcRenderer.removeListener('import-queue:state-changed', handler)
@@ -1143,11 +1143,11 @@ const electronAPI = {
 
     /** Подписка на изменение статуса item */
     onItemStatus: (
-      callback: (data: { itemId: string; status: ImportQueueStatus; error?: string }) => void
-    ): (() => void) => {
+      callback: (data: { itemId: string; status: ImportQueueStatus; error?: string }) => void,
+    ): () => void => {
       const handler = (
         _event: Electron.IpcRendererEvent,
-        data: { itemId: string; status: ImportQueueStatus; error?: string }
+        data: { itemId: string; status: ImportQueueStatus; error?: string },
       ) => callback(data)
       ipcRenderer.on('import-queue:item-status', handler)
       return () => ipcRenderer.removeListener('import-queue:item-status', handler)
@@ -1162,8 +1162,8 @@ const electronAPI = {
         currentStage?: string
         detailProgress?: ImportQueueDetailProgress
         vmafProgress?: ImportQueueVmafProgress
-      }) => void
-    ): (() => void) => {
+      }) => void,
+    ): () => void => {
       const handler = (
         _event: Electron.IpcRendererEvent,
         data: {
@@ -1173,7 +1173,7 @@ const electronAPI = {
           currentStage?: string
           detailProgress?: ImportQueueDetailProgress
           vmafProgress?: ImportQueueVmafProgress
-        }
+        },
       ) => callback(data)
       ipcRenderer.on('import-queue:item-progress', handler)
       return () => ipcRenderer.removeListener('import-queue:item-progress', handler)
@@ -1197,7 +1197,7 @@ const electronAPI = {
     /** Обновить шаблон */
     update: (
       id: string,
-      data: ImportTemplateUpdateData
+      data: ImportTemplateUpdateData,
     ): Promise<{ success: boolean; data?: ImportTemplate; error?: string }> =>
       ipcRenderer.invoke('templates:update', id, data),
 
@@ -1245,7 +1245,7 @@ const electronAPI = {
   // === События (legacy) ===
   on: {
     /** Подписка на прогресс транскодирования (legacy) */
-    transcodeProgress: (callback: (progress: TranscodeProgress & { type: string }) => void): (() => void) => {
+    transcodeProgress: (callback: (progress: TranscodeProgress & { type: string }) => void): () => void => {
       const handler = (_event: Electron.IpcRendererEvent, progress: TranscodeProgress & { type: string }) =>
         callback(progress)
       ipcRenderer.on('ffmpeg:progress', handler)
@@ -1270,13 +1270,13 @@ const electronAPI = {
         shikimoriId?: number | null
         isBdRemux?: boolean
         fallbackInfo?: { name: string; originalName?: string; year?: number }
-      }
+      },
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('backup:updateAnimeMeta', animeFolder, updates),
 
     /** Прочитать anime.meta.json */
     readAnimeMeta: (
-      animeFolder: string
+      animeFolder: string,
     ): Promise<{
       success: boolean
       data?: {
@@ -1299,7 +1299,7 @@ const electronAPI = {
 
     /** Быстрое сканирование библиотеки — только статистика */
     quickScanLibrary: (
-      libraryPath: string
+      libraryPath: string,
     ): Promise<{
       success: boolean
       stats?: {
@@ -1313,7 +1313,7 @@ const electronAPI = {
     /** Полное сканирование библиотеки для восстановления */
     scanLibraryForRestore: (
       libraryPath: string,
-      loadShikimori?: boolean
+      loadShikimori?: boolean,
     ): Promise<{
       success: boolean
       animes: unknown[]
@@ -1338,7 +1338,7 @@ const electronAPI = {
       libraryPath: string,
       animeFolderPath: string,
       watchStatus: 'NOT_STARTED' | 'WATCHING' | 'COMPLETED' | 'ON_HOLD' | 'DROPPED' | 'PLANNED',
-      watchedAt?: string | null
+      watchedAt?: string | null,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('userData:updateWatchStatus', libraryPath, animeFolderPath, watchStatus, watchedAt),
 
@@ -1346,7 +1346,7 @@ const electronAPI = {
     updateUserRating: (
       libraryPath: string,
       animeFolderPath: string,
-      userRating: number | null
+      userRating: number | null,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('userData:updateUserRating', libraryPath, animeFolderPath, userRating),
 
@@ -1359,7 +1359,7 @@ const electronAPI = {
         audioDubGroup?: string
         subtitleLanguage?: string
         subtitleDubGroup?: string
-      }
+      },
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('userData:updateTrackPreferences', libraryPath, animeFolderPath, trackPreferences),
 
@@ -1379,7 +1379,7 @@ const electronAPI = {
     readEpisodeProgress: (
       libraryPath: string,
       animeFolderPath: string,
-      episodeFolderPath: string
+      episodeFolderPath: string,
     ): Promise<{
       success: boolean
       data?: {
@@ -1396,7 +1396,7 @@ const electronAPI = {
     /** Прочитать данные аниме пользователя */
     readAnimeData: (
       libraryPath: string,
-      animeFolderPath: string
+      animeFolderPath: string,
     ): Promise<{
       success: boolean
       data?: {
@@ -1417,7 +1417,7 @@ const electronAPI = {
     deleteEpisodeProgress: (
       libraryPath: string,
       animeFolderPath: string,
-      episodeFolderPath: string
+      episodeFolderPath: string,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('userData:deleteEpisodeProgress', libraryPath, animeFolderPath, episodeFolderPath),
 
@@ -1458,6 +1458,10 @@ const electronAPI = {
     /** Получить версию приложения */
     getVersion: (): Promise<string> => ipcRenderer.invoke('updater:version'),
 
+    /** Получить changelog из GitHub Releases */
+    getChangelog: (version: string): Promise<{ success: boolean; changelog?: string | null; error?: string }> =>
+      ipcRenderer.invoke('updater:getChangelog', version),
+
     /** Подписка на изменение статуса обновления */
     onStatusChange: (
       callback: (status: {
@@ -1467,8 +1471,8 @@ const electronAPI = {
         error: string | null
         downloadSpeed: number
         downloadEta: number
-      }) => void
-    ): (() => void) => {
+      }) => void,
+    ): () => void => {
       const handler = (
         _event: Electron.IpcRendererEvent,
         status: {
@@ -1478,10 +1482,18 @@ const electronAPI = {
           error: string | null
           downloadSpeed: number
           downloadEta: number
-        }
+        },
       ) => callback(status)
       ipcRenderer.on('updater:status', handler)
       return () => ipcRenderer.removeListener('updater:status', handler)
+    },
+
+    /** Подписка на получение changelog */
+    onChangelog: (callback: (data: { version: string; changelog: string }) => void): () => void => {
+      const handler = (_event: Electron.IpcRendererEvent, data: { version: string; changelog: string }) =>
+        callback(data)
+      ipcRenderer.on('updater:changelog', handler)
+      return () => ipcRenderer.removeListener('updater:changelog', handler)
     },
   },
 }
