@@ -11,11 +11,28 @@ const standaloneRoot = path.join(__dirname, '..')
 const isMonorepo = fs.existsSync(path.join(standaloneRoot, 'project.json'))
 
 // Debug вывод для CI
+console.log('[next.config.js] ==== DEBUG START ====')
 console.log('[next.config.js] __dirname:', __dirname)
+console.log('[next.config.js] process.cwd():', process.cwd())
 console.log('[next.config.js] standaloneRoot:', standaloneRoot)
 console.log('[next.config.js] monorepoRoot:', monorepoRoot)
 console.log('[next.config.js] isMonorepo:', isMonorepo)
 console.log('[next.config.js] turbopack.root будет:', standaloneRoot)
+
+// Проверяем существование next/package.json по разным путям
+const possibleNextPaths = [
+  path.join(standaloneRoot, 'node_modules', 'next', 'package.json'), // animatrona-build/node_modules/next/package.json
+  path.join(__dirname, 'node_modules', 'next', 'package.json'), // renderer/node_modules/next/package.json
+  path.join(monorepoRoot, 'node_modules', 'next', 'package.json'), // lena/node_modules/next/package.json
+]
+
+console.log('[next.config.js] Проверка next/package.json:')
+possibleNextPaths.forEach((p) => {
+  const exists = fs.existsSync(p)
+  console.log(`  ${exists ? '✓' : '✗'} ${p}`)
+})
+console.log('[next.config.js] ==== DEBUG END ====')
+console.log()
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
