@@ -10,6 +10,13 @@ const standaloneRoot = path.join(__dirname, '..')
 // Если есть project.json → монорепо (Nx workspace), если нет → standalone (project.json исключён из rsync)
 const isMonorepo = fs.existsSync(path.join(standaloneRoot, 'project.json'))
 
+// Debug вывод для CI
+console.log('[next.config.js] __dirname:', __dirname)
+console.log('[next.config.js] standaloneRoot:', standaloneRoot)
+console.log('[next.config.js] monorepoRoot:', monorepoRoot)
+console.log('[next.config.js] isMonorepo:', isMonorepo)
+console.log('[next.config.js] turbopack.root будет:', standaloneRoot)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Standalone для Electron с HTTP сервером
@@ -69,9 +76,11 @@ const nextConfig = {
 
   // Turbopack конфигурация
   turbopack: {
-    // Монорепо: корень приложения (apps/animatrona/) для доступа к shared/
-    // Standalone: сам renderer/ (где находится next.config.js)
-    root: isMonorepo ? path.join(__dirname, '..') : __dirname,
+    // Указываем на корень где находится package.json и node_modules/
+    // Это standaloneRoot (один уровень выше renderer/)
+    // - Монорепо: apps/animatrona/
+    // - Standalone: animatrona-build/
+    root: standaloneRoot,
   },
 }
 
