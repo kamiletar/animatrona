@@ -69,9 +69,10 @@ const nextConfig = {
 
   // Turbopack конфигурация
   turbopack: {
-    // Явно задаём корень проекта (один уровень вверх от renderer/)
-    // Это нужно когда Next.js запускается из renderer/ но node_modules в корне
-    root: standaloneRoot,
+    // Явно задаём корень проекта ОТНОСИТЕЛЬНО от cwd (renderer/)
+    // Когда запускаем cd renderer && next build, cwd = renderer/
+    // Поэтому root должен быть ".." (один уровень вверх)
+    root: '..',
   },
 }
 
