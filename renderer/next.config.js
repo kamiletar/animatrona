@@ -67,17 +67,12 @@ const nextConfig = {
     ],
   },
 
-  // Turbopack конфигурация — только для монорепо
-  // В standalone не указываем root, пусть Next.js автоматически определит
-  ...(isMonorepo
-    ? {
-      turbopack: {
-        // В монорепо указываем корень приложения (apps/animatrona/)
-        // чтобы Next.js мог найти shared/ и другие ресурсы
-        root: path.join(__dirname, '..'),
-      },
-    }
-    : {}),
+  // Turbopack конфигурация
+  turbopack: {
+    // Монорепо: корень приложения (apps/animatrona/) для доступа к shared/
+    // Standalone: сам renderer/ (где находится next.config.js)
+    root: isMonorepo ? path.join(__dirname, '..') : __dirname,
+  },
 }
 
 module.exports = nextConfig
