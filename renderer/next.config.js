@@ -6,9 +6,10 @@ const fs = require('fs')
 // Standalone: __dirname = renderer → ..
 const monorepoRoot = path.join(__dirname, '../../../')
 const standaloneRoot = path.join(__dirname, '..')
-const outputFileTracingRoot = fs.existsSync(path.join(monorepoRoot, 'nx.json'))
-  ? monorepoRoot
-  : standaloneRoot
+// Проверяем project.json (Nx конфиг) в корне animatrona
+// Если есть project.json → монорепо (Nx workspace), если нет → standalone (project.json исключён из rsync)
+const isMonorepo = fs.existsSync(path.join(standaloneRoot, 'project.json'))
+const outputFileTracingRoot = isMonorepo ? monorepoRoot : standaloneRoot
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
