@@ -1,0 +1,36 @@
+{
+  "name": "@lena/form-components",
+  "version": "0.54.1",
+  "description": "Reusable form components library with TanStack Form and Chakra UI integration",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@lena/source": "./src/index.ts",
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./offline": {
+      "@lena/source": "./src/lib/offline/index.ts",
+      "types": "./src/lib/offline/index.ts",
+      "import": "./src/lib/offline/index.ts",
+      "default": "./src/lib/offline/index.ts"
+    }
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": ">=3.0.0",
+    "@dnd-kit/core": ">=6.0.0",
+    "@dnd-kit/sortable": ">=10.0.0",
+    "@dnd-kit/utilities": ">=3.0.0",
+    "@tanstack/react-form": ">=1.0.0",
+    "framer-motion": ">=10.0.0",
+    "react": ">=18.0.0",
+    "use-mask-input": ">=3.0.0"
+  },
+  "dependencies": {
+    "@tiptap/extension-image": "^3.14.0"
+  }
+}
