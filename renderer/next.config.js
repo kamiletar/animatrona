@@ -67,8 +67,12 @@ const nextConfig = {
     ],
   },
 
-  // Пустой turbopack конфиг чтобы избежать предупреждений
-  turbopack: {},
+  // Turbopack конфигурация
+  turbopack: {
+    // Явно задаём корень проекта (один уровень вверх от renderer/)
+    // Это нужно когда Next.js запускается из renderer/ но node_modules в корне
+    root: standaloneRoot,
+  },
 }
 
 module.exports = nextConfig
