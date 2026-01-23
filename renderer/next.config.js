@@ -3,21 +3,21 @@ const fs = require('fs')
 
 // Определяем outputFileTracingRoot в зависимости от окружения
 // Монорепо lena: __dirname = apps/animatrona/renderer → ../../../
-// Standalone: __dirname = renderer → ..
+// Standalone: не используем outputFileTracingRoot (не нужен для трейсинга)
 const monorepoRoot = path.join(__dirname, '../../../')
 const standaloneRoot = path.join(__dirname, '..')
 // Проверяем project.json (Nx конфиг) в корне animatrona
 // Если есть project.json → монорепо (Nx workspace), если нет → standalone (project.json исключён из rsync)
 const isMonorepo = fs.existsSync(path.join(standaloneRoot, 'project.json'))
-const outputFileTracingRoot = isMonorepo ? monorepoRoot : standaloneRoot
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Standalone для Electron с HTTP сервером
   output: 'standalone',
 
-  // Корень проекта — монорепо или standalone
-  outputFileTracingRoot,
+  // Корень проекта — только для монорепо (нужен для трейсинга @lena/* пакетов)
+  // Для standalone не используем (вызывает проблемы с project directory detection)
+  ...(isMonorepo ? { outputFileTracingRoot: monorepoRoot } : {}),
 
   // Оптимизация изображений через API route /api/image
   images: {
