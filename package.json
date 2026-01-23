@@ -1,6 +1,6 @@
 {
   "name": "@lena/animatrona",
-  "version": "0.21.16",
+  "version": "0.21.17",
   "private": true,
   "description": "Desktop application for anime transcoding and viewing with IPFS support",
   "author": "Kami Letar",

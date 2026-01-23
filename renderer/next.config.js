@@ -69,10 +69,12 @@ const nextConfig = {
 
   // Turbopack конфигурация
   turbopack: {
-    // Явно задаём корень проекта ОТНОСИТЕЛЬНО от cwd (renderer/)
-    // Когда запускаем cd renderer && next build, cwd = renderer/
-    // Поэтому root должен быть ".." (один уровень вверх)
-    root: '..',
+    // Явно задаём корень проекта АБСОЛЮТНЫМ путём
+    // __dirname в renderer/next.config.js:
+    // - Монорепо: /path/to/lena/apps/animatrona/renderer
+    // - Standalone: /path/to/animatrona/renderer
+    // path.join(__dirname, '..') даёт корень приложения animatrona
+    root: path.join(__dirname, '..'),
   },
 }
 
