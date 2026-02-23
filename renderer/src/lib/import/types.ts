@@ -122,8 +122,6 @@ export interface ImportOptions {
   useCpuFallback?: boolean
   /** VMAF скор (если был подобран) */
   vmafScore?: number
-  /** Режим импорта одиночного файла (не папки) — не сканировать внешние субтитры/аудио */
-  isFileMode?: boolean
 }
 
 /** Расширенная информация о прогрессе транскодирования */

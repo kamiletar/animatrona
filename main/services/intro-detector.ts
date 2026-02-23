@@ -73,14 +73,6 @@ const OUTRO_ZONE_MAX_SEC = 600
 const MIN_CONSECUTIVE_MATCHES = Math.ceil(MIN_INTRO_DURATION / FP_POINT_DURATION)
 
 /**
- * Время опережения (секунды): алгоритм находит стабильное совпадение спустя
- * несколько секунд после реального начала темы (первые секунды содержат
- * специфичный для эпизода аудио-контент). Вычитаем из detected start,
- * чтобы кнопка появлялась в момент реального начала OP/ED.
- */
-const DETECTION_LEAD_SEC = 5
-
-/**
  * Основная функция определения OP/ED
  *
  * @param episodes — минимум 2 эпизода для сравнения
@@ -88,7 +80,7 @@ const DETECTION_LEAD_SEC = 5
  */
 export async function detectIntros(
   episodes: EpisodeInput[],
-  onProgress?: (percent: number, stage: string) => void
+  onProgress?: (percent: number, stage: string) => void,
 ): Promise<IntroDetectorResult[]> {
   if (!isFpcalcAvailable()) {
     log.warn('fpcalc недоступен, пропускаем определение OP/ED')
@@ -169,22 +161,18 @@ export async function detectIntros(
 
     return {
       episodeId: ep.id,
-      introStartMs:
-        intro && intro.duration >= MIN_INTRO_DURATION && intro.duration <= MAX_INTRO_DURATION
-          ? Math.round(Math.max(0, intro.start - DETECTION_LEAD_SEC) * 1000)
-          : null,
-      introEndMs:
-        intro && intro.duration >= MIN_INTRO_DURATION && intro.duration <= MAX_INTRO_DURATION
-          ? Math.round(intro.end * 1000)
-          : null,
-      outroStartMs:
-        outro && outro.duration >= MIN_INTRO_DURATION && outro.duration <= MAX_OUTRO_DURATION
-          ? Math.round(Math.max(0, outro.start - DETECTION_LEAD_SEC) * 1000)
-          : null,
-      outroEndMs:
-        outro && outro.duration >= MIN_INTRO_DURATION && outro.duration <= MAX_OUTRO_DURATION
-          ? Math.round(outro.end * 1000)
-          : null,
+      introStartMs: intro && intro.duration >= MIN_INTRO_DURATION && intro.duration <= MAX_INTRO_DURATION
+        ? Math.round(intro.start * 1000)
+        : null,
+      introEndMs: intro && intro.duration >= MIN_INTRO_DURATION && intro.duration <= MAX_INTRO_DURATION
+        ? Math.round(intro.end * 1000)
+        : null,
+      outroStartMs: outro && outro.duration >= MIN_INTRO_DURATION && outro.duration <= MAX_OUTRO_DURATION
+        ? Math.round(outro.start * 1000)
+        : null,
+      outroEndMs: outro && outro.duration >= MIN_INTRO_DURATION && outro.duration <= MAX_OUTRO_DURATION
+        ? Math.round(outro.end * 1000)
+        : null,
     }
   })
 
@@ -214,7 +202,7 @@ interface EpisodeMatch {
 function findBestMatches(
   episodes: EpisodeInput[],
   fingerprints: Map<string, Uint32Array>,
-  offsets: Map<string, number>
+  offsets: Map<string, number>,
 ): Map<string, EpisodeMatch> {
   // Для каждого эпизода собираем все найденные совпадения
   const allMatches = new Map<string, EpisodeMatch[]>()
@@ -423,8 +411,8 @@ function deduplicateRegions(regions: MatchRegion[]): MatchRegion[] {
   for (const region of sorted) {
     const overlaps = result.some(
       (existing) =>
-        (region.startA >= existing.startA && region.startA <= existing.endA) ||
-        (region.endA >= existing.startA && region.endA <= existing.endA)
+        (region.startA >= existing.startA && region.startA <= existing.endA)
+        || (region.endA >= existing.startA && region.endA <= existing.endA),
     )
 
     if (!overlaps) {

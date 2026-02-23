@@ -140,7 +140,6 @@ function queueEntryToImportOptions(entry: ImportQueueEntry): ImportOptions {
       entry.globalUseGpu === false ||
       entry.forceCpu === true,
     vmafScore: entry.vmafResult?.vmafScore,
-    isFileMode: entry.isFileMode,
   }
 }
 

@@ -131,7 +131,7 @@ export function ImportWizardDialog({
     // Если донор включён и есть совпадающие файлы — показываем шаг калибровки
     if (donorEnabled && donorFiles.length > 0) {
       const hasMatches = files.some(
-        (f) => f.selected && f.episodeNumber !== null && donorFiles.some((d) => d.episodeNumber === f.episodeNumber)
+        (f) => f.selected && f.episodeNumber !== null && donorFiles.some((d) => d.episodeNumber === f.episodeNumber),
       )
       if (hasMatches) {
         return DONOR_STEPS
@@ -273,7 +273,7 @@ export function ImportWizardDialog({
         return names[step - 1] || 'unknown'
       }
     },
-    [wizardSteps.length]
+    [wizardSteps.length],
   )
 
   /** Проверка возможности перехода на следующий шаг */
@@ -345,9 +345,11 @@ export function ImportWizardDialog({
         status: selectedAnime.status,
         episodes: selectedAnime.episodes,
         airedOn: selectedAnime.airedOn
-          ? `${selectedAnime.airedOn.year}-${String(selectedAnime.airedOn.month ?? 1).padStart(2, '0')}-${String(
-              selectedAnime.airedOn.day ?? 1
-            ).padStart(2, '0')}`
+          ? `${selectedAnime.airedOn.year}-${String(selectedAnime.airedOn.month ?? 1).padStart(2, '0')}-${
+            String(
+              selectedAnime.airedOn.day ?? 1,
+            ).padStart(2, '0')
+          }`
           : null,
       },
       files: files.map((f) => ({
@@ -366,47 +368,45 @@ export function ImportWizardDialog({
       // VMAF настройки (подбор CQ выполняется в очереди)
       vmafSettings: importSettings.vmafEnabled
         ? {
-            enabled: true,
-            targetVmaf: importSettings.targetVmaf ?? 94,
-          }
+          enabled: true,
+          targetVmaf: importSettings.targetVmaf ?? 94,
+        }
         : undefined,
       // Данные профиля кодирования для main process (VMAF и транскодирование)
       encodingProfile: importSettings.selectedProfile
         ? {
-            id: importSettings.selectedProfile.id,
-            name: importSettings.selectedProfile.name,
-            codec: importSettings.selectedProfile.codec as 'AV1' | 'HEVC' | 'H264',
-            useGpu: importSettings.selectedProfile.useGpu,
-            rateControl: importSettings.selectedProfile.rateControl as 'CONSTQP' | 'VBR',
-            cq: importSettings.selectedProfile.cq,
-            maxBitrate: importSettings.selectedProfile.maxBitrate,
-            preset: importSettings.selectedProfile.preset,
-            tune: importSettings.selectedProfile.tune,
-            multipass: importSettings.selectedProfile.multipass,
-            spatialAq: importSettings.selectedProfile.spatialAq,
-            temporalAq: importSettings.selectedProfile.temporalAq,
-            aqStrength: importSettings.selectedProfile.aqStrength,
-            lookahead: importSettings.selectedProfile.lookahead,
-            lookaheadLevel: importSettings.selectedProfile.lookaheadLevel,
-            gopSize: importSettings.selectedProfile.gopSize,
-            bRefMode: importSettings.selectedProfile.bRefMode,
-            bFrames: null, // Not in schema, use null
-            preferCpu: importSettings.selectedProfile.preferCpu ?? false,
-          }
+          id: importSettings.selectedProfile.id,
+          name: importSettings.selectedProfile.name,
+          codec: importSettings.selectedProfile.codec as 'AV1' | 'HEVC' | 'H264',
+          useGpu: importSettings.selectedProfile.useGpu,
+          rateControl: importSettings.selectedProfile.rateControl as 'CONSTQP' | 'VBR',
+          cq: importSettings.selectedProfile.cq,
+          maxBitrate: importSettings.selectedProfile.maxBitrate,
+          preset: importSettings.selectedProfile.preset,
+          tune: importSettings.selectedProfile.tune,
+          multipass: importSettings.selectedProfile.multipass,
+          spatialAq: importSettings.selectedProfile.spatialAq,
+          temporalAq: importSettings.selectedProfile.temporalAq,
+          aqStrength: importSettings.selectedProfile.aqStrength,
+          lookahead: importSettings.selectedProfile.lookahead,
+          lookaheadLevel: importSettings.selectedProfile.lookaheadLevel,
+          gopSize: importSettings.selectedProfile.gopSize,
+          bRefMode: importSettings.selectedProfile.bRefMode,
+          bFrames: null, // Not in schema, use null
+          preferCpu: importSettings.selectedProfile.preferCpu ?? false,
+        }
         : undefined,
       // Данные донора (если включён)
       donorPath: donorEnabled ? donorPath : null,
       donorFiles: donorEnabled
         ? donorFiles.map((f) => ({
-            path: f.path,
-            name: f.name,
-            episodeNumber: f.episodeNumber,
-            selected: f.selected,
-          }))
+          path: f.path,
+          name: f.name,
+          episodeNumber: f.episodeNumber,
+          selected: f.selected,
+        }))
         : [],
       syncOffset: donorEnabled ? syncOffset : 0,
-      // Режим импорта одиночного файла — не сканировать внешние субтитры
-      isFileMode,
       // Анализ файлов с рекомендациями по аудиодорожкам
       fileAnalyses: fileAnalyses
         .filter((a): a is typeof a & { file: { episodeNumber: number } } => a.file.episodeNumber !== null)
@@ -590,7 +590,9 @@ export function ImportWizardDialog({
                   {getLogicalStep(currentStep) === 'settings' && (
                     <Button colorPalette="purple" onClick={addToQueue} disabled={!canGoNext()}>
                       <Icon as={LuListPlus} mr={2} />В очередь (
-                      {fileAnalyses.filter((a) => a.mediaInfo !== null).length})
+                      {fileAnalyses.filter((a) =>
+                        a.mediaInfo !== null
+                      ).length})
                     </Button>
                   )}
                 </HStack>

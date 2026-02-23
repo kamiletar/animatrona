@@ -44,7 +44,7 @@ export class ImportProcessor {
     private mutations: ImportMutations,
     private dispatch: Dispatch,
     private refs: ImportRefs,
-    private queryClient: QueryClient
+    private queryClient: QueryClient,
   ) {}
 
   /**
@@ -101,7 +101,7 @@ export class ImportProcessor {
     } = options
 
     const selectedFiles = files.filter(
-      (f): f is ParsedFile & { episodeNumber: number } => f.selected && f.episodeNumber !== null
+      (f): f is ParsedFile & { episodeNumber: number } => f.selected && f.episodeNumber !== null,
     )
 
     if (selectedFiles.length === 0) {
@@ -175,10 +175,8 @@ export class ImportProcessor {
       const seasonNum = parsedInfo.seasonNumber ?? 1
       const seasonId = await this.createSeasonRecord(animeId, selectedAnime, parsedInfo)
 
-      // 5. Сканируем внешние субтитры (пропускаем при импорте одиночного файла)
-      const externalSubsMap = options.isFileMode
-        ? new Map<number, ExternalSubtitleMatch[]>()
-        : await this.scanExternalSubtitles(options.folderPath, selectedFiles)
+      // 5. Сканируем внешние субтитры
+      const externalSubsMap = await this.scanExternalSubtitles(options.folderPath, selectedFiles)
 
       // 6. Обрабатываем файлы
       this.setStage('demuxing')
@@ -305,7 +303,7 @@ export class ImportProcessor {
           demuxResult,
           fileAnalyses,
           file,
-          this.mutations
+          this.mutations,
         )
 
         // Создаём SubtitleTrack записи
@@ -317,7 +315,7 @@ export class ImportProcessor {
           episodeOutputDir,
           externalSubsMap,
           api,
-          this.mutations
+          this.mutations,
         )
 
         // Создаём Chapter записи (возвращает true если главы были в MKV)
@@ -392,10 +390,10 @@ export class ImportProcessor {
               outputPath: track.isExternal
                 ? `${episodeOutputDir}/audio_external_${track.id}.m4a`
                 : track.useStreamMapping
-                  ? `${episodeOutputDir}/audio_${track.streamIndex}_${track.language}.m4a`
-                  : track.passthrough
-                    ? track.inputPath // Passthrough: файл уже готов после demux
-                    : track.inputPath.replace(/\.\w+$/, '.m4a'),
+                ? `${episodeOutputDir}/audio_${track.streamIndex}_${track.language}.m4a`
+                : track.passthrough
+                ? track.inputPath // Passthrough: файл уже готов после demux
+                : track.inputPath.replace(/\.\w+$/, '.m4a'),
               options: { targetBitrate: 256 },
               useStreamMapping: track.useStreamMapping,
               syncOffset: track.isDonor && syncOffset ? syncOffset : undefined,
@@ -425,7 +423,7 @@ export class ImportProcessor {
           postProcessDataMap,
           electronApi,
           videoMaxConcurrent,
-          audioMaxConcurrent
+          audioMaxConcurrent,
         )
 
         // 8. Пост-обработка
@@ -435,7 +433,7 @@ export class ImportProcessor {
 
       // 8.5. Автоопределение OP/ED (если нет глав из MKV)
       console.log(
-        `[ImportProcessor] Checking intro detection requirements: ${episodesWithoutChapters.length} candidates`
+        `[ImportProcessor] Checking intro detection requirements: ${episodesWithoutChapters.length} candidates`,
       )
 
       if (episodesWithoutChapters.length >= 2 && electronApi.introDetector) {
@@ -449,7 +447,7 @@ export class ImportProcessor {
               id: ep.id,
               sourcePath: ep.sourcePath,
               duration: ep.durationMs,
-            }))
+            })),
           )
 
           // Создаём Chapter записи для найденных OP/ED
@@ -560,7 +558,7 @@ export class ImportProcessor {
         if (!deleted) {
           console.warn(
             '[ImportFlow] ⚠️ Не удалось удалить папку, удалите вручную:',
-            this.refs.createdAnimeFolder.current
+            this.refs.createdAnimeFolder.current,
           )
         }
       }
@@ -619,7 +617,7 @@ export class ImportProcessor {
   private async prepareAnimeFolder(
     libraryPath: string,
     animeName: string,
-    useCpuFallback?: boolean
+    useCpuFallback?: boolean,
   ): Promise<{ folderPath: string; ffmpegVersion?: string; hardwareModel?: string }> {
     // Получаем версию FFmpeg и модель оборудования
     let ffmpegVersion: string | undefined
@@ -656,7 +654,7 @@ export class ImportProcessor {
    */
   private async downloadAndSavePoster(
     selectedAnime: ImportOptions['selectedAnime'],
-    folderPath: string
+    folderPath: string,
   ): Promise<string | undefined> {
     try {
       let posterId: string | undefined
@@ -671,10 +669,11 @@ export class ImportProcessor {
 
       const electronApi = window.electronAPI
       if (posterUrl && electronApi) {
-        const posterResult = await withRetry(() =>
-          electronApi.shikimori.downloadPoster(posterUrl, selectedAnime.id, {
-            savePath: folderPath,
-          })
+        const posterResult = await withRetry(
+          () =>
+            electronApi.shikimori.downloadPoster(posterUrl, selectedAnime.id, {
+              savePath: folderPath,
+            }),
         )
         if (posterResult.success && posterResult.localPath) {
           const fileResult = await this.mutations.upsertFile.mutateAsync({
@@ -708,7 +707,7 @@ export class ImportProcessor {
     selectedAnime: ImportOptions['selectedAnime'],
     parsedInfo: ImportOptions['parsedInfo'],
     folderPath: string,
-    posterId?: string
+    posterId?: string,
   ): Promise<string> {
     // Поля, которые есть только в ShikimoriAnimeDetails (не в Preview)
     const isDetailed = 'licensors' in selectedAnime
@@ -755,7 +754,7 @@ export class ImportProcessor {
   private async createSeasonRecord(
     animeId: string,
     selectedAnime: ImportOptions['selectedAnime'],
-    parsedInfo: ImportOptions['parsedInfo']
+    parsedInfo: ImportOptions['parsedInfo'],
   ): Promise<string> {
     const seasonNum = parsedInfo.seasonNumber ?? 1
     const seasonResult = await this.mutations.upsertSeason.mutateAsync({
@@ -790,7 +789,7 @@ export class ImportProcessor {
           name: g.name,
           russian: g.russian,
           kind: g.kind ?? 'genre',
-        }))
+        })),
       )
       console.warn('[ImportFlow] Genres saved')
     } catch (err) {
@@ -807,7 +806,7 @@ export class ImportProcessor {
    */
   private async scanExternalSubtitles(
     folderPath: string,
-    selectedFiles: Array<ParsedFile & { episodeNumber: number }>
+    selectedFiles: Array<ParsedFile & { episodeNumber: number }>,
   ): Promise<Map<number, ExternalSubtitleMatch[]>> {
     const externalSubsMap = new Map<number, ExternalSubtitleMatch[]>()
 
@@ -815,7 +814,7 @@ export class ImportProcessor {
       // createHandler возвращает { success, data: { subtitles, ... } }
       const result = (await window.electronAPI?.fs.scanExternalSubtitles(
         folderPath,
-        selectedFiles.map((f) => ({ path: f.path, episodeNumber: f.episodeNumber }))
+        selectedFiles.map((f) => ({ path: f.path, episodeNumber: f.episodeNumber })),
       )) as unknown as { success: boolean; data?: { subtitles: ExternalSubtitleMatch[] } } | undefined
 
       const subtitles = result?.data?.subtitles || []
@@ -842,7 +841,7 @@ export class ImportProcessor {
     postProcessDataMap: Map<string, PostProcessData>,
     electronApi: NonNullable<typeof window.electronAPI>,
     videoMaxConcurrent: number,
-    audioMaxConcurrent: number
+    audioMaxConcurrent: number,
   ) {
     const completedIds = new Set<string>()
     const totalItems = batchItems.length
@@ -862,7 +861,7 @@ export class ImportProcessor {
         stalledTimer = setTimeout(() => {
           const missing = [...expectedItemIds].filter((id) => !completedIds.has(id))
           console.error(
-            `[ImportProcessor] STALLED: ${completedIds.size}/${totalItems} completed, missing: ${missing.join(', ')}`
+            `[ImportProcessor] STALLED: ${completedIds.size}/${totalItems} completed, missing: ${missing.join(', ')}`,
           )
           unsubscribe?.()
           unsubscribeProgress?.()
@@ -883,7 +882,7 @@ export class ImportProcessor {
           console.warn(
             `[ImportProcessor] Received itemCompleted: ${itemId}, success=${success}, completed=${
               completedIds.size + 1
-            }/${totalItems}`
+            }/${totalItems}`,
           )
 
           // Игнорируем события от предыдущих/чужих импортов
@@ -901,7 +900,9 @@ export class ImportProcessor {
             this.setFileProgress(
               completedIds.size,
               totalItems,
-              episodeData ? `Серия ${episodeData.episodeNumber} закодирована` : null
+              episodeData
+                ? `Серия ${episodeData.episodeNumber} закодирована`
+                : null,
             )
           }
 
@@ -918,7 +919,7 @@ export class ImportProcessor {
           } else {
             resetStalledTimer()
           }
-        }
+        },
       )
 
       const unsubscribeBatchError = electronApi.parallelTranscode.onBatchError((error: string) => {
@@ -951,7 +952,7 @@ export class ImportProcessor {
    */
   private async runPostProcess(
     postProcessDataMap: Map<string, PostProcessData>,
-    electronApi: NonNullable<typeof window.electronAPI>
+    electronApi: NonNullable<typeof window.electronAPI>,
   ) {
     const episodes = Array.from(postProcessDataMap.values())
     const totalEpisodes = episodes.length
@@ -976,7 +977,7 @@ export class ImportProcessor {
               data.videoOutputPath,
               data.outputDir,
               data.duration,
-              { count: 5, format: 'webp', thumbnailWidth: 320, fullWidth: 1280, quality: 80 }
+              { count: 5, format: 'webp', thumbnailWidth: 320, fullWidth: 1280, quality: 80 },
             )
 
             if (screenshotResult.success) {
@@ -1011,7 +1012,7 @@ export class ImportProcessor {
               }
 
               console.warn(
-                `[PostProcess] Screenshots uploaded & local deleted: ${validThumbnailCids.length} thumbnails, ${validScreenshotCids.length} full`
+                `[PostProcess] Screenshots uploaded & local deleted: ${validThumbnailCids.length} thumbnails, ${validScreenshotCids.length} full`,
               )
             }
           } catch (e) {
@@ -1030,14 +1031,16 @@ export class ImportProcessor {
               data.videoOutputPath,
               data.outputDir,
               data.duration,
-              { frameCount: 100, frameWidth: 160, frameHeight: 90, columns: 10, quality: 75 }
+              { frameCount: 100, frameWidth: 160, frameHeight: 90, columns: 10, quality: 75 },
             )
 
             if (spriteResult.success) {
               console.warn(
-                `[PostProcess] Sprite generated: ${spriteResult.spritePath} (${Math.round(
-                  spriteResult.spriteSize / 1024
-                )}KB)`
+                `[PostProcess] Sprite generated: ${spriteResult.spritePath} (${
+                  Math.round(
+                    spriteResult.spriteSize / 1024,
+                  )
+                }KB)`,
               )
 
               // Загружаем sprite файлы в IPFS
@@ -1197,33 +1200,33 @@ export class ImportProcessor {
         // JSON с настройками кодирования
         const encodingSettingsJson = data.videoOptions
           ? JSON.stringify({
-              profileName: data.encodingProfileName ?? 'default',
-              codec: data.videoOptions.codec,
-              cq: data.videoOptions.cq,
-              preset: data.videoOptions.preset,
-              rateControl: data.videoOptions.rateControl,
-              tune: data.videoOptions.tune,
-              multipass: data.videoOptions.multipass,
-              spatialAq: data.videoOptions.spatialAq,
-              temporalAq: data.videoOptions.temporalAq,
-              aqStrength: data.videoOptions.aqStrength,
-              gopSize: data.videoOptions.gopSize,
-              lookahead: data.videoOptions.lookahead,
-              bRefMode: data.videoOptions.bRefMode,
-              force10Bit: data.videoOptions.force10Bit,
-              // Новые поля v0.10.0
-              vmafScore: data.vmafScore,
-              encoderType: data.encoderType,
-              hardwareModel: data.hardwareModel,
-              ffmpegVersion: data.ffmpegVersion,
-              // Метаданные от завершённого кодирования
-              ffmpegCommand: encodingMeta?.ffmpegCommand,
-              transcodeDurationMs: encodingMeta?.transcodeDurationMs,
-              activeGpuWorkers: encodingMeta?.activeGpuWorkers,
-              // Лимиты потоков
-              videoMaxConcurrent: data.videoMaxConcurrent,
-              audioMaxConcurrent: data.audioMaxConcurrent,
-            })
+            profileName: data.encodingProfileName ?? 'default',
+            codec: data.videoOptions.codec,
+            cq: data.videoOptions.cq,
+            preset: data.videoOptions.preset,
+            rateControl: data.videoOptions.rateControl,
+            tune: data.videoOptions.tune,
+            multipass: data.videoOptions.multipass,
+            spatialAq: data.videoOptions.spatialAq,
+            temporalAq: data.videoOptions.temporalAq,
+            aqStrength: data.videoOptions.aqStrength,
+            gopSize: data.videoOptions.gopSize,
+            lookahead: data.videoOptions.lookahead,
+            bRefMode: data.videoOptions.bRefMode,
+            force10Bit: data.videoOptions.force10Bit,
+            // Новые поля v0.10.0
+            vmafScore: data.vmafScore,
+            encoderType: data.encoderType,
+            hardwareModel: data.hardwareModel,
+            ffmpegVersion: data.ffmpegVersion,
+            // Метаданные от завершённого кодирования
+            ffmpegCommand: encodingMeta?.ffmpegCommand,
+            transcodeDurationMs: encodingMeta?.transcodeDurationMs,
+            activeGpuWorkers: encodingMeta?.activeGpuWorkers,
+            // Лимиты потоков
+            videoMaxConcurrent: data.videoMaxConcurrent,
+            audioMaxConcurrent: data.audioMaxConcurrent,
+          })
           : null
 
         // Обновляем Episode с CID полями
@@ -1352,7 +1355,7 @@ export class ImportProcessor {
 
       // Фильтруем только эпизоды с манифестами (по CID)
       const episodesWithManifest = episodes.filter(
-        (ep): ep is typeof ep & { manifestCid: string } => ep.manifestCid !== null
+        (ep): ep is typeof ep & { manifestCid: string } => ep.manifestCid !== null,
       )
 
       if (episodesWithManifest.length < 2) {
@@ -1364,7 +1367,7 @@ export class ImportProcessor {
 
       // Вызываем batch-операцию в main процессе
       const result = await electronApi.manifest.updateNavigationBatch(
-        episodesWithManifest.map((ep) => ({ id: ep.id, manifestCid: ep.manifestCid }))
+        episodesWithManifest.map((ep) => ({ id: ep.id, manifestCid: ep.manifestCid })),
       )
 
       if (!result.success) {

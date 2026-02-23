@@ -27,30 +27,21 @@ export async function createChapters(
 
   console.warn(`[ChapterCreator] Creating ${demuxResult.metadata.chapters.length} chapters`)
 
-  // Проверяем, есть ли среди глав значимые типы (OP/ED/RECAP/PREVIEW)
-  // Если все главы — дженерик (CHAPTER), возвращаем false чтобы запустить fingerprinting
-  let hasSkippableChapter = false
-
   await Promise.all(
-    demuxResult.metadata.chapters.map((chapter: Chapter) => {
-      const type = detectChapterType(chapter.title)
-      if (isChapterSkippable(chapter.title)) {
-        hasSkippableChapter = true
-      }
-      return mutations.createChapter.mutateAsync({
+    demuxResult.metadata.chapters.map((chapter: Chapter) =>
+      mutations.createChapter.mutateAsync({
         data: {
           episodeId,
           startMs: Math.round(chapter.start * 1000),
           endMs: Math.round(chapter.end * 1000),
           title: chapter.title || undefined,
-          type,
+          type: detectChapterType(chapter.title),
           skippable: isChapterSkippable(chapter.title),
         },
       })
-    })
+    )
   )
 
-  console.warn(`[ChapterCreator] Chapters created successfully, hasSkippable=${hasSkippableChapter}`)
-  // Только значимые главы (OP/ED/RECAP/PREVIEW) отменяют fingerprinting
-  return hasSkippableChapter
+  console.warn(`[ChapterCreator] Chapters created successfully`)
+  return true
 }

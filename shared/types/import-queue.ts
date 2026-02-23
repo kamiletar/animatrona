@@ -315,8 +315,6 @@ export interface ImportQueueEntry {
   fileAnalyses?: ImportQueueFileAnalysis[]
   /** Принудительное использование CPU кодирования (per-item опция) */
   forceCpu?: boolean
-  /** Режим импорта одиночного файла (не папки) — не сканировать внешние субтитры/аудио */
-  isFileMode?: boolean
 
   // === Данные донора (опционально) ===
 
