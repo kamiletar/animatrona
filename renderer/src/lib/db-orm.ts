@@ -1,7 +1,7 @@
 /**
  * Серверный ZenStack ORM client для API routes
  *
- * Использует fts5-sql-bundle (sql.js с FTS5) — WASM работает и на сервере.
+ * Использует sql.js (WASM) — работает и на сервере.
  * Это единообразно с enhance.ts, но для серверных API routes.
  */
 import * as fs from 'node:fs'
@@ -12,7 +12,6 @@ import { ZenStackClient } from '@zenstackhq/orm'
 import { SqlJsDialect } from 'kysely-wasm'
 import { schema } from '../../../schema'
 
- 
 let initSqlJs: ReturnType<typeof require>
 
 /**
@@ -23,12 +22,15 @@ let initSqlJs: ReturnType<typeof require>
 const dynamicRequire = createRequire(import.meta.url)
 
 // Разбиваем путь на части чтобы Turbopack не анализировал его статически
-const FTS5_MODULE = ['fts5-sql', 'bundle', 'dist', 'sql-asm.js'].join('-').replace(/-dist-/, '/dist/').replace(/-sql-asm\.js$/, '/sql-asm.js')
+const FTS5_MODULE = ['fts5-sql', 'bundle', 'dist', 'sql-asm.js'].join('-').replace(/-dist-/, '/dist/').replace(
+  /-sql-asm\.js$/,
+  '/sql-asm.js',
+)
 
 try {
   initSqlJs = dynamicRequire(FTS5_MODULE)
 } catch (e) {
-  console.error('[db-orm] Failed to load fts5-sql-bundle:', e)
+  console.error('[db-orm] Failed to load sql.js:', e)
   throw e
 }
 
@@ -104,11 +106,10 @@ async function initOrm() {
 
               if (typeof modelValue === 'function') {
                 const methodName = String(modelProp)
-                const isMutation =
-                  methodName.startsWith('create') ||
-                  methodName.startsWith('update') ||
-                  methodName.startsWith('delete') ||
-                  methodName.startsWith('upsert')
+                const isMutation = methodName.startsWith('create')
+                  || methodName.startsWith('update')
+                  || methodName.startsWith('delete')
+                  || methodName.startsWith('upsert')
 
                 if (isMutation) {
                   return async (...args: unknown[]) => {

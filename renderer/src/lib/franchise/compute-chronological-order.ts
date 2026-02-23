@@ -22,6 +22,11 @@ import type { ShikimoriFranchiseGraph } from '@/types/electron.d'
 export function computeChronologicalOrder(graph: ShikimoriFranchiseGraph): Map<number, number> {
   const order = new Map<number, number>()
 
+  // Проверяем что nodes существует
+  if (!graph.nodes || graph.nodes.length === 0) {
+    return order
+  }
+
   // Собираем все ID
   const nodeIds = new Set(graph.nodes.map((n) => n.id))
 
@@ -36,11 +41,11 @@ export function computeChronologicalOrder(graph: ShikimoriFranchiseGraph): Map<n
 
   // sequel означает что target идёт после source
   // prequel означает что target идёт до source
-  for (const link of graph.links) {
+  for (const link of graph.links || []) {
     const sourceId = graph.nodes[link.source]?.id
     const targetId = graph.nodes[link.target]?.id
 
-    if (!sourceId || !targetId) {continue}
+    if (!sourceId || !targetId) continue
 
     if (link.relation === 'sequel') {
       // source → target (target зависит от source)
@@ -58,7 +63,7 @@ export function computeChronologicalOrder(graph: ShikimoriFranchiseGraph): Map<n
   const sorted: number[] = []
 
   function visit(id: number) {
-    if (visited.has(id)) {return}
+    if (visited.has(id)) return
     visited.add(id)
 
     // Сначала посещаем зависимости
@@ -108,7 +113,7 @@ export function getFranchiseSeasonNumber(
   graph: ShikimoriFranchiseGraph | null,
   shikimoriId: number | null | undefined,
 ): number {
-  if (!graph || !shikimoriId) {return 1}
+  if (!graph || !shikimoriId) return 1
 
   const order = computeChronologicalOrder(graph)
   return order.get(shikimoriId) ?? 1

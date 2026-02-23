@@ -47,17 +47,22 @@ export interface UseStepPersistenceResult {
  */
 export function useStepPersistence(
   currentStep: number,
-  config?: StepPersistenceConfig
+  config?: StepPersistenceConfig,
 ): UseStepPersistenceResult {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Используем ref для config — предотвращает перезапуск useEffect
+  // при каждом рендере из-за смены ссылки на объект
+  const configRef = useRef(config)
+  configRef.current = config
 
   // Получить сохранённый шаг при монтировании
   const getPersistedStep = useCallback((): number | null => {
-    if (!config || typeof window === 'undefined') {
+    const cfg = configRef.current
+    if (!cfg || typeof window === 'undefined') {
       return null
     }
     try {
-      const stored = localStorage.getItem(`${STORAGE_PREFIX}${config.key}`)
+      const stored = localStorage.getItem(`${STORAGE_PREFIX}${cfg.key}`)
       if (stored) {
         const parsed = parseInt(stored, 10)
         if (!isNaN(parsed) && parsed >= 0) {
@@ -68,15 +73,16 @@ export function useStepPersistence(
       // Invalid или ошибка localStorage — игнорируем
     }
     return null
-  }, [config])
+  }, [])
 
-  // Сохранение шага с debounce
+  // Сохранение шага с debounce — зависит только от currentStep
   useEffect(() => {
-    if (!config || typeof window === 'undefined') {
+    const cfg = configRef.current
+    if (!cfg || typeof window === 'undefined') {
       return
     }
 
-    const debounceMs = config.debounceMs ?? 300
+    const debounceMs = cfg.debounceMs ?? 300
 
     // Отменяем предыдущий таймер
     if (debounceTimerRef.current) {
@@ -86,7 +92,7 @@ export function useStepPersistence(
     // Debounced сохранение
     debounceTimerRef.current = setTimeout(() => {
       try {
-        localStorage.setItem(`${STORAGE_PREFIX}${config.key}`, String(currentStep))
+        localStorage.setItem(`${STORAGE_PREFIX}${cfg.key}`, String(currentStep))
       } catch {
         // localStorage может быть переполнен или отключён
       }
@@ -97,22 +103,23 @@ export function useStepPersistence(
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [currentStep, config])
+  }, [currentStep])
 
   // Очистить персистенцию (вызывать после успешной отправки формы)
   const clearPersistence = useCallback(() => {
-    if (!config || typeof window === 'undefined') {
+    const cfg = configRef.current
+    if (!cfg || typeof window === 'undefined') {
       return
     }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
     try {
-      localStorage.removeItem(`${STORAGE_PREFIX}${config.key}`)
+      localStorage.removeItem(`${STORAGE_PREFIX}${cfg.key}`)
     } catch {
       // Игнорируем ошибки
     }
-  }, [config])
+  }, [])
 
   return { getPersistedStep, clearPersistence }
 }

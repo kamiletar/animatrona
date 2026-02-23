@@ -29,15 +29,15 @@ export const SettingsCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Битрейт аудио (kbps)', fieldType: 'slider', fieldProps: {"showValue":true} }
     }),
-  libraryPath: z.string().optional()
+  libraryPath: z.string().nullable().optional()
     .meta({
       ui: { title: 'Папка библиотеки', description: 'Путь к папке с медиафайлами' }
     }),
-  outputPath: z.string().optional()
+  outputPath: z.string().nullable().optional()
     .meta({
       ui: { title: 'Папка для транскодирования', description: 'Куда сохранять перекодированные файлы' }
     }),
-  exportPath: z.string().optional()
+  exportPath: z.string().nullable().optional()
     .meta({
       ui: { title: 'Папка экспорта по умолчанию', description: 'Куда сохранять MKV файлы при экспорте' }
     }),
@@ -76,6 +76,14 @@ export const SettingsCreateFormSchema = z.object({
   trackPreference: TrackPreferenceFormSchema
     .meta({
       ui: { title: 'Предпочтение дорожек', description: 'Какие дорожки выбирать автоматически при первом просмотре', fieldType: 'radioCard' }
+    }),
+  mobileAccessEnabled: z.boolean().default(false)
+    .meta({
+      ui: { title: 'Мобильный доступ', description: 'Доступ к библиотеке с мобильных устройств в локальной сети', fieldType: 'switch' }
+    }),
+  mobileServerPort: z.number().int().min(1024).max(65535).default(4000)
+    .meta({
+      ui: { title: 'Порт мобильного сервера', description: 'HTTP порт для мобильного доступа', fieldType: 'numberInput' }
     })
 })
 

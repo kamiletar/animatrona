@@ -37,7 +37,7 @@ export const EncodingProfileCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Качество (CQ/CRF)', description: 'Меньше = лучше качество, больше размер', fieldType: 'slider', fieldProps: {"showValue":true} }
     }),
-  maxBitrate: z.number().int().min(1).max(100).optional()
+  maxBitrate: z.number().int().min(1).max(100).nullable().optional()
     .meta({
       ui: { title: 'Макс. битрейт (Mbps)', description: 'Для VBR режима', fieldType: 'numberInput' }
     }),
@@ -65,11 +65,11 @@ export const EncodingProfileCreateFormSchema = z.object({
     .meta({
       ui: { title: 'AQ Strength', fieldType: 'slider', fieldProps: {"showValue":true} }
     }),
-  lookahead: z.number().int().min(0).max(250).optional()
+  lookahead: z.number().int().min(0).max(250).nullable().optional()
     .meta({
       ui: { title: 'Lookahead Frames', description: 'Количество кадров для анализа (0 = авто)', fieldType: 'slider', fieldProps: {"showValue":true} }
     }),
-  lookaheadLevel: z.number().int().min(0).max(3).optional()
+  lookaheadLevel: z.number().int().min(0).max(3).nullable().optional()
     .meta({
       ui: { title: 'Lookahead Level', fieldType: 'slider', fieldProps: {"showValue":true} }
     }),

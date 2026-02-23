@@ -9,7 +9,7 @@ import { z } from 'zod/v4'
 export const SubtitleFontCreateFormSchema = z.object({
   subtitleTrackId: z.string(),
   fontName: z.string(),
-  filePath: z.string()
+  fileCid: z.string().nullable().optional()
 })
 
 /**

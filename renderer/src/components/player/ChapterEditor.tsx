@@ -25,7 +25,19 @@ import {
   VStack,
 } from '@chakra-ui/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { LuCheck, LuCopy, LuMusic, LuPause, LuPlay, LuPlus, LuSkipBack, LuTrash2, LuX } from 'react-icons/lu'
+import {
+  LuCheck,
+  LuCopy,
+  LuMusic,
+  LuPause,
+  LuPencil,
+  LuPlay,
+  LuPlus,
+  LuSkipBack,
+  LuTrash2,
+  LuWand,
+  LuX,
+} from 'react-icons/lu'
 
 import { Tooltip } from '@/components/ui/tooltip'
 import type { ChapterType } from '@/generated/prisma'
@@ -62,6 +74,10 @@ export interface ChapterEditorProps {
   onCopyToEpisodes?: (targetEpisodeIds: string[]) => void
   /** Индикатор загрузки копирования */
   isCopying?: boolean
+  /** Обработчик генерации RECAP/PREVIEW */
+  onGenerateRecapPreview?: (episodeIds: string[]) => void
+  /** Индикатор загрузки генерации */
+  isGenerating?: boolean
 }
 
 /** Метаданные типов глав */
@@ -156,112 +172,121 @@ function ChapterRow({
       size="sm"
     >
       <Card.Body py={2} px={3}>
-        {isEditing ? (
-          <VStack gap={2} align="stretch">
+        {isEditing
+          ? (
+            <VStack gap={2} align="stretch">
+              <HStack gap={2}>
+                <Badge colorPalette={meta.color} size="sm">
+                  {meta.label}
+                </Badge>
+                <Input
+                  size="xs"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Название"
+                  flex={1}
+                />
+              </HStack>
+              <HStack gap={2}>
+                <Box flex={1}>
+                  <Text fontSize="xs" color="fg.subtle">
+                    Начало
+                  </Text>
+                  <HStack gap={1}>
+                    <Input
+                      size="xs"
+                      value={editStartTime}
+                      onChange={(e) => setEditStartTime(e.target.value)}
+                      w="70px"
+                      fontFamily="mono"
+                    />
+                    <Tooltip content="Установить текущее время">
+                      <IconButton
+                        aria-label="Установить начало"
+                        size="xs"
+                        variant="ghost"
+                        onClick={handleSetStartFromCurrent}
+                      >
+                        <Icon as={LuPlay} />
+                      </IconButton>
+                    </Tooltip>
+                  </HStack>
+                </Box>
+                <Box flex={1}>
+                  <Text fontSize="xs" color="fg.subtle">
+                    Конец
+                  </Text>
+                  <HStack gap={1}>
+                    <Input
+                      size="xs"
+                      value={editEndTime}
+                      onChange={(e) => setEditEndTime(e.target.value)}
+                      w="70px"
+                      fontFamily="mono"
+                    />
+                    <Tooltip content="Установить текущее время">
+                      <IconButton
+                        aria-label="Установить конец"
+                        size="xs"
+                        variant="ghost"
+                        onClick={handleSetEndFromCurrent}
+                      >
+                        <Icon as={LuPause} />
+                      </IconButton>
+                    </Tooltip>
+                  </HStack>
+                </Box>
+              </HStack>
+              <HStack gap={2} justify="flex-end">
+                <Button size="xs" variant="ghost" onClick={handleCancel}>
+                  <Icon as={LuX} mr={1} />
+                  Отмена
+                </Button>
+                <Button size="xs" colorPalette="green" onClick={handleSave}>
+                  <Icon as={LuCheck} mr={1} />
+                  Сохранить
+                </Button>
+              </HStack>
+            </VStack>
+          )
+          : (
             <HStack gap={2}>
               <Badge colorPalette={meta.color} size="sm">
                 {meta.label}
               </Badge>
-              <Input
-                size="xs"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                placeholder="Название"
+              <Text
                 flex={1}
-              />
+                fontSize="sm"
+                cursor="pointer"
+                onClick={() => onSeek?.(chapter.startTime)}
+                _hover={{ color: 'purple.300' }}
+              >
+                {chapter.title}
+              </Text>
+              <Text
+                fontSize="xs"
+                color="fg.subtle"
+                fontFamily="mono"
+                cursor="pointer"
+                onClick={() => setIsEditing(true)}
+                _hover={{ color: 'purple.300' }}
+              >
+                {formatTimeMs(chapter.startTime)} - {formatTimeMs(chapter.endTime)}
+              </Text>
+              <HStack gap={0}>
+                <Tooltip content="Редактировать">
+                  <IconButton aria-label="Редактировать" size="xs" variant="ghost" onClick={() => setIsEditing(true)}>
+                    <Icon as={LuPencil} boxSize={3} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip content="Удалить">
+                  <IconButton aria-label="Удалить" size="xs" variant="ghost" colorPalette="red" onClick={onDelete}>
+                    <Icon as={LuTrash2} boxSize={3} />
+                  </IconButton>
+                </Tooltip>
+              </HStack>
             </HStack>
-            <HStack gap={2}>
-              <Box flex={1}>
-                <Text fontSize="xs" color="fg.subtle">
-                  Начало
-                </Text>
-                <HStack gap={1}>
-                  <Input
-                    size="xs"
-                    value={editStartTime}
-                    onChange={(e) => setEditStartTime(e.target.value)}
-                    w="70px"
-                    fontFamily="mono"
-                  />
-                  <Tooltip content="Установить текущее время">
-                    <IconButton
-                      aria-label="Установить начало"
-                      size="xs"
-                      variant="ghost"
-                      onClick={handleSetStartFromCurrent}
-                    >
-                      <Icon as={LuPlay} />
-                    </IconButton>
-                  </Tooltip>
-                </HStack>
-              </Box>
-              <Box flex={1}>
-                <Text fontSize="xs" color="fg.subtle">
-                  Конец
-                </Text>
-                <HStack gap={1}>
-                  <Input
-                    size="xs"
-                    value={editEndTime}
-                    onChange={(e) => setEditEndTime(e.target.value)}
-                    w="70px"
-                    fontFamily="mono"
-                  />
-                  <Tooltip content="Установить текущее время">
-                    <IconButton
-                      aria-label="Установить конец"
-                      size="xs"
-                      variant="ghost"
-                      onClick={handleSetEndFromCurrent}
-                    >
-                      <Icon as={LuPause} />
-                    </IconButton>
-                  </Tooltip>
-                </HStack>
-              </Box>
-            </HStack>
-            <HStack gap={2} justify="flex-end">
-              <Button size="xs" variant="ghost" onClick={handleCancel}>
-                <Icon as={LuX} mr={1} />
-                Отмена
-              </Button>
-              <Button size="xs" colorPalette="green" onClick={handleSave}>
-                <Icon as={LuCheck} mr={1} />
-                Сохранить
-              </Button>
-            </HStack>
-          </VStack>
-        ) : (
-          <HStack gap={2}>
-            <Badge colorPalette={meta.color} size="sm">
-              {meta.label}
-            </Badge>
-            <Text
-              flex={1}
-              fontSize="sm"
-              cursor="pointer"
-              onClick={() => onSeek?.(chapter.startTime)}
-              _hover={{ color: 'purple.300' }}
-            >
-              {chapter.title}
-            </Text>
-            <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
-              {formatTimeMs(chapter.startTime)} - {formatTimeMs(chapter.endTime)}
-            </Text>
-            <HStack gap={0}>
-              <Tooltip content="Редактировать">
-                <IconButton aria-label="Редактировать" size="xs" variant="ghost" onClick={() => setIsEditing(true)}>
-                  <Icon as={LuPlay} boxSize={3} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip content="Удалить">
-                <IconButton aria-label="Удалить" size="xs" variant="ghost" colorPalette="red" onClick={onDelete}>
-                  <Icon as={LuTrash2} boxSize={3} />
-                </IconButton>
-              </Tooltip>
-            </HStack>
-          </HStack>
-        )}
+          )}
       </Card.Body>
     </Card.Root>
   )
@@ -282,6 +307,8 @@ export function ChapterEditor({
   allEpisodes,
   onCopyToEpisodes,
   isCopying,
+  onGenerateRecapPreview,
+  isGenerating,
 }: ChapterEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [markerStart, setMarkerStart] = useState<number | null>(null)
@@ -327,6 +354,19 @@ export function ChapterEditor({
     }
   }, [selectedEpisodes, onCopyToEpisodes])
 
+  /** Генерировать RECAP/PREVIEW для всех эпизодов */
+  const handleGenerate = useCallback(() => {
+    if (!onGenerateRecapPreview) return
+    // Все эпизоды: текущий + все остальные
+    const allIds = allEpisodes?.map((ep) => ep.id) ?? []
+    if (currentEpisodeId && !allIds.includes(currentEpisodeId)) {
+      allIds.unshift(currentEpisodeId)
+    }
+    if (allIds.length > 0) {
+      onGenerateRecapPreview(allIds)
+    }
+  }, [currentEpisodeId, allEpisodes, onGenerateRecapPreview])
+
   /** Генерирует уникальный ID */
   const generateId = useCallback(() => `chapter_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`, [])
 
@@ -335,7 +375,13 @@ export function ChapterEditor({
     (type: ChapterType, title?: string) => {
       // Если есть начало маркера — создаём главу от маркера до текущего времени
       const startTime = markerStart ?? currentTime
-      const endTime = markerStart ? currentTime : currentTime + 90 // По умолчанию 90 сек
+      let endTime = markerStart ? currentTime : currentTime + 90 // По умолчанию 90 сек
+
+      // Ограничить конец началом следующей главы
+      const nextChapter = chapters.filter((c) => c.startTime > startTime).sort((a, b) => a.startTime - b.startTime)[0]
+      if (nextChapter && endTime > nextChapter.startTime) {
+        endTime = nextChapter.startTime
+      }
 
       if (endTime <= startTime) {
         return
@@ -355,7 +401,7 @@ export function ChapterEditor({
       onChaptersChange(newChapters)
       setMarkerStart(null)
     },
-    [chapters, currentTime, duration, generateId, markerStart, onChaptersChange]
+    [chapters, currentTime, duration, generateId, markerStart, onChaptersChange],
   )
 
   /** Начать разметку — запомнить текущее время */
@@ -374,7 +420,7 @@ export function ChapterEditor({
       const newChapters = chapters.map((c) => (c.id === updatedChapter.id ? updatedChapter : c))
       onChaptersChange(newChapters.sort((a, b) => a.startTime - b.startTime))
     },
-    [chapters, onChaptersChange]
+    [chapters, onChaptersChange],
   )
 
   /** Удалить главу */
@@ -382,7 +428,7 @@ export function ChapterEditor({
     (id: string) => {
       onChaptersChange(chapters.filter((c) => c.id !== id))
     },
-    [chapters, onChaptersChange]
+    [chapters, onChaptersChange],
   )
 
   /** Обработчик горячих клавиш */
@@ -508,7 +554,8 @@ export function ChapterEditor({
       {/* Подсказка по горячим клавишам */}
       <Box px={4} py={2} bg="bg.subtle" fontSize="xs" color="fg.muted">
         <Text>
-          <strong>O</strong> — OP · <strong>E</strong> — ED · <strong>R</strong> — ретро · <strong>P</strong> — превью ·{' '}
+          <strong>O</strong> — OP · <strong>E</strong> — ED · <strong>R</strong> — ретро · <strong>P</strong> — превью ·
+          {' '}
           <strong>Esc</strong> — отмена
         </Text>
         <Text mt={1}>Нажми клавишу на начале сегмента, затем снова на конце</Text>
@@ -516,22 +563,24 @@ export function ChapterEditor({
 
       {/* Список глав */}
       <VStack flex={1} overflow="auto" px={4} py={3} gap={2} align="stretch">
-        {chapters.length === 0 ? (
-          <Text color="fg.subtle" fontSize="sm" textAlign="center" py={4}>
-            Главы не добавлены
-          </Text>
-        ) : (
-          chapters.map((chapter) => (
-            <ChapterRow
-              key={chapter.id}
-              chapter={chapter}
-              currentTime={currentTime}
-              onUpdate={updateChapter}
-              onDelete={() => deleteChapter(chapter.id)}
-              onSeek={onSeek}
-            />
-          ))
-        )}
+        {chapters.length === 0
+          ? (
+            <Text color="fg.subtle" fontSize="sm" textAlign="center" py={4}>
+              Главы не добавлены
+            </Text>
+          )
+          : (
+            chapters.map((chapter) => (
+              <ChapterRow
+                key={chapter.id}
+                chapter={chapter}
+                currentTime={currentTime}
+                onUpdate={updateChapter}
+                onDelete={() => deleteChapter(chapter.id)}
+                onSeek={onSeek}
+              />
+            ))
+          )}
       </VStack>
 
       {/* Режим копирования OP/ED */}
@@ -628,6 +677,14 @@ export function ChapterEditor({
                 <Button size="xs" colorPalette="cyan" variant="outline" onClick={() => setIsCopyMode(true)}>
                   <Icon as={LuCopy} mr={1} />
                   Копировать
+                </Button>
+              </Tooltip>
+            )}
+            {hasOpEd && onGenerateRecapPreview && (
+              <Tooltip content="Авто-создание RECAP (перед OP) и PREVIEW (после ED) для всех эпизодов">
+                <Button size="xs" colorPalette="teal" variant="outline" onClick={handleGenerate} loading={isGenerating}>
+                  <Icon as={LuWand} mr={1} />
+                  RECAP/PREVIEW
                 </Button>
               </Tooltip>
             )}

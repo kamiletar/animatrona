@@ -10,6 +10,10 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
 
+import { createModuleLogger } from './logger'
+
+const log = createModuleLogger('IpcValidator')
+
 /** Результат IPC операции */
 export interface IpcResult<T = unknown> {
   success: boolean
@@ -32,15 +36,17 @@ export interface IpcResult<T = unknown> {
  */
 export function createValidatedHandler<TSchema extends z.ZodType, TResult = unknown>(
   schema: TSchema,
-  handler: (data: z.infer<TSchema>, event: IpcMainInvokeEvent) => Promise<TResult>
+  handler: (data: z.infer<TSchema>, event: IpcMainInvokeEvent) => Promise<TResult>,
 ): (event: IpcMainInvokeEvent, data: unknown) => Promise<IpcResult<TResult>> {
   return async (event: IpcMainInvokeEvent, data: unknown): Promise<IpcResult<TResult>> => {
     // Валидация входных данных
     const parsed = schema.safeParse(data)
 
     if (!parsed.success) {
-      console.error('[IPC Validation Error] Channel data:', JSON.stringify(data, null, 2).slice(0, 2000))
-      console.error('[IPC Validation Error] Zod errors:', JSON.stringify(parsed.error.format(), null, 2))
+      log.error('IPC validation failed', {
+        data: JSON.stringify(data, null, 2).slice(0, 2000),
+        errors: JSON.stringify(parsed.error.format(), null, 2),
+      })
       return {
         success: false,
         error: 'Validation failed',
@@ -52,7 +58,7 @@ export function createValidatedHandler<TSchema extends z.ZodType, TResult = unkn
       const result = await handler(parsed.data, event)
       return { success: true, data: result }
     } catch (error) {
-      console.error('[IPC Handler Error]', error)
+      log.error('IPC handler error', { error })
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -71,7 +77,7 @@ export function createValidatedHandler<TSchema extends z.ZodType, TResult = unkn
  */
 export function createValidatedAction<TSchema extends z.ZodType>(
   schema: TSchema,
-  handler: (data: z.infer<TSchema>, event: IpcMainInvokeEvent) => Promise<void>
+  handler: (data: z.infer<TSchema>, event: IpcMainInvokeEvent) => Promise<void>,
 ): (event: IpcMainInvokeEvent, data: unknown) => Promise<IpcResult<void>> {
   return createValidatedHandler(schema, handler)
 }
@@ -90,7 +96,7 @@ export const safePathSchema = z
       const normalized = path.replace(/\\/g, '/')
       return !normalized.includes('../') && !normalized.includes('./')
     },
-    { message: 'Path traversal detected' }
+    { message: 'Path traversal detected' },
   )
 
 /** Абсолютный путь (должен начинаться с буквы диска или /) */
@@ -100,7 +106,7 @@ export const absolutePathSchema = safePathSchema.refine(
     // Unix: /...
     return /^([A-Za-z]:|\\\\|\/)/u.test(path)
   },
-  { message: 'Path must be absolute' }
+  { message: 'Path must be absolute' },
 )
 
 /** Положительное целое число */
@@ -161,7 +167,7 @@ export const mergeSchema = z.object({
         language: z.string().optional(),
         title: z.string().optional(),
         default: z.boolean().optional(),
-      })
+      }),
     )
     .optional(),
   subtitleTracks: z
@@ -171,7 +177,7 @@ export const mergeSchema = z.object({
         language: z.string().optional(),
         title: z.string().optional(),
         default: z.boolean().optional(),
-      })
+      }),
     )
     .optional(),
   fonts: z.array(absolutePathSchema).optional(),

@@ -13,6 +13,7 @@ import {
   FieldCascadingSelect,
   FieldCheckbox,
   FieldCheckboxCard,
+  FieldCity,
   FieldColorPicker,
   FieldCombobox,
   FieldCurrency,
@@ -54,10 +55,10 @@ import { FormGroupListDeclarative } from './form-group/form-group-list-declarati
 import { DragHandle } from './form-group/form-group-list-sortable'
 import { Form as FormRoot } from './form-root'
 import {
+  FormSteps as FormStepsRoot,
   FormStepsCompletedContent,
   FormStepsIndicator,
   FormStepsNavigation,
-  FormSteps as FormStepsRoot,
   FormStepsStep,
 } from './form-steps'
 import { FormWhen } from './form-when'
@@ -122,6 +123,7 @@ const FormField = {
   // Specialized fields
   Phone: FieldPhone,
   Address: FieldAddress,
+  City: FieldCity,
   PinInput: FieldPinInput,
   OTPInput: FieldOTPInput,
   ColorPicker: FieldColorPicker,
@@ -250,13 +252,31 @@ export {
 export { ButtonReset, ButtonSubmit, type ResetButtonProps } from './form-buttons'
 export { FormErrors } from './form-errors'
 export {
+  type AutocompleteFieldProps,
+  type AutoFieldConfig,
+  type AutoFieldProps,
   camelCaseToLabel,
+  type CascadingSelectFieldProps,
+  type CascadingSelectLoadResult,
+  type CheckboxCardFieldProps,
+  type CheckboxCardOption,
+  type CityFieldProps,
+  type ColorPickerFieldProps,
+  type ComboboxFieldProps,
+  type ComboboxOption,
+  type DateRangeFieldProps,
+  type DateRangePreset,
+  type DateRangeValue,
+  type DayOfWeek,
+  type DaySchedule,
+  type EditableFieldProps,
   FieldAddress,
   FieldAuto,
   FieldAutocomplete,
   FieldCascadingSelect,
   FieldCheckbox,
   FieldCheckboxCard,
+  FieldCity,
   FieldColorPicker,
   FieldCombobox,
   FieldCurrency,
@@ -290,23 +310,6 @@ export {
   FieldTags,
   FieldTextarea,
   FieldTime,
-  useDeclarativeField,
-  type AutocompleteFieldProps,
-  type AutoFieldConfig,
-  type AutoFieldProps,
-  type CascadingSelectFieldProps,
-  type CascadingSelectLoadResult,
-  type CheckboxCardFieldProps,
-  type CheckboxCardOption,
-  type ColorPickerFieldProps,
-  type ComboboxFieldProps,
-  type ComboboxOption,
-  type DateRangeFieldProps,
-  type DateRangePreset,
-  type DateRangeValue,
-  type DayOfWeek,
-  type DaySchedule,
-  type EditableFieldProps,
   type FileUploadFieldProps,
   type ListboxFieldProps,
   type ListboxOption,
@@ -329,6 +332,7 @@ export {
   type TagsFieldProps,
   type TimeSlot,
   type ToolbarButton,
+  useDeclarativeField,
   type WeeklySchedule,
 } from './form-fields'
 export { FormGroupDeclarative } from './form-group/form-group-declarative'
@@ -344,11 +348,14 @@ export {
 // Factory for app-specific forms
 export { createForm, type ExtendedForm } from './create-form'
 
+// Lazy component helpers (для ленивой загрузки компонентов форм)
+export { createLazyComponent, createLazyComponents, type LazyComponentImport } from './lazy-component'
+
 // API integration hook
 export { useFormApi } from './use-form-api'
 
 // Persistence hook and types
-export { useFormPersistence, type FormPersistenceConfig, type FormPersistenceResult } from './form-persistence'
+export { type FormPersistenceConfig, type FormPersistenceResult, useFormPersistence } from './form-persistence'
 
 // DirtyGuard component
 export { DirtyGuard, type DirtyGuardProps } from './dirty-guard'
@@ -358,24 +365,24 @@ export { FormWhen, type FormWhenProps } from './form-when'
 
 // Multi-step forms
 export {
-  FormStepsCompletedContent,
-  FormStepsContext,
-  FormStepsIndicator,
-  FormStepsNavigation,
   FormSteps as FormStepsRoot,
-  FormStepsStep,
-  useFormStepsContext,
+  FormStepsCompletedContent,
   type FormStepsCompletedContentProps,
+  FormStepsContext,
   type FormStepsContextValue,
+  FormStepsIndicator,
   type FormStepsIndicatorProps,
+  FormStepsNavigation,
   type FormStepsNavigationProps,
   type FormStepsProps,
+  FormStepsStep,
   type FormStepsStepProps,
   type StepInfo,
+  useFormStepsContext,
 } from './form-steps'
 
 // Field actions hook
-export { useFieldActions, type FieldActionsResult } from './use-field-actions'
+export { type FieldActionsResult, useFieldActions } from './use-field-actions'
 
 // Field UI components
 export { FieldLabel, type FieldLabelProps } from './form-fields/base/field-label'
@@ -383,8 +390,8 @@ export { FieldTooltip, type FieldTooltipProps } from './form-fields/base/field-t
 
 // Form Builder (JSON-based form generation)
 export {
-  FormBuilder,
   type FieldConfig,
+  FormBuilder,
   type FormBuilderConfig,
   type FormBuilderProps,
   type FormBuilderSection,
@@ -407,20 +414,20 @@ export { useFieldConstraints, type UseFieldConstraintsResult } from './use-field
 export { generateConstraintHint } from './constraint-hints'
 
 // Schema traversal (for form generation from Zod schema)
-export { filterFields, getFieldPaths, traverseSchema, type SchemaFieldInfo } from './schema-traversal'
+export { filterFields, getFieldPaths, type SchemaFieldInfo, traverseSchema } from './schema-traversal'
 
 // Field type mapper (for mapping field types to components)
 export {
+  type FieldRenderProps,
+  type RelationFieldConfig,
   renderFieldByType,
   renderSchemaField,
   resolveFieldType,
   SchemaFieldWithRelations,
-  type FieldRenderProps,
-  type RelationFieldConfig,
 } from './field-type-mapper'
 
 // Auto-generated fields from schema
-export { FormAutoFields, type AutoFieldsProps } from './form-auto-fields'
+export { type AutoFieldsProps, FormAutoFields } from './form-auto-fields'
 
 // Complete form from schema
 export { FormFromSchema, type FormFromSchemaProps } from './form-from-schema'
@@ -429,7 +436,7 @@ export { FormFromSchema, type FormFromSchemaProps } from './form-from-schema'
 export type { FieldComponentType } from './types/meta-types'
 
 // withUIMeta - enrich Zod schemas with UI metadata (ZenStack integration)
-export { withUIMeta, withUIMetaDeep, type DeepUIMetaConfig, type UIMetaConfig } from './with-ui-meta'
+export { type DeepUIMetaConfig, type UIMetaConfig, withUIMeta, withUIMetaDeep } from './with-ui-meta'
 
 // Common meta helpers (for use with withUIMeta)
 export {
@@ -439,29 +446,29 @@ export {
   enumMeta,
   numberMeta,
   relationMeta,
-  textMeta,
   type SelectionFieldType,
+  textMeta,
 } from './common-meta'
 
 // Relation field provider (auto-loading relation options)
 export {
-  RelationFieldProvider,
-  useRelationFieldContext,
-  useRelationOptions,
-  withRelations,
   type QueryHookResult,
   type RelationConfig,
   type RelationFieldContextValue,
+  RelationFieldProvider,
   type RelationOption,
   type RelationState,
+  useRelationFieldContext,
+  useRelationOptions,
+  withRelations,
 } from './relation-field-provider'
 
 // Async search hook (for Combobox, Autocomplete)
 export {
-  useAsyncSearch,
-  useDebounce,
   type AsyncQueryFn,
   type AsyncQueryResult,
+  useAsyncSearch,
   type UseAsyncSearchOptions,
   type UseAsyncSearchResult,
+  useDebounce,
 } from './form-fields/base'

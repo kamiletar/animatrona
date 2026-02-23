@@ -10,7 +10,10 @@ import { createReadStream, existsSync, statSync } from 'fs'
 import path from 'path'
 import type { Readable } from 'stream'
 
+import { createModuleLogger } from '../utils/logger'
 import { isPathAllowed } from './allowed-paths'
+
+const log = createModuleLogger('MediaProtocol')
 
 /** Поддерживаемые MIME-типы для видео */
 const VIDEO_MIME_TYPES: Record<string, string> = {
@@ -42,6 +45,14 @@ const SUBTITLE_MIME_TYPES: Record<string, string> = {
   '.ssa': 'text/x-ssa',
 }
 
+/** Поддерживаемые MIME-типы для шрифтов (для ASS субтитров) */
+const FONT_MIME_TYPES: Record<string, string> = {
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+}
+
 /** Поддерживаемые MIME-типы для изображений */
 const IMAGE_MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -62,6 +73,7 @@ function getMimeType(filePath: string): string {
     VIDEO_MIME_TYPES[ext] ||
     AUDIO_MIME_TYPES[ext] ||
     SUBTITLE_MIME_TYPES[ext] ||
+    FONT_MIME_TYPES[ext] ||
     IMAGE_MIME_TYPES[ext] ||
     'application/octet-stream'
   )
@@ -116,23 +128,31 @@ async function handleMediaRequest(request: Request): Promise<Response> {
   const url = new URL(request.url)
 
   // Декодируем путь к файлу из URL
-  // media://C:/path/to/file.mkv -> C:/path/to/file.mkv
-  let filePath = decodeURIComponent(url.pathname)
-
-  // Убираем начальный слеш если путь начинается с буквы диска (Windows)
-  if (filePath.match(/^\/[A-Za-z]:\//)) {
-    filePath = filePath.slice(1)
+  // URL парсер интерпретирует media://C:/path как hostname='c', pathname='/path'
+  // Восстанавливаем Windows путь: hostname (буква диска) + pathname
+  let filePath: string
+  if (url.hostname && url.hostname.length === 1) {
+    // Windows путь: hostname = буква диска (c), pathname = /Users/path/file.mkv
+    // Результат: C:/Users/path/file.mkv
+    filePath = `${url.hostname.toUpperCase()}:${decodeURIComponent(url.pathname)}`
+  } else {
+    // Unix путь или уже правильный формат
+    filePath = decodeURIComponent(url.pathname)
+    // Убираем начальный слеш если путь начинается с буквы диска (fallback)
+    if (filePath.match(/^\/[A-Za-z]:\//)) {
+      filePath = filePath.slice(1)
+    }
   }
 
   // Проверяем whitelist — защита от произвольного чтения файлов
   if (!isPathAllowed(filePath)) {
-    console.error(`[media://] Access denied (not in whitelist): ${filePath}`)
+    log.error('Access denied (not in whitelist)', { path: filePath })
     return new Response('Access denied', { status: 403 })
   }
 
   // Проверяем существование файла
   if (!existsSync(filePath)) {
-    console.error(`[media://] File not found: ${filePath}`)
+    log.error('File not found', { path: filePath })
     return new Response('File not found', { status: 404 })
   }
 
@@ -186,7 +206,7 @@ async function handleMediaRequest(request: Request): Promise<Response> {
       },
     })
   } catch (error) {
-    console.error(`[media://] Error reading file:`, error)
+    log.error('Error reading file', { error })
     return new Response('Internal server error', { status: 500 })
   }
 }

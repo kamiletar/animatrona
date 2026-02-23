@@ -36,23 +36,18 @@ import { SegmentedPreset } from './segmented'
 import {
   // Anime
   SelectAnimeStatus,
-  SelectSeasonType,
   // Encoding
   SelectBRefMode,
-  SelectMultipass,
-  SelectRateControl,
-  SelectTune,
-  SelectVideoCodec,
   // Chapters & Media
   SelectChapterType,
   SelectFileCategory,
-  SelectTrackPreference,
-  SelectTranscodeStatus,
-  SelectVideoKind,
-  // Metadata
-  SelectExternalLinkKind,
-  SelectPersonRole,
+  SelectMultipass,
+  SelectRateControl,
   SelectRelationKind,
+  SelectSeasonType,
+  SelectTrackPreference,
+  SelectTune,
+  SelectVideoCodec,
 } from './selects'
 
 export const AnimatronaForm = createForm({
@@ -78,12 +73,10 @@ export const AnimatronaForm = createForm({
     ChapterType: SelectChapterType, // CHAPTER, OP, ED, RECAP, PREVIEW
     FileCategory: SelectFileCategory, // POSTER, SCREENSHOT, THUMBNAIL, FONT
     TrackPreference: SelectTrackPreference, // RUSSIAN_DUB, ORIGINAL_SUB, AUTO
-    TranscodeStatus: SelectTranscodeStatus, // QUEUED, PROCESSING, COMPLETED, SKIPPED, ERROR
-    VideoKind: SelectVideoKind, // OP, ED, PV, CM, CLIP, EPISODE_PREVIEW, OTHER
+    // v0.28.0: VideoKind удалён — теперь в AnimeManifest (IPFS)
 
     // Metadata
-    ExternalLinkKind: SelectExternalLinkKind, // MYANIMELIST, ANIDB, ANILIST, ...
-    PersonRole: SelectPersonRole, // DIRECTOR, WRITER, MUSIC, ...
+    // v0.28.0: ExternalLinkKind, PersonRole удалены — теперь в AnimeManifest (IPFS)
     RelationKind: SelectRelationKind, // SEQUEL, PREQUEL, SIDE_STORY, ...
   },
 })

@@ -17,6 +17,7 @@ import {
   useUpdateSubtitleTrack,
   useUpsertWatchProgress,
 } from '@/lib/hooks'
+import { getFontUrl } from '@/lib/media-url'
 import { checkIsRussianAudio, selectAudioTrack, selectSubtitleTrack } from '@/lib/track-auto-select'
 
 import type { EpisodeWithTracks, SubtitleTrackWithFonts } from './types'
@@ -64,6 +65,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
   const { mutate: upsertProgress } = useUpsertWatchProgress()
 
   // Преобразуем аудиодорожки для VideoPlayer
+  // Для библиотеки передаём только transcodedCid (IPFS-only подход)
   const audioTracksForPlayer = useMemo((): AudioTrackInfo[] => {
     if (!episode?.audioTracks) {
       return []
@@ -76,8 +78,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
       codec: track.codec,
       channels: track.channels,
       isDefault: track.isDefault,
-      transcodedPath: track.transcodedPath || undefined,
-      transcodeStatus: track.transcodeStatus as 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'ERROR' | 'SKIPPED',
+      transcodedCid: track.transcodedCid || undefined,
     }))
   }, [episode?.audioTracks])
 
@@ -94,8 +95,8 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
       language: track.language,
       codec: track.codec,
       isDefault: track.isDefault,
-      transcodeStatus: track.transcodeStatus as 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'ERROR' | 'SKIPPED',
       dubGroup: track.dubGroup || undefined,
+      transcodedCid: track.transcodedCid || undefined,
     }))
   }, [episode?.audioTracks])
 
@@ -115,7 +116,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
     }))
   }, [episode?.subtitleTracks])
 
-  // Текущий выбранный ID аудио
+  // Текущий выбранный ID аудио — для библиотеки проверяем только IPFS CID
   const currentAudioId = useMemo(() => {
     if (selectedAudioTrackId) {
       return selectedAudioTrackId
@@ -127,10 +128,8 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
         return autoSelected.id
       }
     }
-    // Fallback — первая готовая дорожка
-    const readyTrack = episode?.audioTracks?.find(
-      (t) => t.transcodeStatus === 'COMPLETED' || t.transcodeStatus === 'SKIPPED'
-    )
+    // Fallback — первая готовая дорожка (мигрированная в IPFS)
+    const readyTrack = episode?.audioTracks?.find((t) => t.transcodedCid)
     return readyTrack?.id || episode?.audioTracks?.[0]?.id || null
   }, [selectedAudioTrackId, episode?.audioTracks, trackPreference])
 
@@ -164,12 +163,13 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
     return episode.subtitleTracks.find((t) => t.id === autoSelected.id) ?? null
   }, [episode?.subtitleTracks, episode?.audioTracks, selectedSubtitleTrackId, trackPreference, currentAudioId])
 
-  // Пути к шрифтам для текущих субтитров (для ASS)
+  // URL'ы к шрифтам для текущих субтитров (для ASS)
+  // Приоритет: IPFS CID > локальный путь
   const currentSubtitleFonts = useMemo(() => {
     if (!currentSubtitleTrack?.fonts) {
       return []
     }
-    return currentSubtitleTrack.fonts.map((f) => f.filePath)
+    return currentSubtitleTrack.fonts.map((f) => getFontUrl(f)).filter((url): url is string => url !== null)
   }, [currentSubtitleTrack?.fonts])
 
   // Обработчик изменения аудио дорожки
@@ -220,7 +220,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
         },
       })
     },
-    [episode, selectedSubtitleTrackId, upsertProgress, updateAnime, playerRef]
+    [episode, selectedSubtitleTrackId, upsertProgress, updateAnime, playerRef],
   )
 
   // Обработчик изменения дорожки субтитров
@@ -272,7 +272,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
         },
       })
     },
-    [episode, selectedAudioTrackId, upsertProgress, updateAnime, playerRef]
+    [episode, selectedAudioTrackId, upsertProgress, updateAnime, playerRef],
   )
 
   // Открыть редактор аудио дорожки
@@ -288,7 +288,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
         })
       }
     },
-    [episode?.audioTracks]
+    [episode?.audioTracks],
   )
 
   // Открыть редактор дорожки субтитров
@@ -304,7 +304,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
         })
       }
     },
-    [episode?.subtitleTracks]
+    [episode?.subtitleTracks],
   )
 
   // Сохранить изменения дорожки
@@ -322,7 +322,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
         })
       }
     },
-    [editingTrack?.type, updateAudioTrack, updateSubtitleTrack]
+    [editingTrack?.type, updateAudioTrack, updateSubtitleTrack],
   )
 
   // Удалить дорожку
@@ -342,7 +342,7 @@ export function usePlayerTracks(options: UsePlayerTracksOptions) {
         deleteSubtitleTrack({ where: { id } })
       }
     },
-    [editingTrack?.type, selectedAudioTrackId, selectedSubtitleTrackId, deleteAudioTrack, deleteSubtitleTrack]
+    [editingTrack?.type, selectedAudioTrackId, selectedSubtitleTrackId, deleteAudioTrack, deleteSubtitleTrack],
   )
 
   // Закрыть редактор дорожки

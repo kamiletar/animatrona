@@ -135,18 +135,7 @@ export async function getAvailableGenres(): Promise<AvailableItem[]> {
   })
 }
 
-/**
- * Получить студии, которые есть хотя бы у одного аниме в библиотеке
- */
-export async function getAvailableStudios(): Promise<AvailableItem[]> {
-  return db.studio.findMany({
-    where: {
-      animes: { some: {} },
-    },
-    select: { id: true, name: true },
-    orderBy: { name: 'asc' },
-  })
-}
+// v0.28.0: getAvailableStudios удалён — студии теперь в AnimeManifest (IPFS)
 
 /**
  * Получить локальные группы озвучки из аудиодорожек (из AudioTrack.dubGroup)
@@ -159,30 +148,10 @@ export async function getLocalDubGroups(): Promise<AvailableItem[]> {
     distinct: ['dubGroup'],
     orderBy: { dubGroup: 'asc' },
   })
-  return tracks.filter((t) => t.dubGroup).map((t) => ({ id: t.dubGroup!, name: t.dubGroup! }))
-}
-
-/**
- * Получить режиссёров, которые есть хотя бы у одного аниме в библиотеке (v0.19.0)
- */
-export async function getAvailableDirectors(): Promise<AvailableItem[]> {
-  const directors = await db.person.findMany({
-    where: {
-      animeRoles: {
-        some: { role: 'DIRECTOR' },
-      },
-    },
-    select: {
-      id: true,
-      name: true,
-      nameRu: true,
-    },
-    orderBy: { name: 'asc' },
-  })
-
-  // Предпочитаем русское имя, если есть
-  return directors.map((d) => ({
-    id: d.id,
-    name: d.nameRu || d.name,
+  return tracks.filter((t): t is { dubGroup: string } => !!t.dubGroup).map((t) => ({
+    id: t.dubGroup,
+    name: t.dubGroup,
   }))
 }
+
+// v0.28.0: getAvailableDirectors удалён — режиссёры теперь в AnimeManifest (IPFS)

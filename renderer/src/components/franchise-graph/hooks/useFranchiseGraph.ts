@@ -70,6 +70,11 @@ export function useFranchiseGraph({
   watchStatuses = new Map(),
 }: UseFranchiseGraphOptions): UseFranchiseGraphResult {
   return useMemo(() => {
+    // Защита от пустого графа
+    if (!graph.nodes || graph.nodes.length === 0) {
+      return { nodes: [], edges: [], chronologicalOrder: [] }
+    }
+
     // Вычисляем хронологический порядок
     const chronoOrder = computeChronologicalOrder(graph)
 
@@ -102,13 +107,13 @@ export function useFranchiseGraph({
     // Между двумя узлами оставляем только одну связь с наивысшим приоритетом
     const edgeMap = new Map<string, RelationEdge>()
 
-    for (const link of graph.links) {
-      if (!IMPORTANT_RELATIONS.has(link.relation)) {continue}
+    for (const link of graph.links || []) {
+      if (!IMPORTANT_RELATIONS.has(link.relation)) continue
 
       const sourceId = graph.nodes[link.source]?.id
       const targetId = graph.nodes[link.target]?.id
 
-      if (!sourceId || !targetId) {continue}
+      if (!sourceId || !targetId) continue
 
       // Ключ для дедупликации: пара узлов в отсортированном порядке
       const pairKey = [sourceId, targetId].sort((a, b) => a - b).join('-')

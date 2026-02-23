@@ -15,7 +15,7 @@ export const GenreCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Slug' }
     }),
-  shikimoriId: z.number().int().optional()
+  shikimoriId: z.number().int().nullable().optional()
 })
 
 /**

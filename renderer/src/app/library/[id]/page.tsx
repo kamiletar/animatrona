@@ -9,12 +9,13 @@ import { use, useCallback, useState } from 'react'
 import { LuArrowLeft } from 'react-icons/lu'
 
 import { updateAnime } from '@/app/_actions/anime.action'
+import { createManyChapters, deleteChaptersByEpisodeId } from '@/app/_actions/chapter.action'
 import { syncAnimeRelations } from '@/app/_actions/anime-relation.action'
-import { type ExtendedMetadataInput, saveExtendedMetadata } from '@/app/_actions/extended-metadata.action'
+import { saveGenresAndThemes, type ShikimoriGenreInput } from '@/app/_actions/genre.action'
 import { upsertFile } from '@/app/_actions/file.action'
 import { syncFranchiseFromGraph, upsertFranchiseByShikimoriId } from '@/app/_actions/franchise.action'
 import { Header } from '@/components/layout'
-import { AboutTab, AnimeDetailTabs, AnimeHero, EpisodesTab, FranchiseTab, RelatedTab } from '@/components/library/anime-detail'
+import { AboutTab, AnimeDetailTabs, AnimeHero, EpisodesTab, FranchiseTab, RelatedTab, TracksTab } from '@/components/library/anime-detail'
 import { EpisodeNameEditor, VideoSection } from '@/components/library'
 import { toaster } from '@/components/ui/toaster'
 import type {
@@ -31,11 +32,13 @@ import type {
   SubtitleTrack,
   Theme,
   ThemeOnAnime,
-  Video,
   WatchProgress,
   WatchStatus,
 } from '@/generated/prisma'
+// v0.28.0: Video модель удалена, видео трейлеры теперь в AnimeManifest
 import { useFindUniqueAnime, useUpdateAnime } from '@/lib/hooks'
+import { toPlayableUrl } from '@/lib/media-url'
+import { useAnimeManifest } from '@/lib/hooks/index'
 
 // Dynamic imports для диалогов — загружаются только при открытии
 const ImportWizardDialog = nextDynamic(
@@ -70,8 +73,6 @@ type SubtitleTrackWithFonts = SubtitleTrack & {
 
 /** Тип Episode с дополнительными полями для карточек и экспорта */
 type EpisodeWithDetails = Episode & {
-  thumbnailPaths: string | null
-  screenshotPaths: string | null
   audioTracks: AudioTrack[]
   subtitleTracks: SubtitleTrackWithFonts[]
   chapters: Chapter[]
@@ -90,7 +91,7 @@ type AnimeWithRelations = Anime & {
   seasons: Season[]
   watchProgress: WatchProgress[]
   poster: File | null
-  videos: Video[]
+  // v0.28.0: videos удалены из БД, теперь в AnimeManifest
 }
 
 // Отключаем статическую генерацию для динамической страницы
@@ -123,6 +124,8 @@ export default function AnimePage({ params }: AnimePageProps) {
   const [isEpisodeNameEditorOpen, setIsEpisodeNameEditorOpen] = useState(false)
   const [importAnimeInfo, setImportAnimeInfo] = useState<{ shikimoriId: number; name: string | null } | null>(null)
   const [isRefreshingMetadata, setIsRefreshingMetadata] = useState(false)
+  const [isPublishingToTracker, setIsPublishingToTracker] = useState(false)
+  const [isDetectingIntros, setIsDetectingIntros] = useState(false)
 
   const { data, isLoading } = useFindUniqueAnime({
     where: { id },
@@ -155,14 +158,15 @@ export default function AnimePage({ params }: AnimePageProps) {
         orderBy: { lastWatchedAt: 'desc' },
       },
       poster: true,
-      videos: {
-        orderBy: { kind: 'asc' },
-      },
+      // v0.28.0: videos удалены из БД, теперь в AnimeManifest
     },
   })
 
   // Приводим тип к AnimeWithRelations после проверки
   const anime = data as AnimeWithRelations | null | undefined
+
+  // v0.28.0: Загружаем AnimeManifest из IPFS для расширенных данных (видео, студии и т.д.)
+  const { manifest } = useAnimeManifest(anime?.manifestCid)
 
   /**
    * Обновить метаданные из Shikimori и сохранить в БД
@@ -184,23 +188,27 @@ export default function AnimePage({ params }: AnimePageProps) {
         throw new Error(result.error || 'Не удалось загрузить метаданные')
       }
 
-      // Сохраняем метаданные в БД
-      const input: ExtendedMetadataInput = {
-        studios: result.data.studios,
-        personRoles: result.data.personRoles,
-        characterRoles: result.data.characterRoles,
-        fandubbers: result.data.fandubbers,
-        fansubbers: result.data.fansubbers,
-        externalLinks: result.data.externalLinks,
-        videos: result.data.videos || [],
-        nextEpisodeAt: result.data.nextEpisodeAt,
-        genres: result.data.genres,
+      // Сохраняем жанры и темы в БД (остальные метаданные теперь в AnimeManifest)
+      if (result.data.genres?.length) {
+        const genres: ShikimoriGenreInput[] = result.data.genres.map((g) => ({
+          id: g.id,
+          name: g.name,
+          russian: g.russian,
+          kind: g.kind ?? 'genre',
+        }))
+        const saveResult = await saveGenresAndThemes(anime.id, genres)
+        if (!saveResult.success) {
+          console.warn('[RefreshMetadata] Failed to save genres:', saveResult.error)
+        }
       }
 
-      const saveResult = await saveExtendedMetadata(anime.id, input)
-
-      if (!saveResult.success) {
-        throw new Error(saveResult.error || 'Не удалось сохранить метаданные')
+      // Обновляем AnimeManifest в IPFS (если нужно)
+      if (window.electronAPI?.animeManifest) {
+        try {
+          await window.electronAPI.animeManifest.update(anime.id)
+        } catch (err) {
+          console.warn('[RefreshMetadata] Failed to update AnimeManifest:', err)
+        }
       }
 
       // 2. Обновляем постер (если есть новый URL)
@@ -314,6 +322,152 @@ export default function AnimePage({ params }: AnimePageProps) {
     [anime, updateAnimeMutation, queryClient],
   )
 
+  /**
+   * Опубликовать аниме на трекер
+   */
+  const handlePublishToTracker = useCallback(async () => {
+    if (!anime?.manifestCid || !window.electronAPI) {
+      toaster.error({ title: 'Нет манифеста для публикации' })
+      return
+    }
+
+    setIsPublishingToTracker(true)
+
+    try {
+      const result = await window.electronAPI.ipfs.trackerPublish(anime.manifestCid)
+
+      if (result.success && result.data?.success) {
+        toaster.success({
+          title: 'Опубликовано на трекер',
+          description: result.data.episodeCount ? `${result.data.episodeCount} эп.` : undefined,
+        })
+      } else {
+        toaster.error({
+          title: 'Ошибка публикации',
+          description: result.error || 'Неизвестная ошибка',
+        })
+      }
+    } catch (error) {
+      toaster.error({
+        title: 'Ошибка публикации',
+        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+      })
+    } finally {
+      setIsPublishingToTracker(false)
+    }
+  }, [anime?.manifestCid])
+
+  /**
+   * Определить OP/ED постфактум из IPFS
+   * Скачивает транскодированные видео во temp, запускает fingerprinting
+   */
+  const handleDetectIntros = useCallback(async () => {
+    if (!anime?.episodes?.length || !window.electronAPI?.introDetector) {
+      return
+    }
+
+    // Для каждого эпизода находим японскую аудиодорожку (оригинал)
+    // Приоритет: title содержит "Оригинал" → language === 'ja' → первая дорожка с CID
+    const episodesWithAudio: Array<{ id: string; audioCid: string; duration: number }> = []
+
+    for (const ep of anime.episodes) {
+      if (!ep.durationMs || !ep.audioTracks?.length) continue
+
+      const tracks = ep.audioTracks.filter((t) => t.transcodedCid)
+      if (tracks.length === 0) continue
+
+      // Ищем оригинальную японскую дорожку
+      // Приоритет: title "Оригинал" → language 'ja'/'jpn' → первая дорожка
+      const japaneseTrack =
+        tracks.find((t) => t.title?.toLowerCase().includes('оригинал')) ||
+        tracks.find((t) => t.language === 'ja' || t.language === 'jpn') ||
+        tracks.find((t) => t.title?.toLowerCase().includes('japanese')) ||
+        tracks[0]
+
+      episodesWithAudio.push({
+        id: ep.id,
+        audioCid: japaneseTrack.transcodedCid!,
+        duration: ep.durationMs,
+      })
+    }
+
+    if (episodesWithAudio.length < 2) {
+      toaster.error({ title: 'Нужно минимум 2 эпизода с аудиодорожками для определения OP/ED' })
+      return
+    }
+
+    setIsDetectingIntros(true)
+
+    try {
+      const results = await window.electronAPI.introDetector.detectFromIpfs(episodesWithAudio)
+
+      // Сохраняем результаты: удаляем старые OP/ED главы, создаём новые
+      let createdCount = 0
+
+      for (const result of results) {
+        const hasIntro = result.introStartMs !== null && result.introEndMs !== null
+        const hasOutro = result.outroStartMs !== null && result.outroEndMs !== null
+
+        if (!hasIntro && !hasOutro) continue
+
+        // Удаляем старые OP/ED главы этого эпизода
+        await deleteChaptersByEpisodeId(result.episodeId)
+
+        // Создаём новые главы
+        const chapters: Array<{
+          episodeId: string
+          type: 'OP' | 'ED'
+          title: string
+          startMs: number
+          endMs: number
+        }> = []
+
+        if (hasIntro) {
+          chapters.push({
+            episodeId: result.episodeId,
+            type: 'OP',
+            title: 'Opening',
+            startMs: result.introStartMs!,
+            endMs: result.introEndMs!,
+          })
+        }
+
+        if (hasOutro) {
+          chapters.push({
+            episodeId: result.episodeId,
+            type: 'ED',
+            title: 'Ending',
+            startMs: result.outroStartMs!,
+            endMs: result.outroEndMs!,
+          })
+        }
+
+        if (chapters.length > 0) {
+          await createManyChapters(chapters)
+          createdCount += chapters.length
+        }
+      }
+
+      // Инвалидируем кэш
+      await queryClient.invalidateQueries({ queryKey: ['Anime'] })
+
+      const foundIntros = results.filter((r) => r.introStartMs !== null).length
+      const foundOutros = results.filter((r) => r.outroStartMs !== null).length
+
+      toaster.success({
+        title: 'Определение OP/ED завершено',
+        description: `OP: ${foundIntros}, ED: ${foundOutros} из ${episodesWithAudio.length} эп.`,
+      })
+    } catch (error) {
+      toaster.error({
+        title: 'Ошибка определения OP/ED',
+        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+      })
+    } finally {
+      setIsDetectingIntros(false)
+    }
+  }, [anime?.episodes, queryClient])
+
   if (isLoading) {
     return (
       <Box minH="100vh" bg="bg" color="fg">
@@ -372,7 +526,7 @@ export default function AnimePage({ params }: AnimePageProps) {
           loadedEpisodeCount={anime.episodes?.length || 0}
           genres={anime.genres}
           themes={anime.themes}
-          posterPath={anime.poster?.path}
+          posterPath={anime.poster?.path ?? toPlayableUrl({ cid: anime.posterCid }) ?? undefined}
           watchProgress={anime.watchProgress}
           episodes={anime.episodes?.map((ep) => ({
             id: ep.id,
@@ -389,6 +543,13 @@ export default function AnimePage({ params }: AnimePageProps) {
             onRefreshMetadata: handleRefreshMetadata,
             watchStatus: anime.watchStatus,
             onWatchStatusChange: handleWatchStatusChange,
+            hasManifestCid: !!anime.manifestCid,
+            manifestCid: anime.manifestCid ?? undefined,
+            isPublishingToTracker,
+            onPublishToTracker: handlePublishToTracker,
+            episodeCount: anime.episodes?.length || 0,
+            isDetectingIntros,
+            onDetectIntros: handleDetectIntros,
           }}
         />
 
@@ -396,8 +557,9 @@ export default function AnimePage({ params }: AnimePageProps) {
         <Box px={6} py={4}>
           <AnimeDetailTabs
             episodeCount={anime.episodes?.length || 0}
-            hasVideos={!!anime.videos && anime.videos.length > 0}
+            hasVideos={!!manifest?.videos && manifest.videos.length > 0}
             hasFranchise={!!anime.shikimoriId}
+            hasTracks={anime.episodes?.some((ep) => ep.audioTracks.length > 0 || ep.subtitleTracks.length > 0)}
           >
             {{
               episodes: (
@@ -410,6 +572,20 @@ export default function AnimePage({ params }: AnimePageProps) {
               ),
               about: (
                 <AboutTab description={anime.description} animeId={anime.id} shikimoriId={anime.shikimoriId} />
+              ),
+              tracks: (
+                <TracksTab
+                  audioTracks={
+                    anime.episodes?.flatMap((ep) =>
+                      ep.audioTracks.map((track) => ({ ...track, episodeNumber: ep.number })),
+                    ) || []
+                  }
+                  subtitleTracks={
+                    anime.episodes?.flatMap((ep) =>
+                      ep.subtitleTracks.map((track) => ({ ...track, episodeNumber: ep.number })),
+                    ) || []
+                  }
+                />
               ),
               related: (
                 <RelatedTab
@@ -430,7 +606,7 @@ export default function AnimePage({ params }: AnimePageProps) {
                   animeName={anime.name}
                 />
               ),
-              videos: <VideoSection videos={anime.videos || []} />,
+              videos: <VideoSection videos={manifest?.videos || []} />,
             }}
           </AnimeDetailTabs>
         </Box>
@@ -444,7 +620,6 @@ export default function AnimePage({ params }: AnimePageProps) {
           id: anime.id,
           name: anime.name,
           episodeCount: anime.episodes?.length || 0,
-          folderPath: anime.folderPath,
         }}
         onDeleted={() => router.push('/library')}
       />
@@ -458,7 +633,7 @@ export default function AnimePage({ params }: AnimePageProps) {
           id: anime.id,
           name: anime.name,
           year: anime.year,
-          posterPath: anime.poster?.path,
+          posterPath: anime.poster?.path ?? toPlayableUrl({ cid: anime.posterCid }) ?? undefined,
           episodes: anime.episodes || [],
           // Для определения номера сезона во франшизе
           shikimoriId: anime.shikimoriId,
@@ -488,7 +663,7 @@ export default function AnimePage({ params }: AnimePageProps) {
           anime.episodes?.map((ep) => ({
             id: ep.id,
             number: ep.number,
-            transcodedPath: ep.transcodedPath,
+            transcodedCid: ep.transcodedCid,
           })) || []
         }
       />

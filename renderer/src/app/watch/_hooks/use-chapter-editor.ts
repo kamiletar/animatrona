@@ -8,7 +8,13 @@ import { useCallback, useMemo, useState } from 'react'
 
 import type { Chapter, VideoPlayerRef } from '@/components/player'
 import { dbChapterToPlayerChapter, playerChapterToDbChapter } from '@/components/player/chapter-utils'
-import { useCopyChaptersToEpisodes, useCreateChapter, useDeleteChapter, useUpdateChapter } from '@/lib/hooks'
+import {
+  useCopyChaptersToEpisodes,
+  useCreateChapter,
+  useDeleteChapter,
+  useGenerateRecapAndPreview,
+  useUpdateChapter,
+} from '@/lib/hooks'
 
 import type { EpisodeWithTracks } from './types'
 
@@ -35,6 +41,7 @@ export function useChapterEditor(options: UseChapterEditorOptions) {
   const { mutate: updateChapter } = useUpdateChapter()
   const { mutate: deleteChapter } = useDeleteChapter()
   const { mutate: copyChapters, isPending: isCopying } = useCopyChaptersToEpisodes()
+  const { mutate: generateRecapPreview, isPending: isGenerating } = useGenerateRecapAndPreview()
 
   // Конвертируем главы из БД формата в формат плеера
   const playerChapters = useMemo((): Chapter[] => {
@@ -45,9 +52,12 @@ export function useChapterEditor(options: UseChapterEditorOptions) {
   }, [episode?.chapters])
 
   // Seek для ChapterEditor и ChapterMarkers
-  const handleSeek = useCallback((time: number) => {
-    playerRef.current?.seek(time)
-  }, [playerRef])
+  const handleSeek = useCallback(
+    (time: number) => {
+      playerRef.current?.seek(time)
+    },
+    [playerRef]
+  )
 
   // Обновление времени воспроизведения (вызывается из handleTimeUpdate)
   const updatePlaybackTime = useCallback((time: number, duration: number) => {
@@ -112,6 +122,14 @@ export function useChapterEditor(options: UseChapterEditorOptions) {
     [episode?.id, copyChapters]
   )
 
+  // Генерация RECAP/PREVIEW для выбранных эпизодов
+  const handleGenerateRecapPreview = useCallback(
+    (episodeIds: string[]) => {
+      generateRecapPreview(episodeIds)
+    },
+    [generateRecapPreview]
+  )
+
   // Toggle редактора глав
   const toggleChapterEditor = useCallback(() => {
     setIsChapterEditorOpen((prev) => !prev)
@@ -129,11 +147,13 @@ export function useChapterEditor(options: UseChapterEditorOptions) {
     videoDuration,
     playerChapters,
     isCopying,
+    isGenerating,
 
     // Обработчики
     handleSeek,
     handleChaptersChange,
     handleCopyToEpisodes,
+    handleGenerateRecapPreview,
     toggleChapterEditor,
     closeChapterEditor,
     updatePlaybackTime,

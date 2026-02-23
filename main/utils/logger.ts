@@ -69,22 +69,32 @@ function getMinLevel(): LogLevel {
 
 /**
  * Форматирует дополнительные данные для вывода
+ * @param meta - данные для вывода
+ * @param truncate - обрезать ли длинные значения (по умолчанию true)
  */
-function formatMeta(meta?: Record<string, unknown>): string {
+function formatMeta(meta?: Record<string, unknown>, truncate = true): string {
   if (!meta || Object.keys(meta).length === 0) {
     return ''
   }
 
-  // Сокращаем длинные значения
   const formatted = Object.entries(meta).map(([key, value]) => {
     let str = String(value)
-    if (str.length > 100) {
+    // Обрезаем только если truncate=true и значение длиннее 100 символов
+    if (truncate && str.length > 100) {
       str = str.slice(0, 100) + '...'
     }
     return `${key}=${str}`
   })
 
   return ` ${COLORS.dim}[${formatted.join(', ')}]${COLORS.reset}`
+}
+
+/**
+ * Опции для error метода
+ */
+export interface ErrorOptions {
+  /** Показать полный вывод без обрезки (для стектрейсов) */
+  full?: boolean
 }
 
 /**
@@ -97,8 +107,8 @@ export interface Logger {
   info(message: string, meta?: Record<string, unknown>): void
   /** Предупреждение */
   warn(message: string, meta?: Record<string, unknown>): void
-  /** Ошибка */
-  error(message: string, meta?: Record<string, unknown>): void
+  /** Ошибка (по умолчанию обрезает, с { full: true } — полный вывод) */
+  error(message: string, meta?: Record<string, unknown>, options?: ErrorOptions): void
   /** Создать дочерний логгер с дополнительным контекстом */
   child(name: string): Logger
 }
@@ -111,7 +121,7 @@ function createLogger(context: string[]): Logger {
   const minLevelNum = LOG_LEVELS[minLevel]
   const contextStr = context.length > 0 ? `${COLORS.cyan}[${context.join(':')}]${COLORS.reset} ` : ''
 
-  const log = (level: LogLevel, message: string, meta?: Record<string, unknown>) => {
+  const log = (level: LogLevel, message: string, meta?: Record<string, unknown>, noTruncate = false) => {
     // Фильтрация по уровню
     if (LOG_LEVELS[level] < minLevelNum) {
       return
@@ -120,7 +130,8 @@ function createLogger(context: string[]): Logger {
     const timestamp = new Date().toISOString()
     const levelColor = LEVEL_COLORS[level]
     const levelLabel = LEVEL_LABELS[level]
-    const metaStr = formatMeta(meta)
+    // Обрезаем meta, кроме случаев когда noTruncate=true
+    const metaStr = formatMeta(meta, !noTruncate)
 
     const output = `${COLORS.dim}${timestamp}${COLORS.reset} ${levelColor}${levelLabel}${COLORS.reset} ${contextStr}${message}${metaStr}`
 
@@ -142,7 +153,7 @@ function createLogger(context: string[]): Logger {
     debug: (message, meta) => log('debug', message, meta),
     info: (message, meta) => log('info', message, meta),
     warn: (message, meta) => log('warn', message, meta),
-    error: (message, meta) => log('error', message, meta),
+    error: (message, meta, options) => log('error', message, meta, options?.full),
     child: (name) => createLogger([...context, name]),
   }
 }

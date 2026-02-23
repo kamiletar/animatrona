@@ -1,5 +1,5 @@
-import { isDataModel, isEnum } from '@zenstackhq/language/ast'
 import type { DataModel, Enum } from '@zenstackhq/language/ast'
+import { isDataModel, isEnum } from '@zenstackhq/language/ast'
 import type { CliGeneratorContext } from '@zenstackhq/sdk'
 import { mkdir, writeFile } from 'fs/promises'
 import { dirname, join, resolve } from 'path'

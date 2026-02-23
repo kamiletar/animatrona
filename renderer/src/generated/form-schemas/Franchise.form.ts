@@ -8,10 +8,10 @@ import { z } from 'zod/v4'
  */
 export const FranchiseCreateFormSchema = z.object({
   name: z.string(),
-  shikimoriFranchiseId: z.string().optional(),
-  rootShikimoriId: z.number().int().optional(),
-  graphJson: z.string().optional(),
-  graphUpdatedAt: z.date().optional()
+  shikimoriFranchiseId: z.string().nullable().optional(),
+  rootShikimoriId: z.number().int().nullable().optional(),
+  graphJson: z.string().nullable().optional(),
+  graphUpdatedAt: z.date().nullable().optional()
 })
 
 /**

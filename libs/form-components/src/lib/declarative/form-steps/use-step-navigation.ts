@@ -1,7 +1,7 @@
 'use client'
 
 import type { AnyFormApi } from '@tanstack/react-form'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { StepDirection, StepInfo } from './form-steps-context'
 
 /**
@@ -59,18 +59,11 @@ export interface UseStepNavigationResult {
  * - Направлением анимации
  * - Callbacks шагов (onEnter, onLeave)
  *
- * @example
- * ```tsx
- * const {
- *   direction,
- *   goToNext,
- *   goToPrev,
- *   goToStep,
- *   skipToEnd,
- *   triggerSubmit,
- *   validateCurrentStep
- * } = useStepNavigation({ ... })
- * ```
+ * ВАЖНО: Все callback'и используют refs для нестабильных значений (sortedSteps, stepCount,
+ * currentStep, hiddenFields, onStepChange, onStepComplete). Это предотвращает пересоздание
+ * callback'ов при каждой регистрации шага, что вызывало бесконечный цикл:
+ * registerStep → новый sortedSteps/stepCount → новые callback'и → новый contextValue →
+ * ре-рендер → повторная регистрация → бесконечный цикл.
  */
 export function useStepNavigation({
   form,
@@ -87,22 +80,56 @@ export function useStepNavigation({
   // Направление анимации (для slide эффекта)
   const [direction, setDirection] = useState<StepDirection>('forward')
 
+  // Все нестабильные значения через refs — callback'и НИКОГДА не пересоздаются
+  const sortedStepsRef = useRef(sortedSteps)
+  sortedStepsRef.current = sortedSteps
+
+  const stepCountRef = useRef(stepCount)
+  stepCountRef.current = stepCount
+
+  const currentStepRef = useRef(currentStep)
+  currentStepRef.current = currentStep
+
+  const hiddenFieldsRef = useRef(hiddenFields)
+  hiddenFieldsRef.current = hiddenFields
+
+  const onStepChangeRef = useRef(onStepChange)
+  onStepChangeRef.current = onStepChange
+
+  const onStepCompleteRef = useRef(onStepComplete)
+  onStepCompleteRef.current = onStepComplete
+
+  const controlledStepRef = useRef(controlledStep)
+  controlledStepRef.current = controlledStep
+
+  const validateOnNextRef = useRef(validateOnNext)
+  validateOnNextRef.current = validateOnNext
+
   // Валидация полей текущего шага (исключая скрытые поля)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
-    if (!validateOnNext) {
+    if (!validateOnNextRef.current) {
       return true
     }
 
-    const currentStepInfo = sortedSteps[currentStep]
+    const currentStepInfo = sortedStepsRef.current[currentStepRef.current]
     if (!currentStepInfo || currentStepInfo.fieldNames.length === 0) {
       return true
     }
 
     // Фильтруем скрытые поля — они не должны валидироваться
-    const visibleFieldNames = currentStepInfo.fieldNames.filter((name) => !hiddenFields.has(name))
+    const visibleFieldNames = currentStepInfo.fieldNames.filter((name) => !hiddenFieldsRef.current.has(name))
 
     if (visibleFieldNames.length === 0) {
       return true
+    }
+
+    // Помечаем поля как touched для показа ошибок
+    for (const fieldName of visibleFieldNames) {
+      form.setFieldMeta(fieldName, (prev) => ({
+        ...prev,
+        isTouched: true,
+      }))
     }
 
     // Валидируем каждое видимое поле текущего шага
@@ -120,16 +147,18 @@ export function useStepNavigation({
     }
 
     return true
-  }, [form, currentStep, sortedSteps, validateOnNext, hiddenFields])
+  }, [form])
 
   // Переход к следующему шагу
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const goToNext = useCallback(async (): Promise<boolean> => {
     const isValid = await validateCurrentStep()
     if (!isValid) {
       return false
     }
 
-    const currentStepInfo = sortedSteps[currentStep]
+    const step = currentStepRef.current
+    const currentStepInfo = sortedStepsRef.current[step]
 
     // Вызываем onLeave callback если есть (может отменить переход)
     if (currentStepInfo?.onLeave) {
@@ -140,20 +169,20 @@ export function useStepNavigation({
     }
 
     // Вызываем onStepComplete callback
-    if (onStepComplete) {
-      await onStepComplete(currentStep, form.state.values)
+    if (onStepCompleteRef.current) {
+      await onStepCompleteRef.current(step, form.state.values)
     }
 
-    const nextStep = currentStep + 1
-    if (nextStep < stepCount) {
+    const nextStep = step + 1
+    if (nextStep < stepCountRef.current) {
       setDirection('forward')
-      if (controlledStep === undefined) {
+      if (controlledStepRef.current === undefined) {
         setInternalStep(nextStep)
       }
-      onStepChange?.(nextStep)
+      onStepChangeRef.current?.(nextStep)
 
       // Вызываем onEnter callback следующего шага
-      const nextStepInfo = sortedSteps[nextStep]
+      const nextStepInfo = sortedStepsRef.current[nextStep]
       if (nextStepInfo?.onEnter) {
         nextStepInfo.onEnter()
       }
@@ -161,23 +190,15 @@ export function useStepNavigation({
       return true
     }
     return false
-  }, [
-    currentStep,
-    stepCount,
-    controlledStep,
-    onStepChange,
-    validateCurrentStep,
-    sortedSteps,
-    onStepComplete,
-    form,
-    setInternalStep,
-  ])
+  }, [form, validateCurrentStep, setInternalStep])
 
   // Переход к предыдущему шагу
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const goToPrev = useCallback(async () => {
-    const prevStep = currentStep - 1
+    const step = currentStepRef.current
+    const prevStep = step - 1
     if (prevStep >= 0) {
-      const currentStepInfo = sortedSteps[currentStep]
+      const currentStepInfo = sortedStepsRef.current[step]
 
       // Вызываем onLeave callback если есть (может отменить переход)
       if (currentStepInfo?.onLeave) {
@@ -188,42 +209,44 @@ export function useStepNavigation({
       }
 
       setDirection('backward')
-      if (controlledStep === undefined) {
+      if (controlledStepRef.current === undefined) {
         setInternalStep(prevStep)
       }
-      onStepChange?.(prevStep)
+      onStepChangeRef.current?.(prevStep)
 
       // Вызываем onEnter callback предыдущего шага
-      const prevStepInfo = sortedSteps[prevStep]
+      const prevStepInfo = sortedStepsRef.current[prevStep]
       if (prevStepInfo?.onEnter) {
         prevStepInfo.onEnter()
       }
     }
-  }, [currentStep, controlledStep, onStepChange, sortedSteps, setInternalStep])
+  }, [setInternalStep])
 
   // Переход к конкретному шагу
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const goToStep = useCallback(
     (step: number) => {
-      if (step >= 0 && step < stepCount) {
-        // Определяем направление на основе разницы шагов
-        setDirection(step > currentStep ? 'forward' : 'backward')
-        if (controlledStep === undefined) {
+      if (step >= 0 && step < stepCountRef.current) {
+        setDirection(step > currentStepRef.current ? 'forward' : 'backward')
+        if (controlledStepRef.current === undefined) {
           setInternalStep(step)
         }
-        onStepChange?.(step)
+        onStepChangeRef.current?.(step)
       }
     },
-    [stepCount, currentStep, controlledStep, onStepChange, setInternalStep]
+    [setInternalStep],
   )
 
   // Пропустить до конца (без валидации)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const skipToEnd = useCallback(() => {
+    const count = stepCountRef.current
     setDirection('forward')
-    if (controlledStep === undefined) {
-      setInternalStep(stepCount) // За последний шаг — состояние completed
+    if (controlledStepRef.current === undefined) {
+      setInternalStep(count) // За последний шаг — состояние completed
     }
-    onStepChange?.(stepCount)
-  }, [stepCount, controlledStep, onStepChange, setInternalStep])
+    onStepChangeRef.current?.(count)
+  }, [setInternalStep])
 
   // Программный запуск отправки формы
   const triggerSubmit = useCallback(() => {

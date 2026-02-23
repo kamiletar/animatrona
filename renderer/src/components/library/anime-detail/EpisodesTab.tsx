@@ -6,7 +6,7 @@
  * Grid карточек эпизодов с прогрессом просмотра
  */
 
-import { Box, Button, Card, HStack, Heading, Icon, SimpleGrid, Text } from '@chakra-ui/react'
+import { Box, Button, Card, Heading, HStack, Icon, SimpleGrid, Text } from '@chakra-ui/react'
 import { LuFileText } from 'react-icons/lu'
 
 import { EpisodeCard } from '@/components/library/EpisodeCard'
@@ -17,8 +17,10 @@ export interface EpisodeData {
   number: number
   name?: string | null
   durationMs: number | null
-  thumbnailPaths: string | null
-  screenshotPaths: string | null
+  /** JSON массив CID thumbnail'ов в IPFS */
+  thumbnailCids: string | null
+  /** JSON массив CID скриншотов в IPFS */
+  screenshotCids: string | null
   encodingSettingsJson: string | null
   sourceSize: bigint | null
   transcodedSize: bigint | null
@@ -64,10 +66,9 @@ export function EpisodesTab({ episodes, watchProgress, isBdRemux, onEditNames }:
           const watchStatus = progress?.completed ? 'completed' : progress ? 'in_progress' : 'unwatched'
 
           // Вычисляем процент просмотра
-          const watchPercent =
-            progress && episode.durationMs && progress.currentTime
-              ? Math.min(100, ((progress.currentTime * 1000) / episode.durationMs) * 100)
-              : 0
+          const watchPercent = progress && episode.durationMs && progress.currentTime
+            ? Math.min(100, ((progress.currentTime * 1000) / episode.durationMs) * 100)
+            : 0
 
           return (
             <EpisodeCard
@@ -76,8 +77,8 @@ export function EpisodesTab({ episodes, watchProgress, isBdRemux, onEditNames }:
               number={episode.number}
               name={episode.name}
               durationMs={episode.durationMs}
-              thumbnailPaths={episode.thumbnailPaths}
-              screenshotPaths={episode.screenshotPaths}
+              thumbnailCids={episode.thumbnailCids}
+              screenshotCids={episode.screenshotCids}
               watchStatus={watchStatus}
               watchProgress={watchPercent}
               encodingSettingsJson={episode.encodingSettingsJson}

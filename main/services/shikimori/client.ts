@@ -7,6 +7,7 @@ import * as https from 'node:https'
 import * as path from 'node:path'
 
 import { app, nativeImage } from 'electron'
+import { createModuleLogger } from '../../utils/logger'
 
 import {
   GET_ANIME_DETAILS_QUERY,
@@ -26,6 +27,8 @@ import type {
   ShikimoriSearchResponse,
   ShikimoriWithRelatedResponse,
 } from './types'
+
+const log = createModuleLogger('ShikimoriClient')
 
 const GRAPHQL_ENDPOINT = 'https://shikimori.one/api/graphql'
 const USER_AGENT = 'Animatrona/1.0 (Desktop App)'
@@ -67,7 +70,7 @@ const CACHE_MISS = Symbol('CACHE_MISS')
  */
 function getCached<T>(key: string): T | typeof CACHE_MISS {
   const entry = apiCache.get(key)
-  if (!entry) {return CACHE_MISS}
+  if (!entry) return CACHE_MISS
 
   // Проверяем TTL
   if (Date.now() > entry.expiresAt) {
@@ -132,27 +135,38 @@ async function executeQuery<T>(query: string, variables: Record<string, unknown>
   // Throttle запросы для избежания 429
   await throttle()
 
-  const response = await fetch(GRAPHQL_ENDPOINT, {
-    method: 'POST',
-    headers: DEFAULT_HEADERS,
-    body: JSON.stringify({ query, variables }),
-  })
+  try {
+    const response = await fetch(GRAPHQL_ENDPOINT, {
+      method: 'POST',
+      headers: DEFAULT_HEADERS,
+      body: JSON.stringify({ query, variables }),
+    })
 
-  if (!response.ok) {
-    throw new Error(`Shikimori API error: ${response.status} ${response.statusText}`)
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {
+        /* игнорируем */
+      })
+      throw new Error(`Shikimori API error: ${response.status} ${response.statusText}`)
+    }
+
+    const json = (await response.json()) as { data?: T; errors?: { message: string }[] }
+
+    if (json.errors && json.errors.length > 0) {
+      throw new Error(`GraphQL errors: ${json.errors.map((e) => e.message).join(', ')}`)
+    }
+
+    if (!json.data) {
+      throw new Error('No data in response')
+    }
+
+    return json.data
+  } catch (error) {
+    // TypeError: terminated — соединение прервано (при закрытии приложения)
+    if (error instanceof TypeError && error.message === 'terminated') {
+      throw new Error('Соединение прервано')
+    }
+    throw error
   }
-
-  const json = (await response.json()) as { data?: T; errors?: { message: string }[] }
-
-  if (json.errors && json.errors.length > 0) {
-    throw new Error(`GraphQL errors: ${json.errors.map((e) => e.message).join(', ')}`)
-  }
-
-  if (!json.data) {
-    throw new Error('No data in response')
-  }
-
-  return json.data
 }
 
 /**
@@ -272,10 +286,9 @@ function getMimeType(ext: string): string {
 export async function downloadPoster(
   posterUrl: string,
   animeId: string,
-  options?: { fileName?: string; savePath?: string }
+  options?: { fileName?: string; savePath?: string },
 ): Promise<PosterDownloadResult> {
-  // Логируем входящий URL для отладки
-  console.log('[downloadPoster] Input URL:', posterUrl)
+  log.debug('Скачивание постера', { posterUrl, animeId })
 
   try {
     // Папка для постеров:
@@ -291,18 +304,20 @@ export async function downloadPoster(
     const finalFileName = options?.fileName || (options?.savePath ? `poster${ext}` : `${animeId}${ext}`)
     const localPath = path.join(postersDir, finalFileName)
 
-    // Скачать файл
+    // Скачать файл (с timeout для устойчивости к обрывам сети)
+    const DOWNLOAD_TIMEOUT = 15_000
+
     await new Promise<void>((resolve, reject) => {
       const file = fs.createWriteStream(localPath)
 
-      https
-        .get(posterUrl, (response) => {
+      const req = https
+        .get(posterUrl, { timeout: DOWNLOAD_TIMEOUT }, (response) => {
           // Следуем редиректам
           if (response.statusCode === 301 || response.statusCode === 302) {
             const redirectUrl = response.headers.location
             if (redirectUrl) {
-              https
-                .get(redirectUrl, (redirectResponse) => {
+              const redirectReq = https
+                .get(redirectUrl, { timeout: DOWNLOAD_TIMEOUT }, (redirectResponse) => {
                   redirectResponse.pipe(file)
                   file.on('finish', () => {
                     file.close()
@@ -310,6 +325,10 @@ export async function downloadPoster(
                   })
                 })
                 .on('error', reject)
+              redirectReq.on('timeout', () => {
+                redirectReq.destroy()
+                reject(new Error(`Poster download timeout (redirect: ${redirectUrl})`))
+              })
               return
             }
           }
@@ -329,6 +348,11 @@ export async function downloadPoster(
           }
           reject(err)
         })
+
+      req.on('timeout', () => {
+        req.destroy()
+        reject(new Error(`Poster download timeout: ${posterUrl}`))
+      })
     })
 
     // Получить размер файла асинхронно
@@ -348,8 +372,7 @@ export async function downloadPoster(
       blurDataURL = `data:image/jpeg;base64,${blurBuffer.toString('base64')}`
     }
 
-    // Логируем результат для отладки
-    console.log('[downloadPoster] Downloaded:', { localPath, width, height, size })
+    log.debug('Постер скачан', { localPath, width, height, size })
 
     return {
       success: true,

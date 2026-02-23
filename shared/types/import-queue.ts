@@ -259,6 +259,8 @@ export interface ImportQueueAudioRecommendation {
   groupName?: string
   /** Язык аудиодорожки (ru, en, ja и т.д.) */
   language?: string
+  /** Команда озвучки, выбранная пользователем в UI */
+  dubGroup?: string
 }
 
 /**
@@ -311,6 +313,10 @@ export interface ImportQueueEntry {
   encodingProfile?: ImportQueueEncodingProfile
   /** Анализ файлов с рекомендациями по аудиодорожкам */
   fileAnalyses?: ImportQueueFileAnalysis[]
+  /** Принудительное использование CPU кодирования (per-item опция) */
+  forceCpu?: boolean
+  /** Режим импорта одиночного файла (не папки) — не сканировать внешние субтитры/аудио */
+  isFileMode?: boolean
 
   // === Данные донора (опционально) ===
 
@@ -323,6 +329,8 @@ export interface ImportQueueEntry {
 
   // === Runtime данные ===
 
+  /** Глобальная настройка useGpu из Settings (заполняется main process при processNext) */
+  globalUseGpu?: boolean
   /** Прогресс (0-100) */
   progress?: number
   /** Текущий обрабатываемый файл */

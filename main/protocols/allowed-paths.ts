@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Динамический whitelist разрешённых путей для media:// протокола
  *
@@ -12,6 +11,9 @@ import { app } from 'electron'
 import path from 'path'
 
 import { getDefaultLibraryPath } from '../services/output-path-resolver'
+import { createModuleLogger } from '../utils/logger'
+
+const log = createModuleLogger('AllowedPaths')
 
 /** Set разрешённых директорий (абсолютные пути) */
 const allowedPaths = new Set<string>()
@@ -42,7 +44,7 @@ export function initAllowedPaths(): void {
 
   initialized = true
 
-  console.log('[AllowedPaths] Initialized with:', [...allowedPaths])
+  log.info('Initialized', { paths: [...allowedPaths] })
 }
 
 /**
@@ -52,7 +54,7 @@ export function initAllowedPaths(): void {
 export function allowPath(folderPath: string): void {
   const resolved = path.resolve(folderPath)
   allowedPaths.add(resolved)
-  console.log(`[AllowedPaths] Added: ${resolved}`)
+  log.info('Path added', { path: resolved })
 }
 
 /**

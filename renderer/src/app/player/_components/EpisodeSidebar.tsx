@@ -15,7 +15,7 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react'
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import {
   LuChevronDown,
   LuChevronRight,
@@ -63,9 +63,9 @@ interface EpisodeSidebarProps {
 
 /** Форматирование размера файла */
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {return `${bytes} B`}
-  if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`}
-  if (bytes < 1024 * 1024 * 1024) {return `${(bytes / (1024 * 1024)).toFixed(1)} MB`}
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
@@ -73,8 +73,62 @@ function formatFileSize(bytes: number): string {
 function truncateName(name: string, maxLength = 35): string {
   // Убираем расширение
   const nameWithoutExt = name.replace(/\.[^.]+$/, '')
-  if (nameWithoutExt.length <= maxLength) {return nameWithoutExt}
+  if (nameWithoutExt.length <= maxLength) return nameWithoutExt
   return nameWithoutExt.slice(0, maxLength - 3) + '...'
+}
+
+/**
+ * Находит общий префикс для массива имён файлов
+ * Например: ["2002 - Robin - S01E01.mkv", "2002 - Robin - S01E02.mkv"] -> "2002 - Robin - "
+ */
+function findCommonPrefix(names: string[]): string {
+  if (names.length <= 1) return '' // Для одного файла не убираем префикс
+
+  // Убираем расширения для сравнения
+  const namesWithoutExt = names.map((n) => n.replace(/\.[^.]+$/, ''))
+  const first = namesWithoutExt[0]
+  let prefixLength = 0
+
+  for (let i = 0; i < first.length; i++) {
+    const char = first[i]
+    if (namesWithoutExt.every((name) => name[i] === char)) {
+      prefixLength++
+    } else {
+      break
+    }
+  }
+
+  // Не убираем слишком короткий префикс (меньше 5 символов)
+  if (prefixLength < 5) return ''
+
+  return first.slice(0, prefixLength)
+}
+
+/**
+ * Получает отображаемое имя эпизода, убирая общий префикс
+ */
+function getDisplayName(name: string, commonPrefix: string, episodeNumber: number | null): string {
+  // Убираем расширение
+  const nameWithoutExt = name.replace(/\.[^.]+$/, '')
+
+  // Убираем общий префикс
+  let displayName = commonPrefix ? nameWithoutExt.slice(commonPrefix.length).trim() : nameWithoutExt
+
+  // Убираем начальные разделители (-, _, .)
+  displayName = displayName.replace(/^[\s\-_.]+/, '')
+
+  // Если осталось что-то осмысленное — используем
+  if (displayName.length > 0 && displayName.length <= 40) {
+    return displayName
+  }
+
+  // Fallback на номер эпизода если есть
+  if (episodeNumber !== null) {
+    return `Эпизод ${episodeNumber}`
+  }
+
+  // Последний fallback — обрезанное имя
+  return truncateName(nameWithoutExt)
 }
 
 /** Получение бейджа типа эпизода */
@@ -97,15 +151,19 @@ const EpisodeItem = memo(function EpisodeItem({
   index,
   isActive,
   progressPercent,
+  commonPrefix,
   onSelect,
 }: {
   episode: FolderEpisode
   index: number
   isActive: boolean
   progressPercent: number
+  /** Общий префикс имён файлов для удаления */
+  commonPrefix: string
   onSelect: () => void
 }) {
   const typeBadge = getEpisodeTypeBadge(episode.episodeType)
+  const displayName = getDisplayName(episode.name, commonPrefix, episode.episodeNumber)
 
   return (
     <Box
@@ -138,7 +196,7 @@ const EpisodeItem = memo(function EpisodeItem({
         <VStack align="start" gap={0.5} flex={1} minW={0}>
           <HStack gap={1.5} w="full">
             <Text fontSize="sm" fontWeight={isActive ? 'semibold' : 'normal'} color="fg" truncate flex={1}>
-              {truncateName(episode.name)}
+              {displayName}
             </Text>
             {typeBadge && (
               <Badge size="xs" colorPalette={typeBadge.colorPalette}>
@@ -237,6 +295,11 @@ export const EpisodeSidebar = memo(function EpisodeSidebar({
   onToggleCollapse: _onToggleCollapse,
   onImportToLibrary,
 }: EpisodeSidebarProps) {
+  // Вычисляем общий префикс для всех эпизодов
+  const commonPrefix = useMemo(() => {
+    return findCommonPrefix(episodes.map((ep) => ep.name))
+  }, [episodes])
+
   if (isCollapsed) {
     return null
   }
@@ -245,6 +308,7 @@ export const EpisodeSidebar = memo(function EpisodeSidebar({
     <Box
       w="280px"
       h="full"
+      minH={0}
       bg="bg.panel"
       borderRight="1px"
       borderColor="border.subtle"
@@ -270,7 +334,23 @@ export const EpisodeSidebar = memo(function EpisodeSidebar({
       </Flex>
 
       {/* Список эпизодов */}
-      <Box flex={1} overflowY="auto" py={2}>
+      <Box
+        flex={1}
+        minH={0}
+        overflowY="auto"
+        py={2}
+        css={{
+          '&::-webkit-scrollbar': { width: '6px' },
+          '&::-webkit-scrollbar-track': { background: 'transparent' },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'var(--chakra-colors-border-subtle)',
+            borderRadius: '3px',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            background: 'var(--chakra-colors-fg-subtle)',
+          },
+        }}
+      >
         {/* Секция эпизодов */}
         {episodes.length > 0 && (
           <Box mb={2}>
@@ -289,6 +369,7 @@ export const EpisodeSidebar = memo(function EpisodeSidebar({
                   index={idx}
                   isActive={!isCurrentBonus && currentIndex === idx}
                   progressPercent={getProgressPercent(ep.path)}
+                  commonPrefix={commonPrefix}
                   onSelect={() => onSelectEpisode(idx)}
                 />
               ))}

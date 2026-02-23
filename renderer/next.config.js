@@ -49,8 +49,21 @@ const nextConfig = {
     loaderFile: './src/lib/image-loader.ts',
   },
 
-  // Транспиляция shared библиотек из монорепо
-  transpilePackages: ['@lena/ui', '@lena/chakra-provider', '@lena/form-components', '@lena/query-provider'],
+  // Транспиляция shared библиотек из монорепо + Prisma libsql адаптер (принудительный бандлинг)
+  transpilePackages: [
+    '@lena/ui',
+    '@lena/chakra-provider',
+    '@lena/form-components',
+    '@lena/query-provider',
+    // Принудительно бандлим вместо экстернализации — иначе turbopack создаёт внешние модули
+    // с битыми ESM зависимостями (node-fetch → fetch-blob)
+    '@libsql/client',
+    '@libsql/core',
+    '@libsql/hrana-client',
+    '@prisma/adapter-libsql',
+    '@prisma/driver-adapter-utils',
+    '@prisma/debug',
+  ],
 
   // TypeScript проверка
   typescript: {
@@ -64,6 +77,8 @@ const nextConfig = {
     '@zenstackhq/orm',
     '@zenstackhq/plugin-policy',
     '@zenstackhq/server',
+    // libsql — native SQLite binding (N-API), единственный модуль требующий экстернализации
+    'libsql',
   ],
 
   // Разрешаем cross-origin запросы в dev режиме (для Electron)
@@ -81,6 +96,8 @@ const nextConfig = {
       './node_modules/@zenstackhq/**/*',
       './node_modules/kysely/**/*',
       './node_modules/kysely-wasm/**/*',
+      // libsql — native SQLite binding для Prisma 7 Driver Adapter
+      './node_modules/libsql/**/*',
       // Prisma client (fallback)
       './apps/animatrona/renderer/src/generated/prisma/**/*',
       // @lena монорепо библиотеки
@@ -98,6 +115,12 @@ const nextConfig = {
     // - Монорепо: apps/animatrona/
     // - Standalone: animatrona-build/
     root: standaloneRoot,
+    // Заменяем node-fetch/cross-fetch на встроенный fetch (Node.js 22+ / Electron 40)
+    // Это убирает цепочку ESM полифиллов: fetch-blob, web-streams-polyfill, data-uri-to-buffer, etc.
+    resolveAlias: {
+      'cross-fetch': './src/lib/fetch-shim.ts',
+      'node-fetch': './src/lib/fetch-shim.ts',
+    },
   },
 }
 

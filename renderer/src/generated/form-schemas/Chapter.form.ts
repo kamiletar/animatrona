@@ -11,7 +11,7 @@ export const ChapterCreateFormSchema = z.object({
   episodeId: z.string(),
   startMs: z.number().int(),
   endMs: z.number().int(),
-  title: z.string().optional()
+  title: z.string().nullable().optional()
     .meta({
       ui: { title: 'Название' }
     }),

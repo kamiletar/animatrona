@@ -7,6 +7,7 @@ import { useCallback, useState } from 'react'
 
 import { getCachedProbe } from '@/lib/cache'
 import { parseEpisodeInfo } from '@/lib/parse-filename'
+import type { ExternalAudioScanResult, ExternalSubtitleScanResult } from '@/types/electron'
 
 import type { EmbeddedTracksInfo, ExternalTracksInfo, FolderEpisode, FolderPlayerState } from '../types'
 import { isBonusVideo } from '../types'
@@ -79,9 +80,18 @@ export function useFolderPlayer() {
 
     try {
       // Сканируем видеофайлы
+      // createHandler оборачивает в { success, data: { files } }
       const result = await window.electronAPI.fs.scanFolder(folderPath, true, ['video'])
+      // Результат: { success: boolean, data?: { files: [...] } } или { success: false, error: string }
+      const rawResult = result as {
+        success: boolean
+        data?: { files: Array<{ path: string; name: string; size: number; extension: string }> }
+        files?: Array<{ path: string; name: string; size: number; extension: string }>
+      }
+      // Поддерживаем оба формата: data.files (новый) и files (старый)
+      const files = rawResult.data?.files || rawResult.files || []
 
-      if (!result.success || result.files.length === 0) {
+      if (!rawResult.success || files.length === 0) {
         setState((s) => ({
           ...s,
           isScanning: false,
@@ -94,7 +104,7 @@ export function useFolderPlayer() {
       const episodes: FolderEpisode[] = []
       const bonusVideos: FolderEpisode[] = []
 
-      for (const file of result.files) {
+      for (const file of files) {
         const episodeInfo = parseEpisodeInfo(file.name)
         const isBonus = isBonusVideo(file.path)
 
@@ -114,9 +124,9 @@ export function useFolderPlayer() {
 
       // Сортируем эпизоды по номеру (null в конец)
       episodes.sort((a, b) => {
-        if (a.episodeNumber === null && b.episodeNumber === null) {return 0}
-        if (a.episodeNumber === null) {return 1}
-        if (b.episodeNumber === null) {return -1}
+        if (a.episodeNumber === null && b.episodeNumber === null) return 0
+        if (a.episodeNumber === null) return 1
+        if (b.episodeNumber === null) return -1
         return a.episodeNumber - b.episodeNumber
       })
 
@@ -161,9 +171,9 @@ export function useFolderPlayer() {
       return
     }
 
-    // Открываем диалог выбора папки
+    // Preload уже разворачивает { success, data } и возвращает string | null
     const folderPath = await window.electronAPI.dialog.selectFolder()
-    if (!folderPath) {return}
+    if (!folderPath) return
 
     await scanFolderInternal(folderPath)
   }, [scanFolderInternal])
@@ -182,7 +192,7 @@ export function useFolderPlayer() {
    * Внутренняя функция сканирования дорожек
    */
   const scanTracksForEpisodeInternal = async (folderPath: string, episode: FolderEpisode) => {
-    if (!window.electronAPI) {return}
+    if (!window.electronAPI) return
 
     setState((s) => ({ ...s, isLoadingTracks: true, embeddedTracks: null }))
 
@@ -196,11 +206,31 @@ export function useFolderPlayer() {
       ]
 
       // Параллельно сканируем внешние дорожки и пробим MKV (с кэшированием)
-      const [audioResult, subsResult, probeResult] = await Promise.all([
-        window.electronAPI.fs.scanExternalAudio(folderPath, videoFiles),
-        window.electronAPI.fs.scanExternalSubtitles(folderPath, videoFiles),
+      // createHandler возвращает { success, data: ExternalAudioScanResult | ExternalSubtitleScanResult }
+      const [audioResultRaw, subsResultRaw, probeResult] = await Promise.all([
+        window.electronAPI.fs.scanExternalAudio(folderPath, videoFiles) as unknown as {
+          success: boolean
+          data?: ExternalAudioScanResult
+        },
+        window.electronAPI.fs.scanExternalSubtitles(folderPath, videoFiles) as unknown as {
+          success: boolean
+          data?: ExternalSubtitleScanResult
+        },
         getCachedProbe(episode.path),
       ])
+
+      // Извлекаем данные из обёртки createHandler
+      const audioResult: ExternalAudioScanResult = audioResultRaw.data || {
+        audioTracks: [],
+        audioDirs: [],
+        unmatchedFiles: [],
+      }
+      const subsResult: ExternalSubtitleScanResult = subsResultRaw.data || {
+        subtitles: [],
+        subsDirs: [],
+        fontsDirs: [],
+        unmatchedFiles: [],
+      }
 
       // Фильтруем внешние дорожки для текущего эпизода
       // Для фильмов (episodeNumber === null) берём все дорожки без фильтрации
@@ -268,7 +298,7 @@ export function useFolderPlayer() {
   const goToEpisode = useCallback(
     async (index: number) => {
       const { episodes, folderPath } = state
-      if (index < 0 || index >= episodes.length || !folderPath) {return}
+      if (index < 0 || index >= episodes.length || !folderPath) return
 
       setState((s) => ({
         ...s,
@@ -288,7 +318,7 @@ export function useFolderPlayer() {
   const goToBonus = useCallback(
     async (index: number) => {
       const { bonusVideos, folderPath } = state
-      if (index < 0 || index >= bonusVideos.length || !folderPath) {return}
+      if (index < 0 || index >= bonusVideos.length || !folderPath) return
 
       setState((s) => ({
         ...s,

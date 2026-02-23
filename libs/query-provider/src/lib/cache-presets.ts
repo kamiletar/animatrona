@@ -23,8 +23,8 @@ export const REALTIME_CACHE: DefaultOptions['queries'] = {
  */
 export const STANDARD_CACHE: DefaultOptions['queries'] = {
   staleTime: 5 * 60 * 1000, // 5 минут
-  gcTime: 30 * 60 * 1000, // 30 минут
-  refetchOnWindowFocus: true,
+  gcTime: 5 * 60 * 1000, // 5 минут (было 30 — memory leak fix)
+  refetchOnWindowFocus: false, // Отключено — снижает нагрузку на GC
   refetchOnReconnect: true,
   retry: 2,
   retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ImportQueueController — координатор очереди импорта
  *
@@ -34,6 +33,10 @@ import type {
 import type { CqSearchProgress } from '../../shared/types/vmaf'
 import { setPowerSaveTranscoding } from '../ipc/app.handlers'
 import { findOptimalCQ } from '../src/ffmpeg'
+import { prisma } from '../utils/db'
+import { createModuleLogger } from '../utils/logger'
+
+const log = createModuleLogger('ImportQueue')
 
 /**
  * Контроллер очереди импорта
@@ -73,7 +76,7 @@ export class ImportQueueController extends EventEmitter {
 
   private constructor() {
     super()
-    console.log('[ImportQueueController] Initialized')
+    log.info('Initialized')
   }
 
   // ==========================================
@@ -160,14 +163,12 @@ export class ImportQueueController extends EventEmitter {
         (i) => i.folderPath === entry.folderPath && i.status !== 'completed' && i.status !== 'error',
       )
       if (existingByPath) {
-        console.warn(`[ImportQueueController] Item with path ${entry.folderPath} already in queue, skipping`)
+        log.warn('Item already in queue, skipping', { path: entry.folderPath })
         continue
       }
 
       this.queue.set(id, entry)
-      console.log(
-        `[ImportQueueController] Added item ${id}: ${entry.selectedAnime.russian || entry.selectedAnime.name}`,
-      )
+      log.info('Added item', { id, anime: entry.selectedAnime.russian || entry.selectedAnime.name })
     }
 
     this.emitStateChanged()
@@ -183,12 +184,12 @@ export class ImportQueueController extends EventEmitter {
    */
   startQueue(): void {
     if (this.currentId) {
-      console.log('[ImportQueueController] Queue already processing')
+      log.info('Queue already processing')
       return
     }
 
     this.isPaused = false
-    this.processNext()
+    this.processNext().catch((err) => log.error('processNext error', { error: String(err) }))
   }
 
   /**
@@ -205,7 +206,7 @@ export class ImportQueueController extends EventEmitter {
   resumeQueue(): void {
     this.isPaused = false
     if (!this.currentId) {
-      this.processNext()
+      this.processNext().catch((err) => log.error('processNext error', { error: String(err) }))
     }
     this.emitStateChanged()
   }
@@ -216,7 +217,7 @@ export class ImportQueueController extends EventEmitter {
   cancelItem(itemId: string): void {
     const item = this.queue.get(itemId)
     if (!item) {
-      console.warn(`[ImportQueueController] Item ${itemId} not found`)
+      log.warn('Item not found', { itemId })
       return
     }
 
@@ -224,7 +225,7 @@ export class ImportQueueController extends EventEmitter {
     if (this.currentId === itemId) {
       this.updateItemStatus(itemId, 'cancelled')
       this.currentId = null
-      this.processNext()
+      this.processNext().catch((err) => log.error('processNext error', { error: String(err) }))
     } else {
       this.updateItemStatus(itemId, 'cancelled')
     }
@@ -235,7 +236,7 @@ export class ImportQueueController extends EventEmitter {
    */
   removeItem(itemId: string): void {
     if (this.currentId === itemId) {
-      console.warn(`[ImportQueueController] Cannot remove currently processing item ${itemId}`)
+      log.warn('Cannot remove currently processing item', { itemId })
       return
     }
 
@@ -250,13 +251,13 @@ export class ImportQueueController extends EventEmitter {
   retryItem(itemId: string): void {
     const item = this.queue.get(itemId)
     if (!item) {
-      console.warn(`[ImportQueueController] Item ${itemId} not found for retry`)
+      log.warn('Item not found for retry', { itemId })
       return
     }
 
     // Можно повторять только error или cancelled items
     if (item.status !== 'error' && item.status !== 'cancelled') {
-      console.warn(`[ImportQueueController] Cannot retry item ${itemId} with status ${item.status}`)
+      log.warn('Cannot retry item with this status', { itemId, status: item.status })
       return
     }
 
@@ -271,9 +272,7 @@ export class ImportQueueController extends EventEmitter {
     item.completedAt = undefined
     // vmafResult сохраняем — не нужно повторно подбирать CQ
 
-    console.log(
-      `[ImportQueueController] Retrying item ${itemId}: ${item.selectedAnime.russian || item.selectedAnime.name}`,
-    )
+    log.info('Retrying item', { itemId, anime: item.selectedAnime.russian || item.selectedAnime.name })
 
     this.emitStateChanged()
 
@@ -295,13 +294,13 @@ export class ImportQueueController extends EventEmitter {
     const overItem = this.queue.get(overId)
 
     if (!activeItem || !overItem) {
-      console.warn(`[ImportQueueController] Cannot reorder: item not found`)
+      log.warn('Cannot reorder: item not found')
       return
     }
 
     // Можно переупорядочивать только pending items
     if (activeItem.status !== 'pending' || overItem.status !== 'pending') {
-      console.warn(`[ImportQueueController] Cannot reorder: only pending items can be reordered`)
+      log.warn('Cannot reorder: only pending items can be reordered')
       return
     }
 
@@ -325,7 +324,7 @@ export class ImportQueueController extends EventEmitter {
     })
 
     this.emitStateChanged()
-    console.log(`[ImportQueueController] Reordered: ${activeId} moved to position ${newIndex}`)
+    log.info('Reordered item', { activeId, newIndex })
   }
 
   /**
@@ -335,7 +334,9 @@ export class ImportQueueController extends EventEmitter {
     // Отменяем все pending и processing items
     for (const [id, item] of this.queue) {
       if (
-        item.status === 'pending' || item.status === 'vmaf' || item.status === 'preparing'
+        item.status === 'pending'
+        || item.status === 'vmaf'
+        || item.status === 'preparing'
         || item.status === 'transcoding'
       ) {
         item.status = 'cancelled'
@@ -346,7 +347,7 @@ export class ImportQueueController extends EventEmitter {
 
     this.currentId = null
     this.emitStateChanged()
-    console.log('[ImportQueueController] All items cancelled')
+    log.info('All items cancelled')
   }
 
   /**
@@ -385,7 +386,7 @@ export class ImportQueueController extends EventEmitter {
   updateItemStatus(itemId: string, status: ImportQueueStatus, error?: string): void {
     const item = this.queue.get(itemId)
     if (!item) {
-      console.warn(`[ImportQueueController] Item ${itemId} not found for status update`)
+      log.warn('Item not found for status update', { itemId })
       return
     }
 
@@ -413,7 +414,7 @@ export class ImportQueueController extends EventEmitter {
       }
     }
 
-    console.log(`[ImportQueueController] Item ${itemId} status: ${prevStatus} → ${status}`)
+    log.info('Item status changed', { itemId, from: prevStatus, to: status })
     this.emitItemStatus(itemId, status, error)
 
     // Если завершён — переходим к следующему
@@ -421,7 +422,7 @@ export class ImportQueueController extends EventEmitter {
       if (this.currentId === itemId) {
         this.currentId = null
         if (!this.isPaused) {
-          this.processNext()
+          this.processNext().catch((err) => log.error('processNext error', { error: String(err) }))
         }
       }
     }
@@ -455,10 +456,10 @@ export class ImportQueueController extends EventEmitter {
     if (detailProgress !== undefined) {
       item.detailProgress = {
         ...detailProgress,
-        // Оставляем только активные видео воркеры (progress < 100)
-        videoWorkers: detailProgress.videoWorkers?.filter((w) => w.progress < 100),
-        // Оставляем только активные аудио воркеры (не completed)
-        audioWorkers: detailProgress.audioWorkers?.filter((w) => w.status === 'running' || w.status === 'pending'),
+        // Видео воркеры: показываем все (включая завершённые) для наглядности
+        videoWorkers: detailProgress.videoWorkers,
+        // Аудио воркеры: показываем все (включая завершённые) для наглядности
+        audioWorkers: detailProgress.audioWorkers,
       }
     }
 
@@ -535,19 +536,19 @@ export class ImportQueueController extends EventEmitter {
   updateItem(itemId: string, data: Partial<ImportQueueAddData>): void {
     const item = this.queue.get(itemId)
     if (!item) {
-      console.warn(`[ImportQueueController] Item ${itemId} not found for update`)
+      log.warn('Item not found for update', { itemId })
       return
     }
 
     // Нельзя редактировать текущий обрабатываемый item
     if (this.currentId === itemId) {
-      console.warn(`[ImportQueueController] Cannot update currently processing item ${itemId}`)
+      log.warn('Cannot update currently processing item', { itemId })
       return
     }
 
     // Нельзя редактировать завершённые items
     if (['completed', 'error', 'cancelled'].includes(item.status)) {
-      console.warn(`[ImportQueueController] Cannot update completed/error/cancelled item ${itemId}`)
+      log.warn('Cannot update completed/error/cancelled item', { itemId })
       return
     }
 
@@ -568,7 +569,7 @@ export class ImportQueueController extends EventEmitter {
       item.donorFiles = data.donorFiles
     }
 
-    console.log(`[ImportQueueController] Updated item ${itemId}`)
+    log.info('Updated item', { itemId })
     this.emitStateChanged()
   }
 
@@ -579,9 +580,9 @@ export class ImportQueueController extends EventEmitter {
   /**
    * Обработать следующий item в очереди
    */
-  private processNext(): void {
+  private async processNext(): Promise<void> {
     if (this.isPaused) {
-      console.log('[ImportQueueController] Queue is paused, not processing next')
+      log.info('Queue is paused, not processing next')
       return
     }
 
@@ -591,7 +592,7 @@ export class ImportQueueController extends EventEmitter {
       .sort((a, b) => a.priority - b.priority)
 
     if (pending.length === 0) {
-      console.log('[ImportQueueController] No pending items')
+      log.info('No pending items')
       this.currentId = null
       // Разрешаем спящий режим когда очередь пуста
       setPowerSaveTranscoding(false)
@@ -607,14 +608,18 @@ export class ImportQueueController extends EventEmitter {
     const next = pending[0]
     this.currentId = next.id
 
+    // Получаем глобальные настройки и сохраняем в item для renderer
+    const globalSettings = await this.getGlobalSettings()
+    next.globalUseGpu = globalSettings?.useGpu ?? true
+
     // Блокируем спящий режим при старте обработки
     setPowerSaveTranscoding(true)
 
-    console.log(
-      `[ImportQueueController] Processing next item: ${next.id} (${
-        next.selectedAnime.russian || next.selectedAnime.name
-      })`,
-    )
+    log.info('Processing next item', {
+      id: next.id,
+      anime: next.selectedAnime.russian || next.selectedAnime.name,
+      globalUseGpu: next.globalUseGpu,
+    })
 
     // Устанавливаем статус vmaf если нужен VMAF, иначе preparing
     const needsVmaf = next.vmafSettings?.enabled && !next.vmafResult
@@ -631,9 +636,23 @@ export class ImportQueueController extends EventEmitter {
     // (см. ImportQueueProcessor.tsx — слушает currentItem.status === 'preparing')
     if (needsVmaf) {
       this.runVmaf(next.id).catch((err) => {
-        console.error(`[ImportQueueController] VMAF failed for ${next.id}:`, err)
+        log.error('VMAF failed', { itemId: next.id, error: String(err) })
         this.updateItemStatus(next.id, 'error', err instanceof Error ? err.message : String(err))
       })
+    }
+  }
+
+  /**
+   * Получить глобальные настройки приложения
+   */
+  private async getGlobalSettings(): Promise<{ useGpu: boolean } | null> {
+    try {
+      const settings = await prisma.settings.findFirst()
+      log.info('Global settings loaded', { useGpu: settings?.useGpu, hasSettings: !!settings })
+      return settings ? { useGpu: settings.useGpu } : null
+    } catch (err) {
+      log.warn('Failed to get global settings', { error: String(err) })
+      return null
     }
   }
 
@@ -663,16 +682,35 @@ export class ImportQueueController extends EventEmitter {
       throw new Error('Encoding profile not found')
     }
 
+    // Получаем глобальные настройки для проверки useGpu
+    const globalSettings = await this.getGlobalSettings()
+
+    // Определяем режим кодирования:
+    // 1. profile.preferCpu — принудительно CPU в профиле
+    // 2. !profile.useGpu — GPU отключен в профиле
+    // 3. globalSettings?.useGpu === false — GPU отключен глобально
+    const shouldUseCpu = profile.preferCpu || !profile.useGpu || globalSettings?.useGpu === false
+
     const animeName = item.selectedAnime.russian || item.selectedAnime.name
-    const encodingMode = profile.preferCpu ? 'CPU (preferCpu)' : profile.useGpu ? 'GPU' : 'CPU'
-    console.log(
-      `[ImportQueueController] Starting VMAF for "${animeName}" with targetVmaf=${item.vmafSettings.targetVmaf}, encoding=${encodingMode}`,
-    )
+    const encodingMode = shouldUseCpu ? 'CPU' : 'GPU'
+    log.info('Starting VMAF', {
+      animeName,
+      targetVmaf: item.vmafSettings.targetVmaf,
+      encoding: encodingMode,
+      reason: profile.preferCpu
+        ? 'preferCpu'
+        : !profile.useGpu
+        ? 'profile.useGpu=false'
+        : globalSettings?.useGpu === false
+        ? 'settings.useGpu=false'
+        : 'GPU enabled',
+    })
 
     // Формируем videoOptions из профиля
+    // ВАЖНО: если глобально GPU отключен, переопределяем useGpu в опциях
     const videoOptions = {
       codec: profile.codec.toLowerCase() as 'av1' | 'hevc' | 'h264',
-      useGpu: profile.useGpu,
+      useGpu: !shouldUseCpu, // Учитываем глобальную настройку
       preset: profile.preset,
       rateControl: profile.rateControl as 'CONSTQP' | 'VBR',
       maxBitrate: profile.maxBitrate ?? undefined,
@@ -695,8 +733,7 @@ export class ImportQueueController extends EventEmitter {
       maxIterations: 10,
     }
 
-    // Запускаем VMAF поиск (с поддержкой preferCpu из профиля)
-    const preferCpu = profile.preferCpu ?? false
+    // Запускаем VMAF поиск (preferCpu если нужно использовать CPU)
     const result = await findOptimalCQ(
       sampleFile.path,
       videoOptions,
@@ -709,12 +746,15 @@ export class ImportQueueController extends EventEmitter {
         }
         this.updateVmafProgress(itemId, vmafProgress)
       },
-      preferCpu,
+      shouldUseCpu,
     )
 
-    console.log(
-      `[ImportQueueController] VMAF completed for "${animeName}": optimalCq=${result.optimalCq}, vmaf=${result.vmafScore}, time=${result.totalTime}ms`,
-    )
+    log.info('VMAF completed', {
+      animeName,
+      optimalCq: result.optimalCq,
+      vmaf: result.vmafScore,
+      timeMs: result.totalTime,
+    })
 
     // Сохраняем результат
     const vmafResult: ImportQueueVmafResult = {
@@ -802,7 +842,7 @@ export class ImportQueueController extends EventEmitter {
     }
 
     if (toRemove.length > 0) {
-      console.log(`[ImportQueueController] Cleared ${toRemove.length} completed items`)
+      log.info('Cleared completed items', { count: toRemove.length })
       this.emitStateChanged()
     }
   }
@@ -812,7 +852,7 @@ export class ImportQueueController extends EventEmitter {
    */
   clearAll(): void {
     if (this.currentId) {
-      console.warn('[ImportQueueController] Cannot clear while processing')
+      log.warn('Cannot clear while processing')
       return
     }
 

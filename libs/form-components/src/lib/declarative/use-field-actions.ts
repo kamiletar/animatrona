@@ -4,6 +4,11 @@ import { useCallback, useSyncExternalStore } from 'react'
 import { useFormGroup } from '../form-group'
 import { useDeclarativeForm } from './form-context'
 
+// Стабильный fallback для fieldMeta — предотвращает бесконечный цикл в useSyncExternalStore.
+// Если создавать новый объект в getSnapshot каждый раз, Object.is сравнение даст false,
+// и React будет бесконечно ре-рендерить компонент.
+const EMPTY_FIELD_META = Object.freeze({ errors: [], isTouched: false })
+
 /**
  * Result type for useFieldActions hook
  */
@@ -103,49 +108,38 @@ export function useFieldActions<TValue = unknown>(fieldName: string): FieldActio
       }
       return result as TValue
     },
-    [fullPath]
+    [fullPath],
   )
+
+  // Подписка на store — выносим useCallback ДО useSyncExternalStore
+  // (React 19 запрещает вызов хуков внутри аргументов других хуков)
+  const subscribe = useCallback(
+    (callback: () => void) => form.store.subscribe(callback),
+    [form],
+  )
+
+  const getValueSnapshot = useCallback(
+    () => getNestedValue(form.state.values as Record<string, unknown>),
+    [form, getNestedValue],
+  )
+
+  const getMetaSnapshot = useCallback(() => {
+    const meta = form.store.state.fieldMeta[fullPath]
+    return meta || EMPTY_FIELD_META
+  }, [form, fullPath])
 
   // Subscribe to field value changes
-  const value = useSyncExternalStore(
-    useCallback(
-      (callback: () => void) => {
-        return form.store.subscribe(callback)
-      },
-      [form]
-    ),
-    useCallback(() => {
-      return getNestedValue(form.state.values as Record<string, unknown>)
-    }, [form, getNestedValue]),
-    useCallback(() => {
-      return getNestedValue(form.state.values as Record<string, unknown>)
-    }, [form, getNestedValue])
-  )
+  const value = useSyncExternalStore(subscribe, getValueSnapshot, getValueSnapshot)
 
   // Get field meta (errors, touched, etc.)
-  const fieldMeta = useSyncExternalStore(
-    useCallback(
-      (callback: () => void) => {
-        return form.store.subscribe(callback)
-      },
-      [form]
-    ),
-    useCallback(() => {
-      const meta = form.store.state.fieldMeta[fullPath]
-      return meta || { errors: [], isTouched: false }
-    }, [form, fullPath]),
-    useCallback(() => {
-      const meta = form.store.state.fieldMeta[fullPath]
-      return meta || { errors: [], isTouched: false }
-    }, [form, fullPath])
-  )
+  const fieldMeta = useSyncExternalStore(subscribe, getMetaSnapshot, getMetaSnapshot)
 
   // Set field value
   const onChange = useCallback(
     (newValue: TValue) => {
       form.setFieldValue(fullPath, newValue)
     },
-    [form, fullPath]
+    [form, fullPath],
   )
 
   // Set field error
@@ -156,7 +150,7 @@ export function useFieldActions<TValue = unknown>(fieldName: string): FieldActio
         errors: [error],
       }))
     },
-    [form, fullPath]
+    [form, fullPath],
   )
 
   // Clear field error

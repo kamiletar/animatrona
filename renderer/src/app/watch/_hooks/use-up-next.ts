@@ -18,17 +18,21 @@ import type { UpNextContent, VideoPlayerRef } from '@/components/player'
 import { useFindUniqueSettings } from '@/lib/hooks'
 import { getSequelSuggestion, type SequelSuggestion } from '@/lib/watch-next'
 
+import { toPlayableUrl } from '@/lib/media-url'
+
 import type { EpisodeNavInfo, EpisodeWithTracks } from './types'
 import type { UseEpisodeNavigationReturn } from './use-episode-navigation'
 
 /**
- * Извлекает первый thumbnail из JSON строки thumbnailPaths
+ * Извлекает первый thumbnail из JSON строки thumbnailCids и возвращает URL через gateway
  */
-function getFirstThumbnail(episode: EpisodeNavInfo | null): string | undefined {
-  if (!episode?.thumbnailPaths) {return undefined}
+function getFirstThumbnailUrl(episode: EpisodeNavInfo | null): string | undefined {
+  if (!episode?.thumbnailCids) return undefined
   try {
-    const paths = JSON.parse(episode.thumbnailPaths) as string[]
-    return paths[0] || undefined
+    const cids = JSON.parse(episode.thumbnailCids) as string[]
+    const firstCid = cids[0]
+    if (!firstCid) return undefined
+    return toPlayableUrl({ cid: firstCid }) ?? undefined
   } catch {
     return undefined
   }
@@ -117,7 +121,7 @@ export function useUpNext(options: UseUpNextOptions) {
         title: navigation.nextEpisode.name || `Эпизод ${navigation.nextEpisode.number}`,
         subtitle: `${navigation.nextEpisode.number}`,
         episodeId: navigation.nextEpisode.id,
-        posterPath: getFirstThumbnail(navigation.nextEpisode),
+        posterPath: getFirstThumbnailUrl(navigation.nextEpisode),
       }
     }
 

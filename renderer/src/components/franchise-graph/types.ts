@@ -2,9 +2,8 @@
  * Типы для компонентов графа франшизы
  */
 
-/* eslint-disable @nx/enforce-module-boundaries */
 import type { Edge, Node } from '@xyflow/react'
-/* eslint-enable @nx/enforce-module-boundaries */
+
 import type { ShikimoriFranchiseGraph, ShikimoriRelationKind } from '@/types/electron.d'
 
 /** Дополнительные данные узла аниме */

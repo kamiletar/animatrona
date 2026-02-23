@@ -31,6 +31,7 @@ import {
   createChapter,
   deleteChapter,
   findChaptersByEpisodeId,
+  generateRecapAndPreview,
   updateChapter,
 } from '@/app/_actions/chapter.action'
 import {
@@ -51,14 +52,12 @@ import {
   updateEpisode,
   upsertEpisode,
 } from '@/app/_actions/episode.action'
-import { getAllFandubbers, getAllStudios } from '@/app/_actions/extended-metadata.action'
+// v0.28.0: Studio/Fandubber модели удалены, данные теперь в AnimeManifest
 import { createFile, findManyFiles, upsertFile } from '@/app/_actions/file.action'
 import {
   type AvailableItem,
   type FilterCounts,
-  getAvailableDirectors,
   getAvailableGenres,
-  getAvailableStudios,
   getFilterCounts,
   getLocalDubGroups,
 } from '@/app/_actions/filter-counts.action'
@@ -70,7 +69,7 @@ import {
   updateFranchise,
   upsertFranchiseByShikimoriId,
 } from '@/app/_actions/franchise.action'
-import { createGenre, findManyGenres } from '@/app/_actions/genre.action'
+// v0.28.0: createGenre/findManyGenres удалены, жанры сохраняются через saveGenresAndThemes
 import { createSeason, findManySeasons, upsertSeason } from '@/app/_actions/season.action'
 import {
   getSettings,
@@ -219,7 +218,7 @@ export const useDeleteEncodingProfile = encodingProfileHooks.useDelete
 /** Query хук для useFindFirst EncodingProfile (поиск по умолчанию) */
 export function useFindFirstEncodingProfile(
   args?: Prisma.EncodingProfileFindFirstArgs,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: ['encodingProfileFirst', args],
@@ -298,19 +297,8 @@ export function useDeleteManyAnimeRelation() {
   })
 }
 
-// ============================================================
-// Genre — findMany + create
-// ============================================================
-
-export const useFindManyGenre = createFindManyHook({
-  queryKey: 'genres',
-  queryFn: findManyGenres,
-})
-
-export const useCreateGenre = createCreateHook({
-  listKey: 'genres',
-  mutationFn: createGenre,
-})
+// v0.28.0: Genre хуки удалены, жанры сохраняются через saveGenresAndThemes
+// Для списка жанров используй useAvailableGenres()
 
 // ============================================================
 // Season — findMany + create
@@ -332,18 +320,8 @@ export const useUpsertSeason = createCreateHook({
 })
 
 // ============================================================
-// Studio, Fandubber — read-only
-// ============================================================
-
-export const useFindManyStudio = createFindManyHook({
-  queryKey: 'studios',
-  queryFn: getAllStudios,
-})
-
-export const useFindManyFandubber = createFindManyHook({
-  queryKey: 'fandubbers',
-  queryFn: getAllFandubbers,
-})
+// v0.28.0: Studio/Fandubber модели удалены, данные теперь в AnimeManifest
+// useFindManyStudio и useFindManyFandubber были удалены
 
 // ============================================================
 // File — create, upsert, findMany
@@ -485,6 +463,18 @@ export function useCopyChaptersToEpisodes() {
   })
 }
 
+/** Mutation хук для пакетной генерации RECAP/PREVIEW */
+export function useGenerateRecapAndPreview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (episodeIds: string[]) => generateRecapAndPreview(episodeIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chapters'] })
+      queryClient.invalidateQueries({ queryKey: ['episode'] })
+    },
+  })
+}
+
 // ============================================================
 // WatchProgress — composite key (animeId_episodeId)
 // ============================================================
@@ -492,7 +482,7 @@ export function useCopyChaptersToEpisodes() {
 /** Query хук для useFindUnique WatchProgress */
 export function useFindUniqueWatchProgress(
   args: { where: { animeId_episodeId: { animeId: string; episodeId: string } }; include?: Prisma.WatchProgressInclude },
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean }
 ) {
   const { animeId, episodeId } = args.where.animeId_episodeId
   return useQuery({
@@ -538,7 +528,7 @@ export function useUpsertWatchProgress() {
 /** Query хук для useFindUnique Settings */
 export function useFindUniqueSettings(
   args: { where: { id: string }; include?: object },
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: ['settings', args.where.id, args.include],
@@ -617,15 +607,7 @@ export function useAvailableGenres() {
   })
 }
 
-/** Query хук для получения студий, которые есть в библиотеке */
-export function useAvailableStudios() {
-  return useQuery({
-    queryKey: ['availableStudios'],
-    queryFn: () => getAvailableStudios(),
-    staleTime: 60_000,
-    gcTime: 300_000,
-  })
-}
+// v0.28.0: useAvailableStudios удалён — студии теперь в AnimeManifest (IPFS)
 
 /** Query хук для получения локальных озвучек из AudioTrack.dubGroup */
 export function useLocalDubGroups() {
@@ -637,14 +619,6 @@ export function useLocalDubGroups() {
   })
 }
 
-/** Query хук для получения режиссёров, которые есть в библиотеке (v0.19.0) */
-export function useAvailableDirectors() {
-  return useQuery({
-    queryKey: ['availableDirectors'],
-    queryFn: () => getAvailableDirectors(),
-    staleTime: 60_000,
-    gcTime: 300_000,
-  })
-}
+// v0.28.0: useAvailableDirectors удалён — режиссёры теперь в AnimeManifest (IPFS)
 
 export type { AvailableItem }

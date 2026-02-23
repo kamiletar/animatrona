@@ -53,16 +53,21 @@ export function useTrackAnalysis(options: UseTrackAnalysisOptions) {
 
       try {
         // Сканируем папку на видеофайлы
-        const scanResult = await api.fs.scanFolder(folderPath, true)
+        // createHandler возвращает { success, data: { files } }
+        const scanResult = await api.fs.scanFolder(folderPath, true) as unknown as {
+          success: boolean
+          data?: { files: Array<{ path: string; name: string; size: number; extension: string }> }
+        }
+        const files = scanResult.data?.files || []
 
-        if (!scanResult.success || scanResult.files.length === 0) {
+        if (!scanResult.success || files.length === 0) {
           setError('Видеофайлы не найдены в выбранной папке')
           return
         }
 
         // Создаём DonorFile для каждого видеофайла
         const donorFiles: DonorFile[] = []
-        for (const file of scanResult.files) {
+        for (const file of files) {
           const donorFile = createDonorFile(file.path)
           if (donorFile && donorFile.type === 'video') {
             // Фильтруем по типу контента если задан фильтр
@@ -97,7 +102,7 @@ export function useTrackAnalysis(options: UseTrackAnalysisOptions) {
         setError(`Ошибка сканирования: ${error}`)
       }
     },
-    [episodes, contentTypeFilter, setState, setError]
+    [episodes, contentTypeFilter, setState, setError],
   )
 
   /**
@@ -241,7 +246,7 @@ async function scanExternalTracks(
   donorPath: string,
   matchedFiles: EpisodeMatch[],
   probeResults: Map<string, DonorProbeResult>,
-  contentTypeFilter?: 'series' | 'special'
+  contentTypeFilter?: 'series' | 'special',
 ): Promise<void> {
   // Сканируем внешние субтитры
   try {
@@ -250,9 +255,24 @@ async function scanExternalTracks(
       episodeNumber: m.donorFile.episodeNumber || 0,
     }))
 
-    const externalSubs = await api.fs.scanExternalSubtitles(donorPath, videoFilesForScan)
+    // createHandler возвращает { success, data: { subtitles, ... } }
+    const externalSubsResult = await api.fs.scanExternalSubtitles(donorPath, videoFilesForScan) as unknown as {
+      success: boolean
+      data?: {
+        subtitles: Array<{
+          episodeNumber: number | null
+          filePath: string
+          language: string
+          title: string
+          format: string
+          matchedFonts: Array<{ name: string; path: string }>
+        }>
+        unmatchedFiles: string[]
+      }
+    }
+    const externalSubs = externalSubsResult.data || { subtitles: [], unmatchedFiles: [] }
 
-    if (externalSubs && externalSubs.subtitles.length > 0) {
+    if (externalSubs.subtitles.length > 0) {
       console.warn(`[AddTracks] Found ${externalSubs.subtitles.length} external subtitles`)
 
       // Добавляем внешние субтитры к соответствующим файлам
@@ -284,12 +304,17 @@ async function scanExternalTracks(
   // Сканируем внешние аудиодорожки по папкам (группам озвучки)
   try {
     // Сканируем папку на аудиофайлы (используем mediaTypes: ['audio'])
-    const recursiveScan = await api.fs.scanFolder(donorPath, true, ['audio'])
+    // createHandler возвращает { success, data: { files } }
+    const recursiveScanResult = await api.fs.scanFolder(donorPath, true, ['audio']) as unknown as {
+      success: boolean
+      data?: { files: Array<{ path: string; name: string; size: number; extension: string }> }
+    }
+    const recursiveScanFiles = recursiveScanResult.data?.files || []
 
-    if (recursiveScan.success && recursiveScan.files.length > 0) {
+    if (recursiveScanResult.success && recursiveScanFiles.length > 0) {
       // Фильтруем только аудиофайлы из подпапок (не из корня папки-донора)
       const donorFolderName = donorPath.split(/[/\\]/).pop()
-      const audioFiles = recursiveScan.files.filter((f) => {
+      const audioFiles = recursiveScanFiles.filter((f) => {
         // Извлекаем имя родительской папки
         const pathParts = f.path.split(/[/\\]/)
         const parentFolder = pathParts.length >= 2 ? pathParts[pathParts.length - 2] : ''

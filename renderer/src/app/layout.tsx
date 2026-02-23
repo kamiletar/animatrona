@@ -1,4 +1,6 @@
+import { ExportQueuePanel } from '@/components/export-queue'
 import { AppShell } from '@/components/layout/AppShell'
+import { MiniPlayer } from '@/components/mini-player'
 import { ImportQueueProcessor } from '@/components/transcode'
 import { Provider } from '@/components/ui/provider'
 import { Toaster } from '@/components/ui/toaster'
@@ -28,6 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Drawer с деталями обновления */}
           <UpdateDrawer />
           <AppShell>{children}</AppShell>
+          {/* Панель очереди экспорта — фиксирована внизу экрана */}
+          <ExportQueuePanel />
+          {/* Глобальный mini-player при навигации со страницы просмотра */}
+          <MiniPlayer />
           <Toaster />
         </Provider>
       </body>

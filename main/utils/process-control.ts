@@ -6,9 +6,13 @@
  * - Windows: ntsuspend (NtSuspendProcess/NtResumeProcess)
  */
 
-import { execSync, type ChildProcess } from 'child_process'
+import { type ChildProcess, execSync } from 'child_process'
 import { app } from 'electron'
 import path from 'path'
+
+import { createModuleLogger } from './logger'
+
+const log = createModuleLogger('ProcessControl')
 
 // ntsuspend работает только на Windows
 // На других платформах используем SIGSTOP/SIGCONT
@@ -42,10 +46,10 @@ function getNtsuspend(): NtsuspendModule | null {
 
       ntsuspend = require(ntsuspendPath)
     }
-    console.warn('[process-control] ntsuspend загружен успешно')
+    log.info('ntsuspend загружен успешно')
     return ntsuspend
   } catch (error) {
-    console.warn('[process-control] ntsuspend не загружен — пауза процессов недоступна:', error)
+    log.warn('ntsuspend не загружен — пауза процессов недоступна', { error })
     return null
   }
 }
@@ -62,7 +66,7 @@ export function suspendProcess(pid: number): boolean {
       // Windows: ntsuspend (NtSuspendProcess)
       const nt = getNtsuspend()
       if (!nt) {
-        console.warn('[process-control] ntsuspend недоступен')
+        log.warn('ntsuspend недоступен')
         return false
       }
       return nt.suspend(pid)
@@ -72,7 +76,7 @@ export function suspendProcess(pid: number): boolean {
       return true
     }
   } catch (error) {
-    console.error(`[process-control] Ошибка приостановки процесса ${pid}:`, error)
+    log.error(`Ошибка приостановки процесса ${pid}`, { error })
     return false
   }
 }
@@ -89,7 +93,7 @@ export function resumeProcess(pid: number): boolean {
       // Windows: ntsuspend (NtResumeProcess)
       const nt = getNtsuspend()
       if (!nt) {
-        console.warn('[process-control] ntsuspend недоступен')
+        log.warn('ntsuspend недоступен')
         return false
       }
       return nt.resume(pid)
@@ -99,7 +103,7 @@ export function resumeProcess(pid: number): boolean {
       return true
     }
   } catch (error) {
-    console.error(`[process-control] Ошибка возобновления процесса ${pid}:`, error)
+    log.error(`Ошибка возобновления процесса ${pid}`, { error })
     return false
   }
 }
@@ -221,7 +225,7 @@ export function terminateProcess(pid: number, force = false): boolean {
     }
     return true
   } catch (error) {
-    console.error(`[process-control] Ошибка завершения процесса ${pid}:`, error)
+    log.error(`Ошибка завершения процесса ${pid}`, { error })
     return false
   }
 }
@@ -245,7 +249,7 @@ export function terminateChildProcess(childProcess: ChildProcess, force = false)
       execSync(cmd, { stdio: 'ignore', timeout: 5000 })
       return true
     } catch (error) {
-      console.error('[process-control] Ошибка завершения дерева процессов:', error)
+      log.error('Ошибка завершения дерева процессов', { error })
       return false
     }
   }

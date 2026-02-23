@@ -43,7 +43,7 @@ export async function findEpisodesByAnimeId(animeId: string, include?: Prisma.Ep
 export async function findEpisodeByNumber(
   animeId: string,
   number: number,
-  include?: Prisma.EpisodeInclude
+  include?: Prisma.EpisodeInclude,
 ): Promise<Episode | null> {
   return prisma.episode.findUnique({
     where: {
@@ -77,11 +77,7 @@ export async function upsertEpisode(data: Prisma.EpisodeUncheckedCreateInput): P
       animeId_number: { animeId, number },
     },
     create: data,
-    update: {
-      ...rest,
-      // При повторном импорте обновляем данные, но не затираем статус
-      transcodeStatus: rest.transcodeStatus ?? undefined,
-    },
+    update: rest,
   })
 }
 
@@ -101,41 +97,6 @@ export async function updateEpisode(id: string, data: Prisma.EpisodeUpdateInput)
   return prisma.episode.update({
     where: { id },
     data,
-  })
-}
-
-/**
- * Обновить статус транскодирования
- */
-export async function updateEpisodeTranscodeStatus(
-  id: string,
-  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'SKIPPED' | 'ERROR',
-  error?: string
-): Promise<Episode> {
-  return prisma.episode.update({
-    where: { id },
-    data: {
-      transcodeStatus: status,
-      transcodeError: error ?? null,
-    },
-  })
-}
-
-/**
- * Обновить пути к файлам эпизода
- */
-export async function updateEpisodePaths(
-  id: string,
-  paths: {
-    sourcePath?: string
-    transcodedPath?: string
-    manifestPath?: string
-    extractedVideoPath?: string
-  }
-): Promise<Episode> {
-  return prisma.episode.update({
-    where: { id },
-    data: paths,
   })
 }
 

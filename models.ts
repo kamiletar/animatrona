@@ -26,58 +26,6 @@ export type Anime = $ModelResult<$Schema, "Anime">;
  */
 export type Genre = $ModelResult<$Schema, "Genre">;
 /**
- * Студия анимации
- */
-export type Studio = $ModelResult<$Schema, "Studio">;
-/**
- * Связь студий и аниме (many-to-many)
- */
-export type StudioOnAnime = $ModelResult<$Schema, "StudioOnAnime">;
-/**
- * Персона (режиссёр, сейю, аниматор и т.д.)
- */
-export type Person = $ModelResult<$Schema, "Person">;
-/**
- * Связь персон с аниме (режиссёры, сценаристы и т.д.)
- */
-export type PersonOnAnime = $ModelResult<$Schema, "PersonOnAnime">;
-/**
- * Персонаж аниме
- */
-export type Character = $ModelResult<$Schema, "Character">;
-/**
- * Связь персонажей с аниме
- */
-export type CharacterOnAnime = $ModelResult<$Schema, "CharacterOnAnime">;
-/**
- * Связь персонажа с сейю (кто озвучивает)
- */
-export type CharacterVoice = $ModelResult<$Schema, "CharacterVoice">;
-/**
- * Внешняя ссылка (MAL, AniDB, официальный сайт)
- */
-export type ExternalLink = $ModelResult<$Schema, "ExternalLink">;
-/**
- * Видео (трейлеры, опенинги, эндинги) — v0.5.3
- */
-export type Video = $ModelResult<$Schema, "Video">;
-/**
- * Команда озвучки (fandub)
- */
-export type Fandubber = $ModelResult<$Schema, "Fandubber">;
-/**
- * Связь команд озвучки с аниме
- */
-export type FandubberOnAnime = $ModelResult<$Schema, "FandubberOnAnime">;
-/**
- * Команда субтитров (fansub)
- */
-export type Fansubber = $ModelResult<$Schema, "Fansubber">;
-/**
- * Связь команд субтитров с аниме
- */
-export type FansubberOnAnime = $ModelResult<$Schema, "FansubberOnAnime">;
-/**
  * Связь жанров и аниме (many-to-many)
  */
 export type GenreOnAnime = $ModelResult<$Schema, "GenreOnAnime">;
@@ -131,6 +79,64 @@ export type EncodingProfile = $ModelResult<$Schema, "EncodingProfile">;
  * Хранит настройки из wizard'а для последовательной обработки
  */
 export type ImportQueueItem = $ModelResult<$Schema, "ImportQueueItem">;
+/**
+ * Подписка на библиотеку другого пользователя (P2P Sharing)
+ */
+export type Subscription = $ModelResult<$Schema, "Subscription">;
+/**
+ * Удалённый трекер в федеративной сети
+ */
+export type Tracker = $ModelResult<$Schema, "Tracker">;
+/**
+ * Федеративный контент — импортированный из другого трекера
+ */
+export type FederatedContent = $ModelResult<$Schema, "FederatedContent">;
+/**
+ * Настройки федерации (singleton)
+ */
+export type FederationSettings = $ModelResult<$Schema, "FederationSettings">;
+/**
+ * Статистика пользователя (singleton)
+ */
+export type UserStats = $ModelResult<$Schema, "UserStats">;
+/**
+ * Дневная статистика
+ */
+export type DailyStats = $ModelResult<$Schema, "DailyStats">;
+/**
+ * Репутация пользователя (singleton)
+ */
+export type UserReputation = $ModelResult<$Schema, "UserReputation">;
+/**
+ * Разблокированное достижение пользователя
+ */
+export type UserAchievement = $ModelResult<$Schema, "UserAchievement">;
+/**
+ * Прогресс достижения
+ */
+export type AchievementProgress = $ModelResult<$Schema, "AchievementProgress">;
+/**
+ * Бонусные очки пользователя (singleton)
+ */
+export type UserBonusPoints = $ModelResult<$Schema, "UserBonusPoints">;
+/**
+ * Транзакция бонусных очков
+ */
+export type BonusTransaction = $ModelResult<$Schema, "BonusTransaction">;
+/**
+ * Профиль пользователя для P2P синхронизации (singleton)
+ * Заменяет OrbitDB UserProfileDB — хранится в SQLite, публикуется через IPNS
+ */
+export type LocalUserProfile = $ModelResult<$Schema, "LocalUserProfile">;
+/**
+ * Друг в P2P сети
+ * Хранит информацию о принятых друзьях для PresenceSync
+ */
+export type Friend = $ModelResult<$Schema, "Friend">;
+/**
+ * Запрос в друзья (входящий/исходящий)
+ */
+export type FriendRequest = $ModelResult<$Schema, "FriendRequest">;
 export const AnimeStatus = $schema.enums.AnimeStatus.values;
 export type AnimeStatus = (typeof AnimeStatus)[keyof typeof AnimeStatus];
 /**
@@ -149,8 +155,6 @@ export const AgeRating = $schema.enums.AgeRating.values;
  * Возрастной рейтинг
  */
 export type AgeRating = (typeof AgeRating)[keyof typeof AgeRating];
-export const TranscodeStatus = $schema.enums.TranscodeStatus.values;
-export type TranscodeStatus = (typeof TranscodeStatus)[keyof typeof TranscodeStatus];
 export const VideoCodec = $schema.enums.VideoCodec.values;
 export type VideoCodec = (typeof VideoCodec)[keyof typeof VideoCodec];
 /**
@@ -177,12 +181,6 @@ export const BRefMode = $schema.enums.BRefMode.values;
 export type BRefMode = (typeof BRefMode)[keyof typeof BRefMode];
 export const RelationKind = $schema.enums.RelationKind.values;
 export type RelationKind = (typeof RelationKind)[keyof typeof RelationKind];
-export const PersonRole = $schema.enums.PersonRole.values;
-export type PersonRole = (typeof PersonRole)[keyof typeof PersonRole];
-export const ExternalLinkKind = $schema.enums.ExternalLinkKind.values;
-export type ExternalLinkKind = (typeof ExternalLinkKind)[keyof typeof ExternalLinkKind];
-export const VideoKind = $schema.enums.VideoKind.values;
-export type VideoKind = (typeof VideoKind)[keyof typeof VideoKind];
 /**
  * Статус просмотра аниме (как на Shikimori)
  */
@@ -199,3 +197,35 @@ export const ImportQueueItemStatus = $schema.enums.ImportQueueItemStatus.values;
  * Статус элемента очереди импорта
  */
 export type ImportQueueItemStatus = (typeof ImportQueueItemStatus)[keyof typeof ImportQueueItemStatus];
+/**
+ * Уровень доверия к трекеру
+ */
+export const TrustLevel = $schema.enums.TrustLevel.values;
+/**
+ * Уровень доверия к трекеру
+ */
+export type TrustLevel = (typeof TrustLevel)[keyof typeof TrustLevel];
+/**
+ * Ранги пользователя (для репутации)
+ */
+export const UserRank = $schema.enums.UserRank.values;
+/**
+ * Ранги пользователя (для репутации)
+ */
+export type UserRank = (typeof UserRank)[keyof typeof UserRank];
+/**
+ * Тип транзакции бонусных очков
+ */
+export const BonusTransactionType = $schema.enums.BonusTransactionType.values;
+/**
+ * Тип транзакции бонусных очков
+ */
+export type BonusTransactionType = (typeof BonusTransactionType)[keyof typeof BonusTransactionType];
+/**
+ * Уровень достижения
+ */
+export const AchievementTier = $schema.enums.AchievementTier.values;
+/**
+ * Уровень достижения
+ */
+export type AchievementTier = (typeof AchievementTier)[keyof typeof AchievementTier];

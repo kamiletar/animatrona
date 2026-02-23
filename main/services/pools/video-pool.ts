@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * VideoPool — пул для параллельного кодирования видео на GPU
  *
@@ -14,9 +13,13 @@ import type { TranscodeProgressExtended } from '../../../shared/types'
 import type { VideoPoolTask } from '../../../shared/types/parallel-transcode'
 import { getVideoInfo } from '../../ffmpeg/probe'
 import { parseTimeToSeconds } from '../../ffmpeg/progress-parser'
+import { prisma } from '../../utils/db'
 import { getFFmpegPath } from '../../utils/ffmpeg-installer'
 import { spawnFFmpeg } from '../../utils/ffmpeg-spawn'
+import { createModuleLogger } from '../../utils/logger'
 import { BasePool } from './base-pool'
+
+const log = createModuleLogger('VideoPool')
 
 /** ACCESS_VIOLATION exit code (0xC0000005) — NVENC crash */
 const NVENC_CRASH_CODE = 3221225477
@@ -33,7 +36,7 @@ function parseFFmpegProgress(
   str: string,
   duration: number,
   startTime: number,
-  sourceFps: number,
+  sourceFps: number
 ): Partial<TranscodeProgressExtended> | null {
   // Парсим frame — более надёжный индикатор прогресса чем time (особенно с multipass)
   const frameMatch = str.match(/frame=\s*(\d+)/)
@@ -162,18 +165,18 @@ class CircularLogBuffer {
 function parseLogLevel(line: string): 'info' | 'warning' | 'error' {
   const lowerLine = line.toLowerCase()
   if (
-    lowerLine.includes('[error]')
-    || lowerLine.includes('error:')
-    || lowerLine.includes('failed')
-    || lowerLine.includes('invalid')
+    lowerLine.includes('[error]') ||
+    lowerLine.includes('error:') ||
+    lowerLine.includes('failed') ||
+    lowerLine.includes('invalid')
   ) {
     return 'error'
   }
   if (
-    lowerLine.includes('[warning]')
-    || lowerLine.includes('warning:')
-    || lowerLine.includes('discarding')
-    || lowerLine.includes('discarded')
+    lowerLine.includes('[warning]') ||
+    lowerLine.includes('warning:') ||
+    lowerLine.includes('discarding') ||
+    lowerLine.includes('discarded')
   ) {
     return 'warning'
   }
@@ -187,6 +190,14 @@ export class VideoPool extends BasePool<VideoPoolTask> {
    */
   private globalCpuFallback = false
 
+  /**
+   * Причина активации CPU fallback:
+   * - 'crash' — NVENC crash (0xC0000005), НЕ сбрасывается автоматически
+   * - 'settings' — Settings.useGpu = false, сбрасывается при включении GPU
+   * - 'vmaf' — VMAF определил недоступность GPU
+   */
+  private cpuFallbackReason: 'crash' | 'settings' | 'vmaf' | null = null
+
   /** Сохранённое значение maxConcurrent до CPU fallback */
   private savedMaxConcurrent: number | null = null
 
@@ -199,8 +210,92 @@ export class VideoPool extends BasePool<VideoPoolTask> {
   /** Circular buffer для логов FFmpeg */
   private logBuffer = new CircularLogBuffer()
 
+  /** Интервал watchdog для проверки зависших задач */
+  private watchdogInterval: ReturnType<typeof setInterval> | null = null
+
+  /** Таймаут отсутствия прогресса (5 минут) */
+  private static readonly STALLED_TIMEOUT_MS = 5 * 60 * 1000
+
+  /** Последнее обновление прогресса для каждой задачи */
+  private lastProgressUpdate = new Map<string, number>()
+
   constructor(config?: { maxConcurrent?: number }) {
     super(config?.maxConcurrent ?? 2)
+    // Запускаем watchdog для проверки зависших задач
+    this.startWatchdog()
+  }
+
+  /**
+   * Запустить watchdog для проверки зависших процессов
+   * Проверяет каждые 30 секунд:
+   * - Жив ли FFmpeg процесс
+   * - Был ли прогресс за последние 5 минут
+   */
+  private startWatchdog(): void {
+    if (this.watchdogInterval) return
+
+    this.watchdogInterval = setInterval(() => {
+      this.checkStalledTasks()
+    }, 30_000) // Проверка каждые 30 сек
+  }
+
+  /**
+   * Остановить watchdog (при shutdown)
+   */
+  stopWatchdog(): void {
+    if (this.watchdogInterval) {
+      clearInterval(this.watchdogInterval)
+      this.watchdogInterval = null
+    }
+  }
+
+  /**
+   * Проверить зависшие задачи
+   */
+  private checkStalledTasks(): void {
+    const now = Date.now()
+
+    for (const [taskId, task] of this.runningTasks) {
+      // Проверяем только активные задачи (не на паузе)
+      if (task.status !== 'running') continue
+
+      const process = task.process
+      const lastUpdate = this.lastProgressUpdate.get(taskId) ?? task.startedAt ?? now
+
+      // 1. Проверка: процесс существует и жив?
+      if (process && process.exitCode !== null) {
+        // Процесс завершился, но событие 'close' не дошло
+        log.warn('Watchdog: FFmpeg process exited without close event', {
+          taskId,
+          exitCode: process.exitCode,
+        })
+        this.failTask(task, `FFmpeg процесс завершился без события close (код ${process.exitCode})`)
+        this.lastProgressUpdate.delete(taskId)
+        continue
+      }
+
+      // 2. Проверка: был ли прогресс за последние 5 минут?
+      const timeSinceUpdate = now - lastUpdate
+      if (timeSinceUpdate > VideoPool.STALLED_TIMEOUT_MS) {
+        log.warn('Watchdog: Task stalled - no progress for 5 minutes', {
+          taskId,
+          timeSinceUpdateMs: timeSinceUpdate,
+          lastProgress: task.progress?.percent,
+        })
+
+        // Убиваем процесс если он ещё жив
+        if (process && process.exitCode === null) {
+          try {
+            process.kill('SIGKILL')
+          } catch (e) {
+            log.warn('Failed to kill stalled FFmpeg process', { taskId, error: e })
+          }
+        }
+
+        this.failTask(task, `Задача зависла — нет прогресса более 5 минут`)
+        this.lastProgressUpdate.delete(taskId)
+      }
+    }
   }
 
   // === Публичные методы (специфичные для VideoPool) ===
@@ -247,6 +342,7 @@ export class VideoPool extends BasePool<VideoPoolTask> {
     }
 
     this.globalCpuFallback = true
+    this.cpuFallbackReason = 'vmaf'
 
     // Сохраняем текущий maxConcurrent для возможного восстановления
     this.savedMaxConcurrent = this.maxConcurrent
@@ -254,7 +350,10 @@ export class VideoPool extends BasePool<VideoPoolTask> {
     // libsvtav1 использует все ядра CPU — только 1 поток
     this.maxConcurrent = 1
 
-    console.log(`[VideoPool] CPU mode activated from VMAF (maxConcurrent: ${this.savedMaxConcurrent} → 1)`)
+    log.info('CPU режим активирован из VMAF', {
+      maxConcurrentBefore: this.savedMaxConcurrent,
+      maxConcurrentAfter: 1,
+    })
 
     // Уведомляем UI
     this.emit('globalCpuFallback', { reason: 'VMAF detected GPU unavailable', tasksAffected: this.queue.length })
@@ -267,6 +366,10 @@ export class VideoPool extends BasePool<VideoPoolTask> {
   }
 
   protected clampMaxConcurrent(value: number): number {
+    // При активном CPU fallback — только 1 поток (libsvtav1 использует все ядра)
+    if (this.globalCpuFallback) {
+      return 1
+    }
     // Ограничиваем между 1 и 8 (для тестирования мощных GPU)
     return Math.max(1, Math.min(value, 8))
   }
@@ -284,9 +387,35 @@ export class VideoPool extends BasePool<VideoPoolTask> {
     }
   }
 
+  protected onTaskCompleted(_task: VideoPoolTask): void {
+    this.checkAutoResetCpuFallback()
+  }
+
   protected onClear(): void {
     // Сбрасываем глобальный CPU fallback
     this.resetGlobalCpuFallback()
+  }
+
+  /**
+   * Переопределяем processQueue для синхронной проверки CPU mode
+   *
+   * Проблема: при maxConcurrent=2, базовый processQueue запускает 2 задачи
+   * одновременно через runTask() (async без await). Вторая задача стартует
+   * до того как первая успеет проверить getGlobalSettings() и активировать
+   * CPU режим → обе получают GPU → 2 потока CPU вместо 1.
+   *
+   * Фикс: перед вызовом super.processQueue() проверяем первую задачу —
+   * если она уже помечена useCpuFallback, активируем CPU режим синхронно.
+   */
+  protected processQueue(): void {
+    // Проверяем первую задачу в очереди — если CPU fallback нужен, активируем сразу
+    if (!this.globalCpuFallback && this.queue.length > 0) {
+      const firstTask = this.queue[0]
+      if (firstTask.useCpuFallback) {
+        this.activateCpuModeFromVmaf()
+      }
+    }
+    super.processQueue()
   }
 
   // === Приватные методы ===
@@ -302,6 +431,7 @@ export class VideoPool extends BasePool<VideoPoolTask> {
     }
 
     this.globalCpuFallback = true
+    this.cpuFallbackReason = 'crash' // NVENC crash — НЕ сбрасывается автоматически
 
     // Сохраняем текущий maxConcurrent для возможного восстановления
     this.savedMaxConcurrent = this.maxConcurrent
@@ -318,13 +448,73 @@ export class VideoPool extends BasePool<VideoPoolTask> {
     this.emit('globalCpuFallback', { reason: 'NVENC crash detected', tasksAffected: this.queue.length })
   }
 
-  /** Сбросить глобальный CPU fallback (при clear) */
+  /**
+   * Авто-сброс crash fallback после завершения батча
+   *
+   * Если причина CPU fallback — NVENC crash, сбрасываем после того как
+   * все задачи завершены (очередь пуста и нет запущенных).
+   * Это предотвращает "заражение" следующих аниме.
+   */
+  private checkAutoResetCpuFallback(): void {
+    if (
+      this.globalCpuFallback &&
+      this.cpuFallbackReason === 'crash' &&
+      this.runningTasks.size === 0 &&
+      this.queue.length === 0
+    ) {
+      log.info('Авто-сброс CPU fallback после crash — батч завершён')
+      this.resetGlobalCpuFallback()
+    }
+  }
+
+  /** Сбросить глобальный CPU fallback (при clear или включении GPU в настройках) */
   private resetGlobalCpuFallback(): void {
     if (this.globalCpuFallback && this.savedMaxConcurrent !== null) {
       this.maxConcurrent = this.savedMaxConcurrent
     }
     this.globalCpuFallback = false
+    this.cpuFallbackReason = null
     this.savedMaxConcurrent = null
+  }
+
+  /**
+   * Получить глобальные настройки из БД
+   */
+  private async getGlobalSettings(): Promise<{ useGpu: boolean } | null> {
+    try {
+      const settings = await prisma.settings.findFirst()
+      return settings ? { useGpu: settings.useGpu } : null
+    } catch (err) {
+      log.warn('Failed to get global settings', { error: String(err) })
+      return null
+    }
+  }
+
+  /**
+   * Активировать CPU режим из-за глобальной настройки Settings.useGpu = false
+   * Аналогично activateGlobalCpuFallback, но сбрасывается при включении GPU в настройках
+   */
+  private activateCpuModeFromSettings(): void {
+    if (this.globalCpuFallback) {
+      return // Уже активирован
+    }
+
+    this.globalCpuFallback = true
+    this.cpuFallbackReason = 'settings' // Сбрасывается при включении GPU
+
+    // Сохраняем текущий maxConcurrent для возможного восстановления
+    this.savedMaxConcurrent = this.maxConcurrent
+
+    // libsvtav1 использует все ядра CPU — только 1 поток
+    this.maxConcurrent = 1
+
+    // Помечаем все задачи в очереди для CPU
+    for (const task of this.queue) {
+      task.useCpuFallback = true
+    }
+
+    log.info('CPU mode activated due to global settings', { tasksAffected: this.queue.length })
+    this.emit('globalCpuFallback', { reason: 'GPU disabled in settings', tasksAffected: this.queue.length })
   }
 
   /** Получить следующий индекс GPU (распределение между энкодерами) */
@@ -351,6 +541,24 @@ export class VideoPool extends BasePool<VideoPoolTask> {
     this.emit('taskStarted', task)
 
     try {
+      // ВАЖНО: Проверяем глобальные настройки перед каждой задачей
+      // Это гарантирует что актуальное значение Settings.useGpu учитывается
+      // даже если task был создан до изменения настроек
+      const globalSettings = await this.getGlobalSettings()
+      if (globalSettings?.useGpu === false && !task.useCpuFallback) {
+        log.info('Forcing CPU mode due to global settings', { taskId: task.id })
+        task.useCpuFallback = true
+        // Активируем CPU режим для всех задач
+        if (!this.globalCpuFallback) {
+          this.activateCpuModeFromSettings()
+        }
+      } else if (globalSettings?.useGpu === true && this.globalCpuFallback && this.cpuFallbackReason === 'settings') {
+        // GPU включён обратно в настройках — сбрасываем CPU fallback
+        log.info('Restoring GPU mode due to global settings', { taskId: task.id })
+        this.resetGlobalCpuFallback()
+        task.useCpuFallback = false
+      }
+
       // Получаем duration и fps из probe (не из stdout FFmpeg!)
       const videoInfo = await getVideoInfo(task.inputPath)
       const { duration, fps: sourceFps } = videoInfo
@@ -408,7 +616,10 @@ export class VideoPool extends BasePool<VideoPoolTask> {
           if (progress) {
             // DEBUG: логируем первое обновление прогресса
             if (!task.progress || task.progress.percent === 0) {
-              console.log(`[VideoPool] Task ${task.id.slice(-6)} first progress: ${progress.percent?.toFixed(1)}%`)
+              log.debug('Первое обновление прогресса задачи', {
+                taskId: task.id.slice(-6),
+                percent: progress.percent?.toFixed(1),
+              })
             }
 
             // === Расчёт FPS на основе frames (v0.19.0) ===
@@ -479,6 +690,8 @@ export class VideoPool extends BasePool<VideoPoolTask> {
               elapsedTime: progress.elapsedTime,
               startedAt: new Date(startTime).toISOString(),
             }
+            // Watchdog: обновляем время последнего прогресса
+            this.lastProgressUpdate.set(task.id, Date.now())
             this.emit('taskProgress', task.id, task.progress)
           }
         }
@@ -490,9 +703,10 @@ export class VideoPool extends BasePool<VideoPoolTask> {
 
         this.runningTasks.delete(task.id)
         this.pausedTasks.delete(task.id)
-        // Очищаем историю FPS и трекер для завершённой задачи
+        // Очищаем историю FPS, трекер и watchdog для завершённой задачи
         this.fpsHistoryMap.delete(task.id)
         this.fpsTrackerMap.delete(task.id)
+        this.lastProgressUpdate.delete(task.id)
 
         // === NVENC crash detection & CPU retry ===
         // Проверяем: NVENC crash (0xC0000005) И ещё не пробовали CPU
@@ -555,9 +769,14 @@ export class VideoPool extends BasePool<VideoPoolTask> {
     const useCpu = task.useCpuFallback || task.preferCpu || !useGpu
 
     // Логирование выбора GPU/CPU
-    console.warn(
-      `[VideoPool] Task ${task.id}: useGpu=${useGpu} (options.useGpu=${options.useGpu}), useCpu=${useCpu}, fallback=${task.useCpuFallback}, preferCpu=${task.preferCpu}`,
-    )
+    log.debug('Выбор GPU/CPU для задачи', {
+      taskId: task.id,
+      useGpu,
+      optionsUseGpu: options.useGpu,
+      useCpu,
+      fallback: task.useCpuFallback,
+      preferCpu: task.preferCpu,
+    })
 
     if (!useCpu) {
       args.push('-hwaccel', 'cuda')

@@ -3,7 +3,7 @@
 import { Badge, Box, Button, Card, HStack, Icon, Text, VStack } from '@chakra-ui/react'
 import { LuCircleCheck, LuCopy, LuFileVideo, LuPlay, LuRotateCcw, LuSkipForward, LuX } from 'react-icons/lu'
 
-import { formatBytes } from '@/utils/format'
+import { formatBytes } from '@/lib/format-utils'
 import type { QueueItem, TrackRecommendation } from '../../../../shared/types'
 
 interface TranscodePreviewProps {

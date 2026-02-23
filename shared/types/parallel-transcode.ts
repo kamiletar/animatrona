@@ -121,6 +121,16 @@ export interface AudioPoolTask {
   title?: string
   /** Язык (для внешних) */
   language?: string
+  /**
+   * Режим passthrough — копировать аудио без транскодирования
+   * Используется для AAC/MP3 с хорошим качеством (≤256kbps)
+   */
+  passthrough?: boolean
+  /**
+   * Оригинальный кодек (для passthrough режима)
+   * Нужен чтобы не менять codec на 'aac' в БД
+   */
+  originalCodec?: string
 }
 
 // === Элемент импорта ===
@@ -242,6 +252,16 @@ export interface BatchAudioTrackInput {
   title?: string
   /** Язык (для внешних) */
   language?: string
+  /**
+   * Режим passthrough — копировать аудио без транскодирования
+   * Используется для AAC/MP3 с хорошим качеством (≤256kbps)
+   */
+  passthrough?: boolean
+  /**
+   * Оригинальный кодек (для passthrough режима)
+   * Нужен чтобы не менять codec на 'aac' в БД
+   */
+  originalCodec?: string
 }
 
 /** Элемент для batch-импорта */
@@ -283,7 +303,13 @@ export interface ParallelTranscodeEvents {
   /** Видео-задача завершена */
   videoCompleted: (itemId: string, episodeId: string, outputPath: string) => void
   /** Аудио-дорожка завершена */
-  audioTrackCompleted: (trackId: string, outputPath: string) => void
+  audioTrackCompleted: (
+    trackId: string,
+    outputPath: string,
+    episodeId: string,
+    passthrough?: boolean,
+    originalCodec?: string,
+  ) => void
   /** Элемент импорта завершён (все видео и аудио готовы) */
   itemCompleted: (itemId: string, episodeId: string) => void
   /** Ошибка в задаче */

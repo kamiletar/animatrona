@@ -2,9 +2,8 @@
  * Хук для автоматического размещения узлов с помощью Dagre
  */
 
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import dagre from '@dagrejs/dagre'
-// eslint-disable-next-line @nx/enforce-module-boundaries
+
 import { useNodesInitialized, useReactFlow } from '@xyflow/react'
 import { useCallback, useEffect } from 'react'
 
@@ -39,7 +38,9 @@ export function useAutoLayout({ direction = 'LR' }: UseAutoLayoutOptions = {}) {
     const nodes = getNodes()
     const edges = getEdges()
 
-    if (nodes.length === 0) {return}
+    if (nodes.length === 0) {
+      return
+    }
 
     // Создаём граф dagre
     const dagreGraph = new dagre.graphlib.Graph()

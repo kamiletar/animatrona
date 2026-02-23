@@ -11,4 +11,11 @@ out/
 
 # FFmpeg binaries (скачиваются скриптом download-ffmpeg.ts)
 resources/ffmpeg/
+
+# Kubo (IPFS) binaries (скачиваются при сборке)
+resources/kubo/
+
+# Chromaprint fpcalc (скачивается скриптом download-fpcalc.ts)
+resources/fpcalc/
+
 build.log

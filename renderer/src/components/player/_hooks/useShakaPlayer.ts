@@ -18,20 +18,7 @@ import shaka from 'shaka-player'
 
 import type { MutableRefObject, RefObject } from 'react'
 
-/**
- * Конвертирует локальный путь в media:// URL
- */
-function toMediaUrl(path: string): string {
-  // Если уже URL — возвращаем как есть
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('media://')) {
-    return path
-  }
-
-  // Нормализуем путь для Windows
-  const normalizedPath = path.replace(/\\/g, '/')
-
-  return `media://${normalizedPath}`
-}
+import { toPlayableUrl } from '@/lib/media-url'
 
 export interface UseShakaPlayerOptions {
   /** Путь к видеофайлу */
@@ -135,7 +122,7 @@ export function useShakaPlayer(options: UseShakaPlayerOptions): UseShakaPlayerRe
 
     // Обработка ошибок Shaka
     player.addEventListener('error', (event) => {
-      if (!isMounted) {return}
+      if (!isMounted) return
       const error = (event as unknown as { detail: shaka.util.Error }).detail
       console.error('[useShakaPlayer] Shaka error:', error)
       onError?.(new Error(error.message || 'Playback error'))
@@ -144,10 +131,13 @@ export function useShakaPlayer(options: UseShakaPlayerOptions): UseShakaPlayerRe
     // Загрузка источника
     const loadSource = async () => {
       try {
-        const mediaUrl = toMediaUrl(src)
+        const mediaUrl = toPlayableUrl({ path: src })
+        if (!mediaUrl) {
+          throw new Error('Invalid video source')
+        }
         await player.load(mediaUrl, startTime)
 
-        if (!isMounted) {return}
+        if (!isMounted) return
 
         // Обновляем duration
         onDurationChange?.(video.duration)
@@ -170,11 +160,11 @@ export function useShakaPlayer(options: UseShakaPlayerOptions): UseShakaPlayerRe
           video.play()
         }
       } catch (error) {
-        if (!isMounted) {return}
+        if (!isMounted) return
 
         // Игнорируем LOAD_INTERRUPTED (code 7002)
         const shakaError = error as { code?: number }
-        if (shakaError.code === 7002) {return}
+        if (shakaError.code === 7002) return
 
         console.error('[useShakaPlayer] Load error:', error)
         setIsLoading(false)

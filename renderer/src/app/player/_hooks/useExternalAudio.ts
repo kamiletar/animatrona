@@ -3,7 +3,7 @@
  * Создаёт отдельный <audio> элемент и синхронизирует его с video
  */
 
-import { useEffect, useRef, type RefObject } from 'react'
+import { type RefObject, useEffect, useRef } from 'react'
 
 /** Порог рассинхронизации в секундах */
 const SYNC_THRESHOLD = 0.15
@@ -26,14 +26,25 @@ interface UseExternalAudioOptions {
 export function useExternalAudio({ videoRef, audioPath }: UseExternalAudioOptions) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isActiveRef = useRef(false)
+  // Ref для хранения предыдущего пути — для немедленной остановки при смене
+  const prevAudioPathRef = useRef<string | null>(null)
+
+  // === НЕМЕДЛЕННАЯ остановка при смене audioPath (ДО useEffect cleanup) ===
+  // Это предотвращает воспроизведение двух дорожек одновременно
+  if (prevAudioPathRef.current !== audioPath) {
+    // Немедленно останавливаем предыдущий audio (синхронно, до любых асинхронных операций)
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = ''
+    }
+    prevAudioPathRef.current = audioPath
+  }
 
   useEffect(() => {
     // Без внешнего аудио — просто убедимся что видео не заглушено
     if (!audioPath) {
-      // Очистка предыдущего аудио если было
+      // Очистка предыдущего аудио если было (уже остановлено выше, но очищаем ref)
       if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current.src = ''
         audioRef.current = null
       }
       // Восстановить звук видео
@@ -52,7 +63,7 @@ export function useExternalAudio({ videoRef, audioPath }: UseExternalAudioOption
 
     const setupSync = () => {
       video = videoRef.current
-      if (!video) {return false}
+      if (!video) return false
 
       // Создать audio элемент
       const normalizedPath = audioPath.replace(/\\/g, '/')
@@ -97,7 +108,7 @@ export function useExternalAudio({ videoRef, audioPath }: UseExternalAudioOption
 
       // Периодическая коррекция рассинхронизации (вместо timeupdate)
       const syncInterval = setInterval(() => {
-        if (!audio || !video || audio.readyState < 2) {return}
+        if (!audio || !video || audio.readyState < 2) return
         const diff = audio.currentTime - video.currentTime
         if (Math.abs(diff) > SYNC_THRESHOLD) {
           audio.currentTime = video.currentTime

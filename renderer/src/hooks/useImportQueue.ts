@@ -155,8 +155,8 @@ export function useImportQueue(): UseImportQueueResult {
   /** Ref для setTimeout, чтобы очищать при unmount */
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  /** Интервал flush'а в мс — 4 раза/сек достаточно для плавного UI */
-  const FLUSH_INTERVAL = 250
+  /** Интервал flush'а в мс — 10 раз/сек для плавного обновления прогресса */
+  const FLUSH_INTERVAL = 100
 
   // === Загрузка начального состояния при mount ===
   useEffect(() => {
@@ -226,7 +226,7 @@ export function useImportQueue(): UseImportQueueResult {
     // Накапливаем обновления и flush'им раз в FLUSH_INTERVAL мс
 
     const flushProgressUpdates = () => {
-      if (pendingProgressUpdates.current.size === 0) {return}
+      if (pendingProgressUpdates.current.size === 0) return
 
       // Копируем и очищаем pending updates
       const updates = new Map(pendingProgressUpdates.current)
@@ -236,7 +236,7 @@ export function useImportQueue(): UseImportQueueResult {
         ...prev,
         items: prev.items.map((item) => {
           const update = updates.get(item.id)
-          if (!update) {return item}
+          if (!update) return item
           return {
             ...item,
             progress: update.progress,
@@ -250,7 +250,7 @@ export function useImportQueue(): UseImportQueueResult {
     }
 
     const scheduleFlush = () => {
-      if (flushTimeoutRef.current !== null) {return} // Уже запланирован
+      if (flushTimeoutRef.current !== null) return // Уже запланирован
 
       flushTimeoutRef.current = setTimeout(() => {
         flushTimeoutRef.current = null
@@ -303,7 +303,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const addItems = useCallback(async (items: ImportQueueAddData[]) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.addItems(items)
     if (!result.success) {
@@ -313,7 +313,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const start = useCallback(async () => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.start()
     if (!result.success) {
@@ -323,7 +323,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const pause = useCallback(async () => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.pause()
     if (!result.success) {
@@ -333,7 +333,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const resume = useCallback(async () => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.resume()
     if (!result.success) {
@@ -343,7 +343,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const cancelItem = useCallback(async (itemId: string) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.cancelItem(itemId)
     if (!result.success) {
@@ -353,7 +353,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const removeItem = useCallback(async (itemId: string) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.removeItem(itemId)
     if (!result.success) {
@@ -363,7 +363,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const retryItem = useCallback(async (itemId: string) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.retryItem(itemId)
     if (!result.success) {
@@ -373,7 +373,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const cancelAll = useCallback(async () => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.cancelAll()
     if (!result.success) {
@@ -383,7 +383,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const clearCompleted = useCallback(async () => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.clearCompleted()
     if (!result.success) {
@@ -393,7 +393,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const setAutoStart = useCallback(async (enabled: boolean) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.setAutoStart(enabled)
     if (!result.success) {
@@ -403,7 +403,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const reorderItems = useCallback(async (activeId: string, overId: string) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.reorderItems(activeId, overId)
     if (!result.success) {
@@ -413,7 +413,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const updateItem = useCallback(async (itemId: string, data: Partial<ImportQueueAddData>) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.updateItem(itemId, data)
     if (!result.success) {
@@ -425,7 +425,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const updateStatus = useCallback(async (itemId: string, status: ImportQueueStatus, error?: string) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.updateStatus(itemId, status, error)
     if (!result.success) {
@@ -442,7 +442,7 @@ export function useImportQueue(): UseImportQueueResult {
       detailProgress?: ImportQueueDetailProgress
     ) => {
       const api = window.electronAPI
-      if (!api?.importQueue) {return}
+      if (!api?.importQueue) return
 
       const result = await api.importQueue.updateProgress(
         itemId,
@@ -460,7 +460,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const updateVmafProgress = useCallback(async (itemId: string, vmafProgress: ImportQueueVmafProgress) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.updateVmafProgress(itemId, vmafProgress)
     if (!result.success) {
@@ -470,7 +470,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const setVmafResult = useCallback(async (itemId: string, result: ImportQueueVmafResult) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const res = await api.importQueue.setVmafResult(itemId, result)
     if (!res.success) {
@@ -480,7 +480,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const setImportResult = useCallback(async (itemId: string, animeId: string) => {
     const api = window.electronAPI
-    if (!api?.importQueue) {return}
+    if (!api?.importQueue) return
 
     const result = await api.importQueue.setImportResult(itemId, animeId)
     if (!result.success) {
@@ -495,10 +495,7 @@ export function useImportQueue(): UseImportQueueResult {
     [state.items, state.currentId]
   )
 
-  const pendingCount = useMemo(
-    () => state.items.filter((item) => item.status === 'pending').length,
-    [state.items]
-  )
+  const pendingCount = useMemo(() => state.items.filter((item) => item.status === 'pending').length, [state.items])
 
   const completedCount = useMemo(
     () =>
@@ -510,10 +507,7 @@ export function useImportQueue(): UseImportQueueResult {
 
   const hasItems = useMemo(() => state.items.length > 0, [state.items])
 
-  const isProcessing = useMemo(
-    () => state.currentId !== null && !state.isPaused,
-    [state.currentId, state.isPaused]
-  )
+  const isProcessing = useMemo(() => state.currentId !== null && !state.isPaused, [state.currentId, state.isPaused])
 
   return {
     // State

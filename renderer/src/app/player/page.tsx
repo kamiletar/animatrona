@@ -7,9 +7,10 @@
 
 import { Box, Button, Card, HStack, Icon, Spinner, Text, VStack } from '@chakra-ui/react'
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LuArrowLeft, LuFile, LuFolderOpen, LuPlay } from 'react-icons/lu'
+
+import { navigateTo } from '@/lib/navigation'
 
 import { ImportWizardDialog } from '@/components/import/ImportWizardDialog'
 import { Header } from '@/components/layout'
@@ -80,10 +81,10 @@ export default function PlayerPage() {
   // Добавляем папку в историю при успешном открытии
   useEffect(() => {
     if (
-      folderPlayer.isFolderMode &&
-      folderPlayer.folderPath &&
-      folderPlayer.folderName &&
-      folderPlayer.totalEpisodes > 0
+      folderPlayer.isFolderMode
+      && folderPlayer.folderPath
+      && folderPlayer.folderName
+      && folderPlayer.totalEpisodes > 0
     ) {
       folderHistory.addFolder(folderPlayer.folderPath, folderPlayer.folderName, folderPlayer.totalEpisodes)
     }
@@ -97,7 +98,7 @@ export default function PlayerPage() {
 
   /** Данные для быстрого импорта из папочного режима */
   const importInitialData = useMemo(() => {
-    if (!folderPlayer.folderPath) {return undefined}
+    if (!folderPlayer.folderPath) return undefined
     return {
       folderPath: folderPlayer.folderPath,
       videoFiles: [...folderPlayer.episodes.map((e) => e.path), ...folderPlayer.bonusVideos.map((e) => e.path)],
@@ -143,7 +144,7 @@ export default function PlayerPage() {
   /** Обработчик обновления времени (для сохранения прогресса) */
   const handleTimeUpdate = useCallback(
     (currentTime: number, duration: number) => {
-      if (!currentVideoPath || duration === 0) {return}
+      if (!currentVideoPath || duration === 0) return
 
       // Сохраняем каждые 5 секунд изменения позиции
       if (Math.abs(currentTime - lastSavedTimeRef.current) >= 5) {
@@ -151,7 +152,7 @@ export default function PlayerPage() {
         lastSavedTimeRef.current = currentTime
       }
     },
-    [currentVideoPath, watchProgress]
+    [currentVideoPath, watchProgress],
   )
 
   /** Обработчик окончания видео */
@@ -211,7 +212,7 @@ export default function PlayerPage() {
         console.warn('[PlayerPage] Папка не найдена или пуста:', folderPath)
       }
     },
-    [folderPlayer, folderHistory]
+    [folderPlayer, folderHistory],
   )
 
   // === Render ===
@@ -223,21 +224,19 @@ export default function PlayerPage() {
   const headerTitle = isFolderMode
     ? `${folderPlayer.currentNumber}/${folderPlayer.totalInCategory} — ${currentVideoName}`
     : hasVideo
-      ? currentVideoName
-      : 'Плеер'
+    ? currentVideoName
+    : 'Плеер'
 
   return (
-    <Box minH="100vh" bg="bg" color="fg" display="flex" flexDirection="column">
+    <Box h="full" bg="bg" color="fg" display="flex" flexDirection="column" overflow="hidden">
       <Header title={headerTitle} />
 
       {/* Навигация */}
-      <HStack px={6} py={2} gap={2}>
-        <Link href="/">
-          <Button variant="ghost" size="sm">
-            <Icon as={LuArrowLeft} mr={2} />
-            На главную
-          </Button>
-        </Link>
+      <HStack px={6} py={2} gap={2} flexShrink={0}>
+        <Button variant="ghost" size="sm" onClick={() => navigateTo('/')}>
+          <Icon as={LuArrowLeft} mr={2} />
+          На главную
+        </Button>
 
         {/* Кнопка показа сайдбара (если свёрнут) */}
         {isFolderMode && sidebarCollapsed && (
@@ -249,7 +248,7 @@ export default function PlayerPage() {
       </HStack>
 
       {/* Основной контент */}
-      <Box flex={1} display="flex" p={4} gap={4}>
+      <Box flex={1} display="flex" p={4} gap={4} minH={0}>
         {/* Сайдбар с эпизодами (только в folder mode) */}
         {isFolderMode && !sidebarCollapsed && (
           <EpisodeSidebar
@@ -270,115 +269,121 @@ export default function PlayerPage() {
         )}
 
         {/* Область плеера */}
-        <Box flex={1} display="flex" flexDirection="column">
-          {isLoading ? (
-            /* Состояние загрузки */
-            <VStack flex={1} justify="center" gap={4}>
-              <Spinner size="xl" color="purple.500" />
-              <Text color="fg.muted">Сканирование папки...</Text>
-            </VStack>
-          ) : hasVideo ? (
-            /* Режим воспроизведения */
-            <Box flex={1} borderRadius="lg" overflow="hidden" bg="black">
-              <VideoPlayer
-                ref={playerRef}
-                src={currentVideoPath}
-                autoPlay
-                startTime={initialResumeTime}
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={handleVideoEnded}
-                onError={handleVideoError}
-                // Навигация между эпизодами (только в folder mode)
-                hasPrevEpisode={isFolderMode && folderPlayer.hasPrev}
-                hasNextEpisode={isFolderMode && folderPlayer.hasNext}
-                onPrevEpisode={folderModeUI.handlePrevEpisode}
-                onNextEpisode={folderModeUI.handleNextEpisode}
-                prevEpisodeTooltip={folderPlayer.prevEpisode?.name}
-                nextEpisodeTooltip={folderPlayer.nextEpisode?.name}
-                // Внешние субтитры (выбранные через TrackSelector)
-                subtitlePath={folderModeUI.currentSubtitlePath}
-                subtitleFonts={folderModeUI.currentSubtitleFonts}
-                // TrackSelector в header плеера
-                headerRight={folderModeUI.trackSelectorElement}
-              />
-            </Box>
-          ) : (
-            /* Режим выбора файла */
-            <VStack flex={1} justify="center" gap={6}>
-              <Card.Root bg="bg.panel" border="1px" borderColor="border.subtle" maxW="md" w="full">
-                <Card.Body p={8}>
-                  <VStack gap={6}>
-                    <Icon as={LuPlay} boxSize={16} color="purple.400" />
+        <Box flex={1} display="flex" flexDirection="column" minH={0}>
+          {isLoading
+            ? (
+              /* Состояние загрузки */
+              <VStack flex={1} justify="center" gap={4}>
+                <Spinner size="xl" color="purple.500" />
+                <Text color="fg.muted">Сканирование папки...</Text>
+              </VStack>
+            )
+            : hasVideo
+            ? (
+              /* Режим воспроизведения */
+              <Box flex={1} borderRadius="lg" overflow="hidden" bg="black" minH={0}>
+                <VideoPlayer
+                  ref={playerRef}
+                  src={currentVideoPath}
+                  autoPlay
+                  startTime={initialResumeTime}
+                  onTimeUpdate={handleTimeUpdate}
+                  onEnded={handleVideoEnded}
+                  onError={handleVideoError}
+                  // Навигация между эпизодами (только в folder mode)
+                  hasPrevEpisode={isFolderMode && folderPlayer.hasPrev}
+                  hasNextEpisode={isFolderMode && folderPlayer.hasNext}
+                  onPrevEpisode={folderModeUI.handlePrevEpisode}
+                  onNextEpisode={folderModeUI.handleNextEpisode}
+                  prevEpisodeTooltip={folderPlayer.prevEpisode?.name}
+                  nextEpisodeTooltip={folderPlayer.nextEpisode?.name}
+                  // Внешние субтитры (выбранные через TrackSelector)
+                  subtitlePath={folderModeUI.currentSubtitlePath}
+                  subtitleFonts={folderModeUI.currentSubtitleFonts}
+                  // TrackSelector в header плеера
+                  headerRight={folderModeUI.trackSelectorElement}
+                  // Внешнее аудио управляется через useFolderModeUI
+                  externalAudioManaged={folderModeUI.usesExternalAudio}
+                />
+              </Box>
+            )
+            : (
+              /* Режим выбора файла */
+              <VStack flex={1} justify="center" gap={6}>
+                <Card.Root bg="bg.panel" border="1px" borderColor="border.subtle" maxW="md" w="full">
+                  <Card.Body p={8}>
+                    <VStack gap={6}>
+                      <Icon as={LuPlay} boxSize={16} color="purple.400" />
 
-                    <VStack gap={2} textAlign="center">
-                      <Text fontSize="xl" fontWeight="bold">
-                        Видеоплеер
+                      <VStack gap={2} textAlign="center">
+                        <Text fontSize="xl" fontWeight="bold">
+                          Видеоплеер
+                        </Text>
+                        <Text color="fg.muted">Выберите файл или папку с сериалом</Text>
+                      </VStack>
+
+                      {/* Кнопки выбора */}
+                      <HStack gap={3} w="full">
+                        <Button colorPalette="purple" size="lg" flex={1} onClick={handleSelectFolder}>
+                          <Icon as={LuFolderOpen} mr={2} />
+                          Выбрать папку
+                        </Button>
+                        <Button variant="outline" colorPalette="gray" size="lg" flex={1} onClick={handleSelectFile}>
+                          <Icon as={LuFile} mr={2} />
+                          Выбрать файл
+                        </Button>
+                      </HStack>
+
+                      <Text fontSize="sm" color="fg.subtle">
+                        Поддерживаемые форматы: MKV, MP4, WebM, AVI, MOV
                       </Text>
-                      <Text color="fg.muted">Выберите файл или папку с сериалом</Text>
                     </VStack>
+                  </Card.Body>
+                </Card.Root>
 
-                    {/* Кнопки выбора */}
-                    <HStack gap={3} w="full">
-                      <Button colorPalette="purple" size="lg" flex={1} onClick={handleSelectFolder}>
-                        <Icon as={LuFolderOpen} mr={2} />
-                        Выбрать папку
-                      </Button>
-                      <Button variant="outline" colorPalette="gray" size="lg" flex={1} onClick={handleSelectFile}>
-                        <Icon as={LuFile} mr={2} />
-                        Выбрать файл
-                      </Button>
-                    </HStack>
+                {/* Недавние папки */}
+                <RecentFoldersCard
+                  history={folderHistory.history}
+                  onSelectFolder={handleOpenFolderFromHistory}
+                  onRemoveFolder={folderHistory.removeFolder}
+                />
 
-                    <Text fontSize="sm" color="fg.subtle">
-                      Поддерживаемые форматы: MKV, MP4, WebM, AVI, MOV
+                {/* Горячие клавиши */}
+                <Card.Root bg="bg.panel" border="1px" borderColor="border.subtle" maxW="md" w="full">
+                  <Card.Body>
+                    <Text fontWeight="medium" mb={3}>
+                      Горячие клавиши плеера
                     </Text>
-                  </VStack>
-                </Card.Body>
-              </Card.Root>
-
-              {/* Недавние папки */}
-              <RecentFoldersCard
-                history={folderHistory.history}
-                onSelectFolder={handleOpenFolderFromHistory}
-                onRemoveFolder={folderHistory.removeFolder}
-              />
-
-              {/* Горячие клавиши */}
-              <Card.Root bg="bg.panel" border="1px" borderColor="border.subtle" maxW="md" w="full">
-                <Card.Body>
-                  <Text fontWeight="medium" mb={3}>
-                    Горячие клавиши плеера
-                  </Text>
-                  <VStack align="stretch" gap={1} fontSize="sm" color="fg.muted">
-                    <HStack justify="space-between">
-                      <Text>Воспроизведение / Пауза</Text>
-                      <Text>Space, K</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text>Назад / Вперёд 10 сек</Text>
-                      <Text>←, →</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text>Громкость</Text>
-                      <Text>↑, ↓</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text>Выключить звук</Text>
-                      <Text>M</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text>Полноэкранный режим</Text>
-                      <Text>F</Text>
-                    </HStack>
-                    <HStack justify="space-between">
-                      <Text>Предыдущий / Следующий эпизод</Text>
-                      <Text>Shift + ←, →</Text>
-                    </HStack>
-                  </VStack>
-                </Card.Body>
-              </Card.Root>
-            </VStack>
-          )}
+                    <VStack align="stretch" gap={1} fontSize="sm" color="fg.muted">
+                      <HStack justify="space-between">
+                        <Text>Воспроизведение / Пауза</Text>
+                        <Text>Space, K</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text>Назад / Вперёд 10 сек</Text>
+                        <Text>←, →</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text>Громкость</Text>
+                        <Text>↑, ↓</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text>Выключить звук</Text>
+                        <Text>M</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text>Полноэкранный режим</Text>
+                        <Text>F</Text>
+                      </HStack>
+                      <HStack justify="space-between">
+                        <Text>Предыдущий / Следующий эпизод</Text>
+                        <Text>Shift + ←, →</Text>
+                      </HStack>
+                    </VStack>
+                  </Card.Body>
+                </Card.Root>
+              </VStack>
+            )}
         </Box>
       </Box>
 

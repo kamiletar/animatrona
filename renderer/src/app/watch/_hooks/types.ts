@@ -16,8 +16,6 @@ export type EpisodeWithTracks = Episode & {
   audioTracks: AudioTrack[]
   subtitleTracks: SubtitleTrackWithFonts[]
   chapters: DbChapter[]
-  /** Путь к манифесту (для определения папки эпизода при записи progress.meta.json) */
-  manifestPath: string | null
   anime: {
     id: string
     name: string
@@ -42,8 +40,8 @@ export interface EpisodeNavInfo {
   id: string
   number: number
   name?: string | null
-  /** JSON массив путей к thumbnail-ам для UpNext overlay */
-  thumbnailPaths?: string | null
+  /** JSON массив CID thumbnail'ов в IPFS для UpNext overlay */
+  thumbnailCids?: string | null
 }
 
 /** Интервал сохранения прогресса (мс) */

@@ -2,8 +2,10 @@
 
 import { Box, Flex } from '@chakra-ui/react'
 import { useRouter } from 'next/navigation'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 
+import { setGatewayBaseUrl } from '@/lib/media-url'
+import { setRouter } from '@/lib/navigation'
 import { useGlobalShortcuts } from '@/lib/shortcuts'
 
 import { WelcomeDialog } from '../onboarding'
@@ -34,6 +36,30 @@ export function AppShell({ children }: AppShellProps) {
   const router = useRouter()
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false)
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false)
+
+  // Регистрируем роутер для navigateTo()
+  useEffect(() => {
+    setRouter(router)
+  }, [router])
+
+  // Синхронизируем реальный порт IPFS gateway (может быть не 8765 если порт занят)
+  useEffect(() => {
+    const api = window.electronAPI?.ipfs
+    if (!api) return
+
+    // Получить текущий baseUrl если gateway уже запущен
+    void api.gatewayStatus().then((result) => {
+      setGatewayBaseUrl(result.data?.baseUrl ?? null)
+    })
+
+    const unsubStart = api.onGatewayStarted((status) => setGatewayBaseUrl(status.baseUrl))
+    const unsubStop = api.onGatewayStopped(() => setGatewayBaseUrl(null))
+
+    return () => {
+      unsubStart()
+      unsubStop()
+    }
+  }, [])
 
   // Закрытие простых модальных окон (не влияет на визарды и сложные диалоги)
   const closeSimpleModals = () => {

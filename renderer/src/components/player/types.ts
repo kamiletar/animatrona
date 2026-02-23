@@ -2,8 +2,6 @@
  * Типы для VideoPlayer компонента
  */
 
-import type { AudioTranscodeStatus } from '../../../../shared/types/manifest'
-
 /** Аудиодорожка с информацией о транскодировании */
 export interface AudioTrackInfo {
   id: string
@@ -12,10 +10,8 @@ export interface AudioTrackInfo {
   codec: string
   channels: string
   isDefault: boolean
-  /** Путь к транскодированному/skipped файлу */
-  transcodedPath?: string
-  /** Статус транскодирования */
-  transcodeStatus: AudioTranscodeStatus
+  /** CID в IPFS — единственный источник для библиотеки */
+  transcodedCid?: string
 }
 
 /** Информация о видео для оверлея (I) */
@@ -72,6 +68,8 @@ export interface VideoPlayerProps {
   onAudioTrackChange?: (trackId: string) => void
   /** Путь к файлу субтитров */
   subtitlePath?: string | null
+  /** Формат субтитров (ass, srt, vtt) — если не указан, определяется по расширению URL */
+  subtitleFormat?: 'ass' | 'ssa' | 'srt' | 'vtt' | null
   /** Шрифты для субтитров */
   subtitleFonts?: string[]
   /** Главы для маркеров на прогресс-баре */
@@ -96,6 +94,12 @@ export interface VideoPlayerProps {
   headerCenter?: React.ReactNode
   /** Контент для правой части верхней панели (выбор дорожек) */
   headerRight?: React.ReactNode
+  /**
+   * Внешнее аудио управляется снаружи (через useExternalAudio)
+   * Когда true, VideoPlayer не будет обновлять isMuted состояние по video.muted
+   * (потому что video.muted всегда true для внешнего аудио)
+   */
+  externalAudioManaged?: boolean
 }
 
 /** Публичный API плеера */

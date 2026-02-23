@@ -34,8 +34,7 @@ import {
 } from 'react-icons/lu'
 
 import { getLocalDubGroups } from '@/app/_actions/audio-track.action'
-
-import { type ExtendedMetadataInput, saveExtendedMetadata } from '@/app/_actions/extended-metadata.action'
+import { saveGenresAndThemes, type ShikimoriGenreInput } from '@/app/_actions/genre.action'
 import type {
   ShikimoriAnimeExtended,
   ShikimoriCharacterRole,
@@ -236,7 +235,10 @@ export function AnimeMetadataSection({ animeId, shikimoriId }: AnimeMetadataSect
     }
   }, [shikimoriId])
 
-  /** Сохранить метаданные в БД */
+  /**
+   * Сохранить жанры в БД и обновить AnimeManifest в IPFS
+   * v0.28.0: Расширенные метаданные (studios, staff, characters и т.д.) теперь хранятся в AnimeManifest
+   */
   const handleSaveToDb = useCallback(async () => {
     if (!data) {
       return
@@ -246,26 +248,26 @@ export function AnimeMetadataSection({ animeId, shikimoriId }: AnimeMetadataSect
     setSaveStatus('idle')
 
     try {
-      const input: ExtendedMetadataInput = {
-        studios: data.studios,
-        personRoles: data.personRoles,
-        characterRoles: data.characterRoles,
-        fandubbers: data.fandubbers,
-        fansubbers: data.fansubbers,
-        externalLinks: data.externalLinks,
-        videos: data.videos || [],
-        nextEpisodeAt: data.nextEpisodeAt,
-        // Жанры и темы (исправлено в v0.17.x)
-        genres: data.genres,
+      // 1. Сохраняем жанры/темы в БД (для фильтрации в списке библиотеки)
+      if (data.genres?.length) {
+        const genres: ShikimoriGenreInput[] = data.genres.map((g) => ({
+          id: g.id,
+          name: g.name,
+          russian: g.russian,
+          kind: g.kind ?? 'genre',
+        }))
+        const genreResult = await saveGenresAndThemes(animeId, genres)
+        if (!genreResult.success) {
+          console.warn('[AnimeMetadataSection] Failed to save genres:', genreResult.error)
+        }
       }
 
-      const result = await saveExtendedMetadata(animeId, input)
-      if (result.success) {
-        setSaveStatus('saved')
-      } else {
-        setError(result.error || 'Не удалось сохранить')
-        setSaveStatus('error')
+      // 2. Обновляем AnimeManifest в IPFS (студии, персонал, персонажи и т.д.)
+      if (window.electronAPI?.animeManifest) {
+        await window.electronAPI.animeManifest.update(animeId)
       }
+
+      setSaveStatus('saved')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Неизвестная ошибка')
       setSaveStatus('error')
@@ -281,7 +283,7 @@ export function AnimeMetadataSection({ animeId, shikimoriId }: AnimeMetadataSect
 
   // Загрузить локальные dubGroups для сопоставления с Shikimori
   useEffect(() => {
-    if (!animeId) {return}
+    if (!animeId) return
 
     getLocalDubGroups(animeId)
       .then(setLocalDubGroups)
@@ -391,7 +393,7 @@ export function AnimeMetadataSection({ animeId, shikimoriId }: AnimeMetadataSect
                 disabled={isSaving || saveStatus === 'saved'}
               >
                 <Icon as={LuDatabase} mr={1} />
-                {saveStatus === 'saved' ? 'Сохранено' : isSaving ? 'Сохранение...' : 'Сохранить в БД'}
+                {saveStatus === 'saved' ? 'Сохранено' : isSaving ? 'Сохранение...' : 'Обновить манифест'}
               </Button>
             </HStack>
           </HStack>

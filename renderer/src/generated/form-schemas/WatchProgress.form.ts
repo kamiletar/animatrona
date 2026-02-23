@@ -17,8 +17,8 @@ export const WatchProgressCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Просмотрено полностью', fieldType: 'switch' }
     }),
-  selectedAudioTrackId: z.string().optional(),
-  selectedSubtitleTrackId: z.string().optional(),
+  selectedAudioTrackId: z.string().nullable().optional(),
+  selectedSubtitleTrackId: z.string().nullable().optional(),
   volume: z.number().default(1),
   lastWatchedAt: z.date()
 })

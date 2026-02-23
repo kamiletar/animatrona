@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Сервис хранения истории импортов
  *
@@ -17,6 +16,9 @@ import type {
   ImportHistoryFilter,
   ImportHistoryStats,
 } from '../../shared/types/import-history'
+import { createModuleLogger } from '../utils/logger'
+
+const log = createModuleLogger('HistoryStore')
 
 const HISTORY_FILE = 'import-history.json'
 const MAX_HISTORY_ENTRIES = 100
@@ -41,7 +43,7 @@ function loadHistory(): ImportHistoryEntry[] {
     const data = fs.readFileSync(filePath, 'utf-8')
     return JSON.parse(data)
   } catch (error) {
-    console.error('[HistoryStore] Ошибка загрузки истории:', error)
+    log.error('Ошибка загрузки истории', { error })
     return []
   }
 }
@@ -54,7 +56,7 @@ function saveHistory(history: ImportHistoryEntry[]): void {
     const filePath = getHistoryPath()
     fs.writeFileSync(filePath, JSON.stringify(history, null, 2), 'utf-8')
   } catch (error) {
-    console.error('[HistoryStore] Ошибка сохранения истории:', error)
+    log.error('Ошибка сохранения истории', { error })
     throw error
   }
 }
@@ -83,8 +85,8 @@ export function getHistory(filter?: ImportHistoryFilter): ImportHistoryEntry[] {
       const searchLower = filter.search.toLowerCase()
       history = history.filter(
         (h) =>
-          h.animeName.toLowerCase().includes(searchLower) ||
-          h.animeNameRu?.toLowerCase().includes(searchLower)
+          h.animeName.toLowerCase().includes(searchLower)
+          || h.animeNameRu?.toLowerCase().includes(searchLower),
       )
     }
 
@@ -138,7 +140,7 @@ export function addHistoryEntry(data: ImportHistoryCreateData): ImportHistoryEnt
   }
 
   saveHistory(history)
-  console.log(`[HistoryStore] Добавлена запись: ${newEntry.animeName} (${newEntry.status})`)
+  log.info('Добавлена запись истории', { animeName: newEntry.animeName, status: newEntry.status })
 
   return newEntry
 }
@@ -156,7 +158,7 @@ export function deleteHistoryEntry(id: string): boolean {
 
   history.splice(index, 1)
   saveHistory(history)
-  console.log(`[HistoryStore] Удалена запись: ${id}`)
+  log.info('Удалена запись истории', { id })
 
   return true
 }
@@ -166,7 +168,7 @@ export function deleteHistoryEntry(id: string): boolean {
  */
 export function clearHistory(): void {
   saveHistory([])
-  console.log('[HistoryStore] История очищена')
+  log.info('История очищена')
 }
 
 /**

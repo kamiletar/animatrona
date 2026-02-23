@@ -12,11 +12,12 @@ export const FileCreateFormSchema = z.object({
   path: z.string(),
   mimeType: z.string(),
   size: z.number().int(),
-  width: z.number().int().optional(),
-  height: z.number().int().optional(),
-  blurDataURL: z.string().optional(),
+  width: z.number().int().nullable().optional(),
+  height: z.number().int().nullable().optional(),
+  blurDataURL: z.string().nullable().optional(),
   category: FileCategoryFormSchema,
-  source: z.string().optional(),
+  source: z.string().nullable().optional(),
+  cid: z.string().nullable().optional(),
   uploadedAt: z.date()
 })
 

@@ -13,11 +13,11 @@ export const AnimeCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Название', placeholder: 'Например: Стальной алхимик' }
     }),
-  originalName: z.string().optional()
+  originalName: z.string().nullable().optional()
     .meta({
       ui: { title: 'Оригинальное название', placeholder: 'Например: 鋼の錬金術師' }
     }),
-  year: z.number().int().min(1900).max(2100).optional()
+  year: z.number().int().min(1900).max(2100).nullable().optional()
     .meta({
       ui: { title: 'Год выпуска', fieldType: 'numberInput' }
     }),
@@ -29,15 +29,15 @@ export const AnimeCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Количество серий', fieldType: 'numberInput' }
     }),
-  description: z.string().optional()
+  description: z.string().nullable().optional()
     .meta({
       ui: { title: 'Описание', fieldType: 'textarea' }
     }),
-  rating: z.number().min(0).max(10).multipleOf(0.1).optional()
+  rating: z.number().min(0).max(10).multipleOf(0.1).nullable().optional()
     .meta({
       ui: { title: 'Рейтинг', fieldType: 'slider', fieldProps: {"showValue":true} }
     }),
-  folderPath: z.string().optional()
+  folderPath: z.string().nullable().optional()
     .meta({
       ui: { title: 'Путь к папке', description: 'Путь к папке с файлами аниме' }
     }),
@@ -45,7 +45,7 @@ export const AnimeCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Статус просмотра', fieldType: 'radioCard' }
     }),
-  userRating: z.number().int().min(0).max(10).multipleOf(1).optional()
+  userRating: z.number().int().min(0).max(10).multipleOf(1).nullable().optional()
     .meta({
       ui: { title: 'Оценка', fieldType: 'slider', fieldProps: {"showValue":true} }
     })
@@ -59,7 +59,7 @@ export const AnimeUpdateFormSchema = AnimeCreateFormSchema.partial()
 /**
  * Поля, исключённые из форм
  */
-export const AnimeExcludedFields = ['id', 'nameEn', 'synonyms', 'posterId', 'poster', 'source', 'ageRating', 'duration', 'licensor', 'isBdRemux', 'shikimoriId', 'franchiseId', 'franchise', 'seasons', 'episodes', 'genres', 'themes', 'watchProgress', 'sourceRelations', 'targetRelations', 'studios', 'staff', 'characters', 'externalLinks', 'fandubbers', 'fansubbers', 'videos', 'nextEpisodeAt', 'lastSelectedAudioDubGroup', 'lastSelectedAudioLanguage', 'lastSelectedSubtitleDubGroup', 'lastSelectedSubtitleLanguage', 'relationsCheckedAt', 'watchedAt', 'createdAt', 'updatedAt'] as const
+export const AnimeExcludedFields = ['id', 'nameEn', 'synonyms', 'posterId', 'poster', 'posterCid', 'source', 'ageRating', 'duration', 'licensor', 'isBdRemux', 'manifestCid', 'shikimoriId', 'franchiseId', 'franchise', 'seasons', 'episodes', 'genres', 'themes', 'watchProgress', 'sourceRelations', 'targetRelations', 'federatedContent', 'nextEpisodeAt', 'lastSelectedAudioDubGroup', 'lastSelectedAudioLanguage', 'lastSelectedSubtitleDubGroup', 'lastSelectedSubtitleLanguage', 'relationsCheckedAt', 'watchedAt', 'createdAt', 'updatedAt'] as const
 
 /**
  * Типы

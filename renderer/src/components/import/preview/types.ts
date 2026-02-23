@@ -7,6 +7,9 @@ import type { EncodingProfile } from '@/generated/prisma'
 import type { MediaInfo } from '../../../../../shared/types'
 import type { ParsedFile } from '../FileScanStep'
 
+/** Тип субтитров: полные, надписи (signs), песни (songs) */
+export type SubtitleType = 'full' | 'signs' | 'songs'
+
 /** Настройки импорта (профиль + потоки) */
 export interface ImportSettings {
   /** ID выбранного профиля кодирования */
@@ -21,6 +24,8 @@ export interface ImportSettings {
   cqOverride?: number
   /** Требуется CPU fallback (GPU недоступен для контента) */
   useCpuFallback?: boolean
+  /** Принудительно использовать CPU вместо GPU */
+  forceCpu?: boolean
   /** Включить VMAF подбор CQ перед кодированием (в очереди) */
   vmafEnabled?: boolean
   /** Целевой VMAF для подбора CQ (по умолчанию 94) */
@@ -41,6 +46,10 @@ export interface AudioRecommendation {
   groupName?: string
   /** Язык аудиодорожки (ru, en, ja и т.д.) */
   language?: string
+  /** Группа озвучки (AniDUB, AniLibria и т.д.) */
+  dubGroup?: string
+  /** ID группы для batch-редактирования ("embedded:0" | "external:FolderName") */
+  groupId?: string
 }
 
 /** Рекомендация для субтитров */
@@ -61,6 +70,12 @@ export interface SubtitleRecommendation {
   matchedFonts?: Array<{ name: string; path: string }>
   /** Включен для импорта */
   enabled: boolean
+  /** Группа озвучки/субтитров (AniDUB, HorribleSubs и т.д.) */
+  dubGroup?: string
+  /** Тип субтитров (полные, надписи, песни) */
+  subtitleType?: SubtitleType
+  /** ID группы для batch-редактирования ("embedded:0" | "external:FolderName") */
+  groupId?: string
 }
 
 /** Результат анализа файла (используем probe, не demux) */
@@ -91,6 +106,10 @@ export interface FileCardProps {
   folderPath: string
   onToggleTrack: (fileIndex: number, trackIndex: number, enabled: boolean) => void
   onToggleSubtitle: (episodeNumber: number, subtitleIndex: number, enabled: boolean) => void
+  /** Callback для обновления групп дорожек (только текущий эпизод) */
+  onTrackGroupEdit?: (episodeNumber: number, type: 'audio' | 'subtitle', groupId: string, edit: TrackGroupEdit) => void
+  /** Callback для применения настроек ко всем эпизодам */
+  onApplyToAll?: (type: 'audio' | 'subtitle', groupId: string, edit: TrackGroupEdit) => void
 }
 
 /** Опции видео для VMAF теста */
@@ -107,4 +126,37 @@ export interface EncodingSettingsState {
   isLoadingProfiles: boolean
   audioMaxConcurrent: number
   videoMaxConcurrent: number
+}
+
+/** Редактирование групп дорожек (batch edit) */
+export interface TrackGroupEdit {
+  /** Изменённый язык */
+  language?: string
+  /** Изменённая группа озвучки (null = без группы) */
+  dubGroup?: string | null
+  /** Изменённый тип субтитров */
+  subtitleType?: SubtitleType
+}
+
+/** Маппинг groupId -> изменения */
+export type TrackGroupEdits = Record<string, TrackGroupEdit>
+
+/** Информация о группе дорожек */
+export interface TrackGroup {
+  /** Уникальный ID группы */
+  groupId: string
+  /** Тип группы */
+  type: 'embedded' | 'external'
+  /** Название для отображения (папка или "Встроенные #N") */
+  displayName: string
+  /** Количество дорожек в группе */
+  trackCount: number
+  /** Текущий язык (если у всех одинаковый) */
+  language?: string
+  /** Текущая группа озвучки (если у всех одинаковая) */
+  dubGroup?: string
+  /** Тип субтитров (если у всех одинаковый) */
+  subtitleType?: SubtitleType
+  /** Индексы дорожек в этой группе (для аудио: trackIndex, для сабов: индекс в массиве) */
+  trackIndices: number[]
 }

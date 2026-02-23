@@ -5,7 +5,7 @@
  */
 
 import { Badge, Box, HoverCard, HStack, Image, Portal, Progress, Text, VStack } from '@chakra-ui/react'
-// eslint-disable-next-line @nx/enforce-module-boundaries
+
 import { Handle, type NodeProps, Position } from '@xyflow/react'
 import { memo } from 'react'
 import { LuCheck, LuClock, LuLibrary, LuPause, LuPlay, LuX } from 'react-icons/lu'
@@ -64,15 +64,7 @@ function AnimeNodeComponent(props: NodeProps) {
           >
             {/* Порядковый номер */}
             {data.chronologicalOrder && (
-              <Badge
-                position="absolute"
-                top="2"
-                left="2"
-                zIndex="1"
-                colorPalette="blue"
-                variant="solid"
-                fontSize="xs"
-              >
+              <Badge position="absolute" top="2" left="2" zIndex="1" colorPalette="blue" variant="solid" fontSize="xs">
                 #{data.chronologicalOrder}
               </Badge>
             )}
@@ -125,13 +117,7 @@ function AnimeNodeComponent(props: NodeProps) {
 
               {/* Оверлей для текущего аниме */}
               {data.isCurrent && (
-                <Box
-                  position="absolute"
-                  inset="0"
-                  bg="blue.500/20"
-                  borderBottom="3px solid"
-                  borderColor="blue.500"
-                />
+                <Box position="absolute" inset="0" bg="blue.500/20" borderBottom="3px solid" borderColor="blue.500" />
               )}
             </Box>
 

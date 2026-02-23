@@ -8,10 +8,11 @@
  * - Субтитры (или отключить)
  */
 
-import { Badge, Box, Button, HStack, Icon, IconButton, Menu, Portal, Text, VStack } from '@chakra-ui/react'
+import { Box, Button, HStack, Icon, IconButton, Menu, Portal, Text, VStack } from '@chakra-ui/react'
+import { type RefObject } from 'react'
 import { LuCaptions, LuCheck, LuLanguages, LuPencil, LuTrash2, LuVolume2 } from 'react-icons/lu'
 
-import type { AudioTranscodeStatus } from '../../../../shared/types/manifest'
+import { usePlayerContainer } from './PlayerContext'
 
 /** Информация о дорожке */
 export interface TrackInfo {
@@ -22,10 +23,10 @@ export interface TrackInfo {
   language?: string
   codec?: string
   isDefault?: boolean
-  /** Статус транскодирования (только для аудио) */
-  transcodeStatus?: AudioTranscodeStatus
   /** Название группы озвучки (имя папки-дублёра) */
   dubGroup?: string
+  /** CID в IPFS — дорожка готова к воспроизведению */
+  transcodedCid?: string
 }
 
 /** Пропсы компонента TrackSelector */
@@ -50,6 +51,11 @@ export interface TrackSelectorProps {
   onEditSubtitleTrack?: (trackId: string | number) => void
   /** Обработчик удаления субтитров */
   onDeleteSubtitleTrack?: (trackId: string | number) => void
+  /**
+   * Контейнер для Portal (для корректной работы в fullscreen)
+   * Если не указан, используется контекст плеера или document.body
+   */
+  portalContainer?: RefObject<HTMLElement | null>
 }
 
 /**
@@ -113,50 +119,11 @@ function formatTrackLabel(track: TrackInfo): string {
 }
 
 /**
- * Получить badge для статуса транскодирования
- */
-function getTranscodeStatusBadge(status?: AudioTranscodeStatus) {
-  if (!status) {
-    return null
-  }
-
-  switch (status) {
-    case 'SKIPPED':
-      // AAC дорожка использована без транскодирования
-      return (
-        <Badge colorPalette="green" size="sm" variant="subtle">
-          AAC
-        </Badge>
-      )
-    case 'COMPLETED':
-      // Транскодирование завершено — нет badge (просто работает)
-      return null
-    case 'ERROR':
-      return (
-        <Badge colorPalette="red" size="sm" variant="subtle">
-          Ошибка
-        </Badge>
-      )
-    case 'QUEUED':
-    case 'PROCESSING':
-      return (
-        <Badge colorPalette="yellow" size="sm" variant="subtle">
-          ...
-        </Badge>
-      )
-    default:
-      return null
-  }
-}
-
-/**
  * Проверяет, доступна ли дорожка для воспроизведения
+ * Дорожка доступна если есть transcodedCid (загружена в IPFS)
  */
-function isTrackPlayable(status?: AudioTranscodeStatus): boolean {
-  if (!status) {
-    return true
-  } // Без статуса — считаем доступной (legacy)
-  return status === 'COMPLETED' || status === 'SKIPPED'
+function isTrackPlayable(track: TrackInfo): boolean {
+  return !!track.transcodedCid
 }
 
 /**
@@ -173,7 +140,12 @@ export function TrackSelector({
   onDeleteAudioTrack,
   onEditSubtitleTrack,
   onDeleteSubtitleTrack,
+  portalContainer,
 }: TrackSelectorProps) {
+  // Используем контекст плеера для Portal если не передан явно
+  const contextContainerRef = usePlayerContainer()
+  const effectiveContainerRef = portalContainer ?? contextContainerRef
+
   return (
     <HStack gap={1}>
       {/* Аудиодорожки */}
@@ -184,7 +156,7 @@ export function TrackSelector({
               <Icon as={LuVolume2} color="white" />
             </Button>
           </Menu.Trigger>
-          <Portal>
+          <Portal container={effectiveContainerRef ?? undefined}>
             <Menu.Positioner>
               <Menu.Content bg="bg.panel" borderColor="border.subtle">
                 <Box px={3} py={2} borderBottom="1px" borderColor="border.subtle">
@@ -196,8 +168,7 @@ export function TrackSelector({
                   </HStack>
                 </Box>
                 {audioTracks.map((track) => {
-                  const playable = isTrackPlayable(track.transcodeStatus)
-                  const badge = getTranscodeStatusBadge(track.transcodeStatus)
+                  const playable = isTrackPlayable(track)
                   const isSelected = selectedAudioTrack === track.id
 
                   return (
@@ -208,6 +179,9 @@ export function TrackSelector({
                       disabled={!playable}
                       // Используем data-selected для CSS, hover из slot recipe
                       data-selected={isSelected || undefined}
+                      title={!playable
+                        ? 'Дорожка не транскодирована. Перекодируйте эпизод для использования этой дорожки.'
+                        : undefined}
                       css={{
                         '&[data-selected]': {
                           background: 'var(--chakra-colors-purple-700)',
@@ -216,14 +190,18 @@ export function TrackSelector({
                         '&[data-selected]:hover': {
                           background: 'var(--chakra-colors-purple-600)',
                         },
+                        '&[data-disabled]': {
+                          opacity: 0.5,
+                          cursor: 'not-allowed',
+                        },
                       }}
                     >
                       <HStack justify="space-between" w="full">
                         <VStack align="start" gap={0} flex={1}>
-                          <HStack gap={2}>
-                            <Text fontSize="sm" color={isSelected ? 'white' : undefined}>{formatTrackLabel(track)}</Text>
-                            {badge}
-                          </HStack>
+                          <Text fontSize="sm" color={isSelected ? 'white' : !playable ? 'fg.muted' : undefined}>
+                            {formatTrackLabel(track)}
+                            {!playable && ' ⚠️'}
+                          </Text>
                           {track.codec && (
                             <Text fontSize="xs" color={isSelected ? 'whiteAlpha.700' : 'fg.muted'}>
                               {track.codec}
@@ -281,7 +259,7 @@ export function TrackSelector({
               <Icon as={LuCaptions} color={selectedSubtitleTrack !== null ? 'purple.400' : 'white'} />
             </Button>
           </Menu.Trigger>
-          <Portal>
+          <Portal container={effectiveContainerRef ?? undefined}>
             <Menu.Positioner>
               <Menu.Content bg="bg.panel" borderColor="border.subtle">
                 <Box px={3} py={2} borderBottom="1px" borderColor="border.subtle">
@@ -308,7 +286,9 @@ export function TrackSelector({
                   }}
                 >
                   <HStack justify="space-between" w="full">
-                    <Text fontSize="sm" color={selectedSubtitleTrack === null ? 'white' : undefined}>Выключены</Text>
+                    <Text fontSize="sm" color={selectedSubtitleTrack === null ? 'white' : undefined}>
+                      Выключены
+                    </Text>
                     {selectedSubtitleTrack === null && <Icon as={LuCheck} color="white" />}
                   </HStack>
                 </Menu.Item>
@@ -332,7 +312,9 @@ export function TrackSelector({
                     >
                       <HStack justify="space-between" w="full">
                         <VStack align="start" gap={0} flex={1}>
-                          <Text fontSize="sm" color={isSelected ? 'white' : undefined}>{formatTrackLabel(track)}</Text>
+                          <Text fontSize="sm" color={isSelected ? 'white' : undefined}>
+                            {formatTrackLabel(track)}
+                          </Text>
                           {track.codec && (
                             <Text fontSize="xs" color={isSelected ? 'whiteAlpha.700' : 'fg.muted'}>
                               {track.codec}

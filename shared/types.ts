@@ -21,6 +21,8 @@ export interface AudioTrack {
   bitrate?: number
   /** Количество каналов */
   channels?: number
+  /** Теги (для извлечения группы/автора) */
+  tags?: Record<string, string>
 }
 
 /** Информация о субтитрах */
@@ -37,6 +39,8 @@ export interface SubtitleTrack {
   title: string
   /** Пути к файлам шрифтов */
   fonts: string[]
+  /** Теги (для извлечения типа) */
+  tags?: Record<string, string>
 }
 
 /** Информация о видеодорожке */

@@ -143,6 +143,7 @@ export function getAudioTracks(videoPath: string): Promise<AudioTrack[]> {
             codec: stream.codec_name,
             bitrate: extractBitrate(stream),
             channels: stream.channels,
+            tags: stream.tags, // Передаём все теги для парсинга на клиенте
           })
         )
         resolve(tracks)
@@ -256,7 +257,7 @@ export function getSubtitleTracks(filePath: string): Promise<SubtitleTrackInfo[]
       '-select_streams',
       's',
       '-show_entries',
-      'stream=index,codec_name:stream_tags=language,title',
+      'stream=index,codec_name:stream_tags', // Запрашиваем ВСЕ теги, а не только language/title
       '-of',
       'json',
       filePath,
@@ -283,6 +284,7 @@ export function getSubtitleTracks(filePath: string): Promise<SubtitleTrackInfo[]
             language: stream.tags?.language || 'und',
             title: stream.tags?.title || `Субтитры`,
             fonts: [],
+            tags: stream.tags, // Передаём все теги для парсинга на клиенте
           })
         )
         resolve(tracks)

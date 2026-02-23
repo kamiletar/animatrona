@@ -4,8 +4,8 @@
  * Server Actions для CRUD операций с SubtitleTrack
  */
 
+import type { Prisma, SubtitleTrack } from '@/generated/prisma'
 import { prisma } from '@/lib/db'
-import type { SubtitleTrack, Prisma } from '@/generated/prisma'
 
 // === READ ===
 
@@ -13,7 +13,7 @@ import type { SubtitleTrack, Prisma } from '@/generated/prisma'
  * Получить список субтитров
  */
 export async function findManySubtitleTracks(
-  args?: Prisma.SubtitleTrackFindManyArgs
+  args?: Prisma.SubtitleTrackFindManyArgs,
 ): Promise<SubtitleTrack[]> {
   return prisma.subtitleTrack.findMany(args)
 }
@@ -23,7 +23,7 @@ export async function findManySubtitleTracks(
  */
 export async function findUniqueSubtitleTrack(
   id: string,
-  include?: Prisma.SubtitleTrackInclude
+  include?: Prisma.SubtitleTrackInclude,
 ): Promise<SubtitleTrack | null> {
   return prisma.subtitleTrack.findUnique({
     where: { id },
@@ -37,7 +37,7 @@ export async function findUniqueSubtitleTrack(
  * Создать субтитры
  */
 export async function createSubtitleTrack(
-  data: Prisma.SubtitleTrackUncheckedCreateInput
+  data: Prisma.SubtitleTrackUncheckedCreateInput,
 ): Promise<SubtitleTrack> {
   return prisma.subtitleTrack.create({ data })
 }
@@ -46,7 +46,7 @@ export async function createSubtitleTrack(
  * Создать несколько субтитров
  */
 export async function createManySubtitleTracks(
-  data: Prisma.SubtitleTrackCreateManyInput[]
+  data: Prisma.SubtitleTrackCreateManyInput[],
 ): Promise<{ count: number }> {
   return prisma.subtitleTrack.createMany({ data })
 }
@@ -58,7 +58,7 @@ export async function createManySubtitleTracks(
  */
 export async function updateSubtitleTrack(
   id: string,
-  data: Prisma.SubtitleTrackUpdateInput
+  data: Prisma.SubtitleTrackUpdateInput,
 ): Promise<SubtitleTrack> {
   return prisma.subtitleTrack.update({
     where: { id },
@@ -84,7 +84,23 @@ export async function deleteSubtitleTrack(id: string): Promise<{ success: boolea
  * Удалить субтитры эпизода
  */
 export async function deleteSubtitleTracksByEpisodeId(
-  episodeId: string
+  episodeId: string,
 ): Promise<{ count: number }> {
   return prisma.subtitleTrack.deleteMany({ where: { episodeId } })
+}
+
+// === BATCH UPDATE ===
+
+/**
+ * Пакетное обновление субтитров
+ * Используется для массового изменения language/dubGroup
+ */
+export async function batchUpdateSubtitleTracks(
+  trackIds: string[],
+  data: { language?: string; dubGroup?: string | null },
+): Promise<{ count: number }> {
+  return prisma.subtitleTrack.updateMany({
+    where: { id: { in: trackIds } },
+    data,
+  })
 }

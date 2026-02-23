@@ -7,15 +7,51 @@
 import { Badge, Box, Card, Checkbox, HStack, Icon, Spinner, Text, VStack } from '@chakra-ui/react'
 import { LuAudioLines, LuCaptions, LuCheck, LuFileVideo, LuVideo, LuX } from 'react-icons/lu'
 
+import { formatLanguageShort } from '@/constants/dub-groups'
+
+import { TrackGroupEditor } from './TrackGroupEditor'
 import type { FileCardProps } from './types'
+import { useTrackGroups } from './use-track-groups'
 import { formatBitrate, formatBytes, formatChannels, formatDuration, getRelativePath } from './utils'
 
 /**
  * Компонент карточки файла
  */
-export function FileCard({ analysis, folderPath, onToggleTrack, onToggleSubtitle }: FileCardProps) {
+export function FileCard({
+  analysis,
+  folderPath,
+  onToggleTrack,
+  onToggleSubtitle,
+  onTrackGroupEdit,
+  onApplyToAll,
+}: FileCardProps) {
   const { file, mediaInfo, isAnalyzing, error, audioRecommendations, subtitleRecommendations } = analysis
   const videoTrack = mediaInfo?.videoTracks[0]
+
+  // Группировка дорожек для batch-редактирования
+  const { audioGroups, subtitleGroups, hasGroups } = useTrackGroups({ analysis })
+
+  // Обработчик редактирования групп (только текущий эпизод)
+  const handleGroupEdit = (
+    type: 'audio' | 'subtitle',
+    groupId: string,
+    edit: Parameters<NonNullable<typeof onTrackGroupEdit>>[3]
+  ) => {
+    if (onTrackGroupEdit && file.episodeNumber !== null) {
+      onTrackGroupEdit(file.episodeNumber, type, groupId, edit)
+    }
+  }
+
+  // Обработчик применения ко всем эпизодам
+  const handleApplyToAll = (
+    type: 'audio' | 'subtitle',
+    groupId: string,
+    edit: Parameters<NonNullable<typeof onApplyToAll>>[2]
+  ) => {
+    if (onApplyToAll) {
+      onApplyToAll(type, groupId, edit)
+    }
+  }
 
   return (
     <Card.Root bg="bg.subtle" borderColor="border.subtle" variant="outline">
@@ -77,6 +113,16 @@ export function FileCard({ analysis, folderPath, onToggleTrack, onToggleSubtitle
                   <Text>{formatBytes(mediaInfo.size)}</Text>
                 </HStack>
               </HStack>
+            )}
+
+            {/* Редактор групп дорожек */}
+            {hasGroups && (
+              <TrackGroupEditor
+                audioGroups={audioGroups}
+                subtitleGroups={subtitleGroups}
+                onGroupEdit={handleGroupEdit}
+                onApplyToAll={handleApplyToAll}
+              />
             )}
 
             {/* Аудиодорожки */}
@@ -161,7 +207,7 @@ export function FileCard({ analysis, folderPath, onToggleTrack, onToggleSubtitle
                         <VStack align="start" gap={0}>
                           <HStack gap={2}>
                             <Badge size="sm" variant="outline">
-                              {track.language.toUpperCase()}
+                              {formatLanguageShort(track.language)}
                             </Badge>
                             {track.title && (
                               <Text fontSize="sm" color="fg.muted" lineClamp={1}>
@@ -210,7 +256,7 @@ export function FileCard({ analysis, folderPath, onToggleTrack, onToggleSubtitle
                       <VStack align="start" gap={0}>
                         <HStack gap={2}>
                           <Badge size="sm" variant="outline">
-                            {rec.language.toUpperCase()}
+                            {formatLanguageShort(rec.language)}
                           </Badge>
                           {rec.title && (
                             <Text fontSize="sm" color="fg.muted" lineClamp={1}>

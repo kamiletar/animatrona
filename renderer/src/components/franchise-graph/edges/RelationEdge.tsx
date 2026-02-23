@@ -5,7 +5,7 @@
  */
 
 import { Badge } from '@chakra-ui/react'
-// eslint-disable-next-line @nx/enforce-module-boundaries
+
 import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath } from '@xyflow/react'
 import { memo } from 'react'
 import type { RelationEdgeData } from '../types'

@@ -123,13 +123,21 @@ export function ResumeOverlay({ savedTime, onResume, onStartOver, isOpen }: Resu
 
         <HStack gap={4} width="100%">
           {/* Кнопка "Сначала" */}
-          <Button flex={1} variant="outline" colorPalette="gray" size="lg" onClick={handleStartOver}>
+          <Button flex={1} variant="outline" colorPalette="gray" size="lg" onClick={handleStartOver} px={6}>
             <Icon as={LuRotateCcw} mr={2} />
             Сначала
           </Button>
 
           {/* Кнопка "Продолжить" с обратным отсчётом */}
-          <Button flex={1} colorPalette="purple" size="lg" onClick={handleResume} position="relative" overflow="hidden">
+          <Button
+            flex={1}
+            colorPalette="purple"
+            size="lg"
+            onClick={handleResume}
+            position="relative"
+            overflow="hidden"
+            px={6}
+          >
             {/* Прогресс-бар обратного отсчёта */}
             <Box
               position="absolute"

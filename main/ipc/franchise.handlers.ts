@@ -4,8 +4,6 @@
  * Синхронизация связей между аниме из Shikimori API
  */
 
-import { ipcMain } from 'electron'
-
 import type { ShikimoriRelationKind } from '../services/shikimori'
 import { getAnimeWithRelated } from '../services/shikimori'
 import {
@@ -14,6 +12,7 @@ import {
   getFranchiseName,
   getRootShikimoriId,
 } from '../services/shikimori/franchise-api'
+import { createHandler } from '../utils/ipc-handler-factory'
 
 /** Маппинг типов связей Shikimori -> наши enum'ы */
 const RELATION_KIND_MAP: Record<ShikimoriRelationKind, string> = {
@@ -45,113 +44,58 @@ export interface RelatedAnimeData {
  * Регистрирует IPC handlers для работы с франшизами
  */
 export function registerFranchiseHandlers(): void {
-  /**
-   * Получить связанные аниме из Shikimori по ID
-   * Возвращает данные для сохранения в AnimeRelation
-   */
-  ipcMain.handle('franchise:fetchRelated', async (_event, shikimoriId: number) => {
-    try {
-      const animeWithRelated = await getAnimeWithRelated(shikimoriId)
-      if (!animeWithRelated) {
-        return { success: false, error: 'Аниме не найдено на Shikimori' }
+  // Получить связанные аниме из Shikimori по ID
+  createHandler('franchise:fetchRelated', async (shikimoriId: number) => {
+    const animeWithRelated = await getAnimeWithRelated(shikimoriId)
+    if (!animeWithRelated) {
+      throw new Error('Аниме не найдено на Shikimori')
+    }
+
+    // Преобразуем данные из Shikimori в формат для БД
+    const relatedAnimes: RelatedAnimeData[] = []
+
+    for (const related of animeWithRelated.related) {
+      // Пропускаем манга и музыкальные видео
+      if (!related.anime || related.anime.kind === 'music') {
+        continue
       }
 
-      // Преобразуем данные из Shikimori в формат для БД
-      const relatedAnimes: RelatedAnimeData[] = []
+      const relationKind = RELATION_KIND_MAP[related.relationKind] || 'OTHER'
 
-      for (const related of animeWithRelated.related) {
-        // Пропускаем если это манга (anime === null)
-        if (!related.anime) {
-          continue
-        }
+      relatedAnimes.push({
+        shikimoriId: parseInt(related.anime.id, 10),
+        relationKind,
+        name: related.anime.russian || related.anime.name,
+        posterUrl: related.anime.poster?.mainUrl || null,
+        year: related.anime.airedOn?.year || null,
+        kind: related.anime.kind || null,
+      })
+    }
 
-        // Пропускаем музыкальные видео — это видео библиотека
-        if (related.anime.kind === 'music') {
-          continue
-        }
-
-        const relationKind = RELATION_KIND_MAP[related.relationKind] || 'OTHER'
-
-        relatedAnimes.push({
-          shikimoriId: parseInt(related.anime.id, 10),
-          relationKind,
-          name: related.anime.russian || related.anime.name,
-          posterUrl: related.anime.poster?.mainUrl || null,
-          year: related.anime.airedOn?.year || null,
-          kind: related.anime.kind || null,
-        })
-      }
-
-      return {
-        success: true,
-        data: {
-          sourceAnime: {
-            shikimoriId: parseInt(animeWithRelated.id, 10),
-            name: animeWithRelated.russian || animeWithRelated.name,
-            /** ID франшизы из Shikimori (строка, например "tondemo_skill_de_isekai_hourou_meshi") */
-            franchise: animeWithRelated.franchise,
-          },
-          relatedAnimes,
-        },
-      }
-    } catch (error) {
-      console.error('[IPC] franchise:fetchRelated error:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
+    return {
+      sourceAnime: {
+        shikimoriId: parseInt(animeWithRelated.id, 10),
+        name: animeWithRelated.russian || animeWithRelated.name,
+        franchise: animeWithRelated.franchise,
+      },
+      relatedAnimes,
     }
   })
 
-  /**
-   * Получить граф франшизы из REST API Shikimori
-   * Возвращает полный граф с узлами (аниме) и связями между ними
-   */
-  ipcMain.handle('franchise:fetchGraph', async (_event, shikimoriId: number) => {
-    try {
-      const graph = await getFranchiseGraph(shikimoriId)
-      if (!graph) {
-        return {
-          success: true,
-          data: null,
-          message: 'Аниме не имеет франшизы',
-        }
-      }
+  // Получить граф франшизы из REST API Shikimori
+  createHandler('franchise:fetchGraph', async (shikimoriId: number) => {
+    const graph = await getFranchiseGraph(shikimoriId)
+    if (!graph) {
+      return { graph: null, message: 'Аниме не имеет франшизы' }
+    }
 
-      // Вычисляем rootShikimoriId и название франшизы
-      const rootShikimoriId = getRootShikimoriId(graph)
-      const franchiseName = getFranchiseName(graph)
-
-      return {
-        success: true,
-        data: {
-          graph,
-          rootShikimoriId,
-          franchiseName,
-        },
-      }
-    } catch (error) {
-      console.error('[IPC] franchise:fetchGraph error:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
+    return {
+      graph,
+      rootShikimoriId: getRootShikimoriId(graph),
+      franchiseName: getFranchiseName(graph),
     }
   })
 
-  /**
-   * Очистить кэш графов франшиз
-   */
-  ipcMain.handle('franchise:clearCache', async () => {
-    try {
-      clearFranchiseCache()
-      return { success: true }
-    } catch (error) {
-      console.error('[IPC] franchise:clearCache error:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Очистить кэш графов франшиз
+  createHandler('franchise:clearCache', () => clearFranchiseCache())
 }

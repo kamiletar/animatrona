@@ -86,6 +86,79 @@ export async function deleteChaptersByEpisodeId(episodeId: string): Promise<{ co
   return prisma.chapter.deleteMany({ where: { episodeId } })
 }
 
+// === GENERATE RECAP/PREVIEW ===
+
+/**
+ * Пакетная генерация RECAP и PREVIEW глав на основе OP/ED
+ * Для каждого эпизода:
+ * - RECAP: от 0 до OP.startMs (если есть OP и нет RECAP)
+ * - PREVIEW: от ED.endMs до durationMs (если есть ED, нет PREVIEW и durationMs > 0)
+ */
+export async function generateRecapAndPreview(episodeIds: string[]): Promise<{ created: number; skipped: number }> {
+  let created = 0
+  let skipped = 0
+
+  for (const episodeId of episodeIds) {
+    // Получить главы и длительность эпизода
+    const [chapters, episode] = await Promise.all([
+      prisma.chapter.findMany({
+        where: { episodeId },
+        orderBy: { startMs: 'asc' },
+      }),
+      prisma.episode.findUnique({
+        where: { id: episodeId },
+        select: { durationMs: true },
+      }),
+    ])
+
+    if (!chapters.length) {
+      continue
+    }
+
+    const types = new Set(chapters.map((c) => c.type))
+
+    // Найти первый OP этого эпизода
+    const firstOp = chapters.find((c) => c.type === 'OP')
+    // Найти последний ED этого эпизода
+    const lastEd = [...chapters].reverse().find((c) => c.type === 'ED')
+
+    // RECAP: от 0 до OP.startMs
+    if (firstOp && !types.has('RECAP') && firstOp.startMs > 0) {
+      await prisma.chapter.create({
+        data: {
+          episodeId,
+          type: 'RECAP',
+          title: 'Ретро',
+          startMs: 0,
+          endMs: firstOp.startMs,
+        },
+      })
+      created++
+    } else if (firstOp && types.has('RECAP')) {
+      skipped++
+    }
+
+    // PREVIEW: от ED.endMs до durationMs
+    const durationMs = episode?.durationMs ?? 0
+    if (lastEd && !types.has('PREVIEW') && durationMs > 0 && lastEd.endMs < durationMs) {
+      await prisma.chapter.create({
+        data: {
+          episodeId,
+          type: 'PREVIEW',
+          title: 'Превью',
+          startMs: lastEd.endMs,
+          endMs: durationMs,
+        },
+      })
+      created++
+    } else if (lastEd && types.has('PREVIEW')) {
+      skipped++
+    }
+  }
+
+  return { created, skipped }
+}
+
 // === COPY ===
 
 /**

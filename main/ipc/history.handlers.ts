@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * IPC handlers для истории импортов
  *
@@ -27,10 +26,8 @@ import {
   getHistoryStats,
   getRecentHistory,
 } from '../services/history-store'
+import { createHandler } from '../utils/ipc-handler-factory'
 import { createValidatedHandler, idSchema } from '../utils/ipc-validator'
-
-/** Флаг для предотвращения повторной регистрации */
-let isRegistered = false
 
 // === Zod схемы ===
 
@@ -70,115 +67,39 @@ const historyCreateSchema: z.ZodType<ImportHistoryCreateData> = z.object({
  * Регистрирует IPC handlers для истории импортов
  */
 export function registerHistoryHandlers(): void {
-  if (isRegistered) {
-    console.warn('[History] Handlers already registered, skipping')
-    return
-  }
-
   // Получить все записи
-  ipcMain.handle('history:getAll', async () => {
-    try {
-      const history = getAllHistory()
-      return { success: true, data: history }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('history:getAll', () => getAllHistory())
 
   // Получить записи с фильтром
   ipcMain.handle(
     'history:get',
-    createValidatedHandler(historyFilterSchema.optional(), async (filter?: ImportHistoryFilter) => {
-      return getHistory(filter)
-    })
+    createValidatedHandler(historyFilterSchema.optional(), (filter?: ImportHistoryFilter) => getHistory(filter)),
   )
 
   // Получить запись по ID
   ipcMain.handle(
     'history:getById',
-    createValidatedHandler(idSchema, async (id: string) => {
-      return getHistoryById(id)
-    })
+    createValidatedHandler(idSchema, (id: string) => getHistoryById(id)),
   )
 
   // Добавить запись
   ipcMain.handle(
     'history:add',
-    createValidatedHandler(historyCreateSchema, async (data: ImportHistoryCreateData) => {
-      return addHistoryEntry(data)
-    })
+    createValidatedHandler(historyCreateSchema, (data: ImportHistoryCreateData) => addHistoryEntry(data)),
   )
 
   // Удалить запись
   ipcMain.handle(
     'history:delete',
-    createValidatedHandler(idSchema, async (id: string) => {
-      return deleteHistoryEntry(id)
-    })
+    createValidatedHandler(idSchema, (id: string) => deleteHistoryEntry(id)),
   )
 
   // Очистить историю
-  ipcMain.handle('history:clear', async () => {
-    try {
-      clearHistory()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('history:clear', () => clearHistory())
 
   // Получить статистику
-  ipcMain.handle('history:getStats', async () => {
-    try {
-      const stats = getHistoryStats()
-      return { success: true, data: stats }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('history:getStats', () => getHistoryStats())
 
   // Получить последние N записей
-  ipcMain.handle('history:getRecent', async (_event, limit?: number) => {
-    try {
-      const history = getRecentHistory(limit)
-      return { success: true, data: history }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
-
-  isRegistered = true
-  console.log('[History] IPC handlers registered')
-}
-
-/**
- * Отменяет регистрацию handlers
- */
-export function unregisterHistoryHandlers(): void {
-  if (!isRegistered) {
-    return
-  }
-
-  ipcMain.removeHandler('history:getAll')
-  ipcMain.removeHandler('history:get')
-  ipcMain.removeHandler('history:getById')
-  ipcMain.removeHandler('history:add')
-  ipcMain.removeHandler('history:delete')
-  ipcMain.removeHandler('history:clear')
-  ipcMain.removeHandler('history:getStats')
-  ipcMain.removeHandler('history:getRecent')
-
-  isRegistered = false
+  createHandler('history:getRecent', (limit?: number) => getRecentHistory(limit))
 }

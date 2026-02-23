@@ -1,3 +1,4 @@
+import { PrismaLibSql } from '@prisma/adapter-libsql'
 import path from 'path'
 import { PrismaClient } from '../generated/prisma'
 
@@ -52,14 +53,26 @@ function getDatabaseUrl(): string {
 function createPrismaClient(): PrismaClient {
   const databaseUrl = getDatabaseUrl()
 
-  return new PrismaClient({
+  // Prisma 7: используем Driver Adapter (libsql для SQLite)
+  const adapter = new PrismaLibSql({ url: databaseUrl })
+
+  const client = new PrismaClient({
     log: ['error', 'warn'],
-    datasources: {
-      db: {
-        url: databaseUrl,
-      },
-    },
+    adapter,
   })
+
+  // Настраиваем SQLite для конкурентного доступа:
+  // WAL mode — читатели не блокируют писателей и наоборот
+  // busy_timeout — ждать освобождения блокировки
+  // synchronous=NORMAL — баланс производительности и надёжности для WAL
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- ошибки PRAGMA не критичны
+  client.$executeRawUnsafe('PRAGMA journal_mode = WAL').catch(() => {})
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  client.$executeRawUnsafe('PRAGMA busy_timeout = 15000').catch(() => {})
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  client.$executeRawUnsafe('PRAGMA synchronous = NORMAL').catch(() => {})
+
+  return client
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()

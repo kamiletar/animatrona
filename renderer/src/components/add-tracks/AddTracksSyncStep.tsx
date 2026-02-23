@@ -4,7 +4,7 @@
  * Шаг 3: Калибровка синхронизации донора
  *
  * Адаптация SyncCalibrationStep для add-tracks flow.
- * Использует эпизоды из библиотеки (с transcodedPath) и файлы донора.
+ * Использует эпизоды из библиотеки (с transcodedCid) и файлы донора.
  */
 
 import { Box, Button, createListCollection, HStack, Icon, Select, Text, VStack } from '@chakra-ui/react'
@@ -16,6 +16,7 @@ import { DualVideoPlayer } from '../player/DualVideoPlayer'
 
 import type { LibraryEpisode } from '@/lib/add-tracks'
 import type { EpisodeMatch } from '@/lib/add-tracks/episode-matcher'
+import { toPlayableUrl } from '@/lib/media-url'
 
 interface AddTracksSyncStepProps {
   /** Сопоставления донор ↔ эпизод */
@@ -29,11 +30,10 @@ interface AddTracksSyncStepProps {
 }
 
 /**
- * Получить URL для локального видеофайла
+ * Получить URL для локального видеофайла донора
  * Использует кастомный media:// протокол Electron
  */
-function getVideoUrl(filePath: string): string {
-  // Кастомный media:// протокол для безопасного доступа к локальным файлам
+function getDonorVideoUrl(filePath: string): string {
   return `media://${filePath.replace(/\\/g, '/')}`
 }
 
@@ -67,7 +67,8 @@ export function AddTracksSyncStep({
     for (const match of matchedOnly) {
       // Находим эпизод библиотеки
       const episode = libraryEpisodes.find((e) => e.id === match.targetEpisode?.id)
-      if (episode && episode.transcodedPath && match.donorFile.type === 'video') {
+      // Для калибровки нужен эпизод с видео в IPFS (transcodedCid)
+      if (episode && episode.transcodedCid && match.donorFile.type === 'video') {
         pairs.push({
           original: episode,
           donor: match.donorFile,
@@ -180,23 +181,21 @@ export function AddTracksSyncStep({
           value={syncOffset}
           onChange={onSyncOffsetChange}
           label="Смещение донора"
-          hint={
-            syncOffset === 0
-              ? 'Синхронизация не требуется'
-              : syncOffset > 0
-                ? `Донор опережает на ${syncOffset}мс → обрезаем начало дорожек`
-                : `Донор отстаёт на ${Math.abs(syncOffset)}мс → добавляем тишину в начало`
-          }
+          hint={syncOffset === 0
+            ? 'Синхронизация не требуется'
+            : syncOffset > 0
+            ? `Донор опережает на ${syncOffset}мс → обрезаем начало дорожек`
+            : `Донор отстаёт на ${Math.abs(syncOffset)}мс → добавляем тишину в начало`}
           showButtons
         />
       </Box>
 
       {/* Плеер */}
-      {showPlayer && currentPair && currentPair.original.transcodedPath && (
+      {showPlayer && currentPair && currentPair.original.transcodedCid && (
         <Box borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden">
           <DualVideoPlayer
-            originalPath={getVideoUrl(currentPair.original.transcodedPath)}
-            donorPath={getVideoUrl(currentPair.donor.path)}
+            originalPath={toPlayableUrl({ cid: currentPair.original.transcodedCid }) ?? ''}
+            donorPath={getDonorVideoUrl(currentPair.donor.path)}
             offsetMs={syncOffset}
             onOffsetChange={onSyncOffsetChange}
             originalLabel={`Библиотека: Эп. ${currentPair.episodeNumber}`}
@@ -214,7 +213,9 @@ export function AddTracksSyncStep({
                 Библиотека:
               </Text>
               <Text fontSize="xs" color="fg.muted" truncate maxW="400px">
-                {currentPair.original.transcodedPath?.split(/[/\\]/).pop() || 'Нет видео'}
+                {currentPair.original.transcodedCid
+                  ? `IPFS: ${currentPair.original.transcodedCid.slice(0, 16)}...`
+                  : 'Нет видео'}
               </Text>
             </HStack>
             <HStack justify="space-between">
@@ -261,8 +262,9 @@ export function AddTracksSyncStep({
       {showPlayer && (
         <Box p={3} bg="bg.subtle" borderRadius="md">
           <Text fontSize="xs" color="fg.subtle" textAlign="center">
-            <strong>Горячие клавиши:</strong> Space — play/pause • ←/→ — ±10мс • Shift+←/→ — ±100мс • Ctrl+←/→ — ±1000мс
-            • Home — сброс • D — скрыть донор • M — звук • F — полноэкранный
+            <strong>Горячие клавиши:</strong>{' '}
+            Space — play/pause • ←/→ — ±10мс • Shift+←/→ — ±100мс • Ctrl+←/→ — ±1000мс • Home — сброс • D — скрыть донор
+            • M — звук • F — полноэкранный
           </Text>
         </Box>
       )}

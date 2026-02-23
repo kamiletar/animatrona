@@ -2,13 +2,15 @@
  * IPC handlers для работы с файловой системой
  */
 
-import { ipcMain, nativeImage, shell } from 'electron'
+import { nativeImage, shell } from 'electron'
 import { existsSync } from 'fs'
 import { copyFile, mkdir, readdir, rm, stat } from 'fs/promises'
 import path from 'path'
+import { allowPath } from '../protocols/allowed-paths'
 import { type ExternalAudioScanResult, scanForExternalAudio } from '../services/external-audio-scanner'
 import { type ExternalSubtitleScanResult, scanForExternalSubtitles } from '../services/external-subtitle-scanner'
 import { getDefaultLibraryPath } from '../services/output-path-resolver'
+import { createHandler } from '../utils/ipc-handler-factory'
 
 /**
  * Проверяет что путь находится внутри библиотеки
@@ -28,9 +30,6 @@ function isPathInsideLibrary(targetPath: string): { safe: boolean; reason?: stri
   }
 
   // Путь должен начинаться с libraryPath + разделитель
-  // Это защищает от:
-  // 1. Path traversal: C:/Videos/Animatrona/../../../Windows → C:/Windows (не матчит)
-  // 2. Похожих путей: C:/Videos/Animatrona2 (не начинается с libraryPath + sep)
   if (!resolvedTarget.startsWith(resolvedLibrary + path.sep)) {
     return { safe: false, reason: `Путь "${resolvedTarget}" вне библиотеки "${resolvedLibrary}"` }
   }
@@ -60,137 +59,102 @@ const EXTENSIONS_BY_TYPE: Record<MediaType, Set<string>> = {
  */
 export function registerFsHandlers(): void {
   // Сканирование папки на медиафайлы
-  ipcMain.handle(
-    'fs:scanFolder',
-    async (_event, folderPath: string, recursive = true, mediaTypes: MediaType[] = ['video']) => {
-      try {
-        const files = await scanFolderForMedia(folderPath, recursive, mediaTypes)
-        return { success: true, files }
-      } catch (error) {
-        return { success: false, error: String(error), files: [] }
-      }
-    }
-  )
+  createHandler('fs:scanFolder', async (folderPath: string, recursive = true, mediaTypes: MediaType[] = ['video']) => {
+    // Добавляем папку в whitelist для media:// протокола
+    allowPath(folderPath)
+    const files = await scanFolderForMedia(folderPath, recursive, mediaTypes)
+    return { files }
+  })
 
   // Удаление файла или папки
-  ipcMain.handle('fs:delete', async (_event, targetPath: string, moveToTrash = true) => {
-    try {
-      // === КРИТИЧЕСКАЯ ЗАЩИТА: Проверка что путь в библиотеке ===
-      const { safe, reason } = isPathInsideLibrary(targetPath)
-      if (!safe) {
-        return { success: false, error: reason }
-      }
+  createHandler('fs:delete', async (targetPath: string, moveToTrash = true) => {
+    // КРИТИЧЕСКАЯ ЗАЩИТА: Проверка что путь в библиотеке
+    const { safe, reason } = isPathInsideLibrary(targetPath)
+    if (!safe) {
+      throw new Error(reason)
+    }
 
-      if (!existsSync(targetPath)) {
-        return { success: true }
-      }
+    if (!existsSync(targetPath)) {
+      return
+    }
 
-      if (moveToTrash) {
-        // Перемещаем в корзину (безопаснее)
-        await shell.trashItem(targetPath)
-      } else {
-        // Полное удаление
-        await rm(targetPath, { recursive: true, force: true })
-      }
-
-      return { success: true }
-    } catch (error) {
-      return { success: false, error: String(error) }
+    if (moveToTrash) {
+      await shell.trashItem(targetPath)
+    } else {
+      await rm(targetPath, { recursive: true, force: true })
     }
   })
 
   // Проверка существования пути
-  ipcMain.handle('fs:exists', async (_event, targetPath: string) => {
-    return existsSync(targetPath)
-  })
+  createHandler('fs:exists', (targetPath: string) => existsSync(targetPath))
 
   // Получение информации о файле (размер, дата)
-  ipcMain.handle('fs:stat', async (_event, filePath: string) => {
-    try {
-      const stats = await stat(filePath)
-      return { success: true, size: stats.size, mtime: stats.mtime }
-    } catch (error) {
-      return { success: false, size: 0, error: String(error) }
-    }
+  createHandler('fs:stat', async (filePath: string) => {
+    const stats = await stat(filePath)
+    return { size: stats.size, mtime: stats.mtime }
   })
 
   // Копирование файла
-  ipcMain.handle('fs:copyFile', async (_event, sourcePath: string, destPath: string) => {
-    try {
-      await mkdir(path.dirname(destPath), { recursive: true })
-      await copyFile(sourcePath, destPath)
-      return { success: true }
-    } catch (error) {
-      return { success: false, error: String(error) }
-    }
+  createHandler('fs:copyFile', async (sourcePath: string, destPath: string) => {
+    await mkdir(path.dirname(destPath), { recursive: true })
+    await copyFile(sourcePath, destPath)
   })
 
   // Сканирование внешних субтитров
-  ipcMain.handle(
+  createHandler(
     'fs:scanExternalSubtitles',
-    async (
-      _event,
+    (
       videoFolderPath: string,
       videoFiles: Array<{ path: string; episodeNumber: number }>
-    ): Promise<ExternalSubtitleScanResult> => {
-      return scanForExternalSubtitles(videoFolderPath, videoFiles)
-    }
+    ): Promise<ExternalSubtitleScanResult> => scanForExternalSubtitles(videoFolderPath, videoFiles)
   )
 
   // Сканирование внешних аудиодорожек
-  ipcMain.handle(
+  createHandler(
     'fs:scanExternalAudio',
-    async (
-      _event,
+    (
       videoFolderPath: string,
       videoFiles: Array<{ path: string; episodeNumber: number }>
-    ): Promise<ExternalAudioScanResult> => {
-      return scanForExternalAudio(videoFolderPath, videoFiles)
-    }
+    ): Promise<ExternalAudioScanResult> => scanForExternalAudio(videoFolderPath, videoFiles)
   )
 
   // Получение метаданных изображения (размеры, blur placeholder)
-  ipcMain.handle('fs:getImageMetadata', async (_event, filePath: string) => {
-    try {
-      if (!existsSync(filePath)) {
-        return { success: false, error: 'Файл не существует' }
-      }
+  createHandler('fs:getImageMetadata', async (filePath: string) => {
+    if (!existsSync(filePath)) {
+      throw new Error('Файл не существует')
+    }
 
-      const stats = await stat(filePath)
-      const image = nativeImage.createFromPath(filePath)
+    const stats = await stat(filePath)
+    const image = nativeImage.createFromPath(filePath)
 
-      if (image.isEmpty()) {
-        return { success: false, error: 'Не удалось загрузить изображение' }
-      }
+    if (image.isEmpty()) {
+      throw new Error('Не удалось загрузить изображение')
+    }
 
-      const { width, height } = image.getSize()
+    const { width, height } = image.getSize()
 
-      // Генерируем blur placeholder (10x10px JPEG в base64)
-      const blurImage = image.resize({ width: 10, height: 10, quality: 'low' })
-      const blurBuffer = blurImage.toJPEG(50)
-      const blurDataURL = `data:image/jpeg;base64,${blurBuffer.toString('base64')}`
+    // Генерируем blur placeholder (10x10px JPEG в base64)
+    const blurImage = image.resize({ width: 10, height: 10, quality: 'low' })
+    const blurBuffer = blurImage.toJPEG(50)
+    const blurDataURL = `data:image/jpeg;base64,${blurBuffer.toString('base64')}`
 
-      // Определяем MIME тип по расширению
-      const ext = path.extname(filePath).toLowerCase()
-      const mimeTypes: Record<string, string> = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.webp': 'image/webp',
-        '.gif': 'image/gif',
-      }
-      const mimeType = mimeTypes[ext] || 'image/jpeg'
+    // Определяем MIME тип по расширению
+    const ext = path.extname(filePath).toLowerCase()
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+    }
+    const mimeType = mimeTypes[ext] || 'image/jpeg'
 
-      return {
-        success: true,
-        width,
-        height,
-        size: stats.size,
-        mimeType,
-        blurDataURL,
-      }
-    } catch (error) {
-      return { success: false, error: String(error) }
+    return {
+      width,
+      height,
+      size: stats.size,
+      mimeType,
+      blurDataURL,
     }
   })
 }

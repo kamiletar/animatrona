@@ -34,7 +34,7 @@ export function useTrackSelection(options: UseTrackSelectionOptions) {
         matches: updateMatch(s.matches, donorFilePath, targetEpisode),
       }))
     },
-    [setState]
+    [setState],
   )
 
   /**
@@ -60,7 +60,7 @@ export function useTrackSelection(options: UseTrackSelectionOptions) {
         }
       })
     },
-    [setState]
+    [setState],
   )
 
   /**
@@ -80,15 +80,13 @@ export function useTrackSelection(options: UseTrackSelectionOptions) {
           }
 
           const episode = episodes.find((ep) => ep.id === targetEp.id)
-          const episodeDir = episode?.transcodedPath
-            ? episode.transcodedPath.replace(/[/\\][^/\\]+$/, '') // Убираем video.webm
-            : ''
+          // Используем folderPath эпизода (дорожки сохраняются в IPFS)
+          const episodeDir = episode?.folderPath ?? ''
 
           // Собираем все дорожки указанного типа (встроенные + внешние)
-          const tracks =
-            type === 'audio'
-              ? [...probeResult.audioTracks, ...Array.from(probeResult.externalAudioByGroup.values()).flat()]
-              : [...probeResult.subtitleTracks, ...probeResult.externalSubtitles]
+          const tracks = type === 'audio'
+            ? [...probeResult.audioTracks, ...Array.from(probeResult.externalAudioByGroup.values()).flat()]
+            : [...probeResult.subtitleTracks, ...probeResult.externalSubtitles]
 
           for (const track of tracks) {
             if (!newSelected.find((t) => t.track.id === track.id)) {
@@ -106,7 +104,7 @@ export function useTrackSelection(options: UseTrackSelectionOptions) {
         return { ...s, selectedTracks: newSelected }
       })
     },
-    [episodes, setState]
+    [episodes, setState],
   )
 
   /**
@@ -126,7 +124,8 @@ export function useTrackSelection(options: UseTrackSelectionOptions) {
           }
 
           const episode = episodes.find((ep) => ep.id === targetEp.id)
-          const episodeDir = episode?.transcodedPath ? episode.transcodedPath.replace(/[/\\][^/\\]+$/, '') : ''
+          // Используем folderPath эпизода (дорожки сохраняются в IPFS)
+          const episodeDir = episode?.folderPath ?? ''
 
           // Собираем все дорожки
           const allTracks = [
@@ -158,7 +157,7 @@ export function useTrackSelection(options: UseTrackSelectionOptions) {
         return { ...s, selectedTracks: newSelected }
       })
     },
-    [episodes, setState]
+    [episodes, setState],
   )
 
   /**
@@ -174,7 +173,7 @@ export function useTrackSelection(options: UseTrackSelectionOptions) {
         }),
       }))
     },
-    [setState]
+    [setState],
   )
 
   return {

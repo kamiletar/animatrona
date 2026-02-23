@@ -10,6 +10,9 @@ import * as path from 'path'
 
 import type { AnimeFallbackInfo, AnimeMeta } from '../../../shared/types/backup'
 import { ANIME_META_FILE, ANIME_META_VERSION } from '../../../shared/types/backup'
+import { createModuleLogger } from '../../utils/logger'
+
+const log = createModuleLogger('MetaWriter')
 
 // =============================================================================
 // ANIME META — РЕЛИЗНЫЕ ДАННЫЕ
@@ -21,6 +24,9 @@ export interface WriteAnimeMetaParams {
 
   /** Shikimori ID (null если не связано) */
   shikimoriId: number | null
+
+  /** CID манифеста AnimeManifest в IPFS (полные метаданные) */
+  manifestCid?: string
 
   /** BDRemux флаг */
   isBdRemux: boolean
@@ -51,6 +57,7 @@ export async function writeAnimeMeta(params: WriteAnimeMetaParams): Promise<void
   const meta: AnimeMeta = {
     version: ANIME_META_VERSION,
     shikimoriId: params.shikimoriId,
+    manifestCid: params.manifestCid,
     isBdRemux: params.isBdRemux,
     fallbackInfo: params.fallbackInfo,
     createdAt: existingCreatedAt ?? now,
@@ -64,7 +71,7 @@ export async function writeAnimeMeta(params: WriteAnimeMetaParams): Promise<void
  */
 export async function updateAnimeMeta(
   animeFolder: string,
-  updates: Partial<Pick<AnimeMeta, 'shikimoriId' | 'isBdRemux' | 'fallbackInfo'>>
+  updates: Partial<Pick<AnimeMeta, 'shikimoriId' | 'manifestCid' | 'isBdRemux' | 'fallbackInfo'>>,
 ): Promise<void> {
   const metaPath = path.join(animeFolder, ANIME_META_FILE)
 
@@ -75,7 +82,7 @@ export async function updateAnimeMeta(
     existing = JSON.parse(content) as AnimeMeta
   } catch {
     // Файл не существует — нельзя обновить
-    console.warn(`[meta-writer] anime.meta.json not found at ${animeFolder}, skipping update`)
+    log.warn('anime.meta.json not found, skipping update', { animeFolder })
     return
   }
 

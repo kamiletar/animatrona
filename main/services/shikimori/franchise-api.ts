@@ -6,10 +6,12 @@
  * Возвращает полный граф связей франшизы (nodes + links)
  */
 
+import { createModuleLogger } from '../../utils/logger'
 import type { ShikimoriFranchiseGraph } from './types'
 
 const REST_API_BASE = 'https://shikimori.one/api'
 const USER_AGENT = 'Animatrona/1.0 (Desktop App)'
+const log = createModuleLogger('FranchiseApi')
 
 /** Минимальный интервал между запросами (мс) для избежания 429 */
 const MIN_REQUEST_INTERVAL = 500
@@ -43,7 +45,7 @@ export async function getFranchiseGraph(shikimoriId: number): Promise<ShikimoriF
   // Проверяем кэш
   const cached = franchiseCache.get(shikimoriId)
   if (cached && Date.now() < cached.expiresAt) {
-    console.log(`[getFranchiseGraph] Cache hit for ${shikimoriId}`)
+    log.debug('Cache hit', { shikimoriId })
     return cached.data
   }
 
@@ -51,7 +53,7 @@ export async function getFranchiseGraph(shikimoriId: number): Promise<ShikimoriF
   await throttle()
 
   const url = `${REST_API_BASE}/animes/${shikimoriId}/franchise`
-  console.log(`[getFranchiseGraph] Fetching: ${url}`)
+  log.info('Fetching franchise graph', { url })
 
   try {
     const response = await fetch(url, {
@@ -65,23 +67,27 @@ export async function getFranchiseGraph(shikimoriId: number): Promise<ShikimoriF
     if (!response.ok) {
       // 404 означает что аниме нет или нет франшизы
       if (response.status === 404) {
-        console.log(`[getFranchiseGraph] No franchise for ${shikimoriId}`)
+        await response.body?.cancel().catch(() => {
+          /* игнорируем */
+        })
+        log.info('No franchise found', { shikimoriId })
         return null
       }
+      await response.body?.cancel().catch(() => {
+        /* игнорируем */
+      })
       throw new Error(`Shikimori API error: ${response.status} ${response.statusText}`)
     }
 
-    const data = await response.json() as ShikimoriFranchiseGraph
+    const data = (await response.json()) as ShikimoriFranchiseGraph
 
     // Проверяем что есть хотя бы узлы
     if (!data.nodes || data.nodes.length === 0) {
-      console.log(`[getFranchiseGraph] Empty graph for ${shikimoriId}`)
+      log.info('Empty graph', { shikimoriId })
       return null
     }
 
-    console.log(
-      `[getFranchiseGraph] Got graph for ${shikimoriId}: ${data.nodes.length} nodes, ${data.links.length} links`,
-    )
+    log.info('Got franchise graph', { shikimoriId, nodes: data.nodes.length, links: data.links.length })
 
     // Кэшируем результат
     franchiseCache.set(shikimoriId, {
@@ -101,7 +107,7 @@ export async function getFranchiseGraph(shikimoriId: number): Promise<ShikimoriF
 
     return data
   } catch (error) {
-    console.error(`[getFranchiseGraph] Error for ${shikimoriId}:`, error)
+    log.error('Error fetching franchise graph', { shikimoriId, error })
     throw error
   }
 }

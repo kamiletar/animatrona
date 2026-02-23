@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react()],
   cacheDir: '../../node_modules/.vitest/form-components',
+  root: __dirname,
   test: {
     name: '@lena/form-components',
     environment: 'jsdom',

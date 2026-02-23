@@ -36,6 +36,9 @@ import type { CqSearchProgress } from '../../shared/types/vmaf'
 import { ParallelTranscodeManager } from '../services/parallel-transcode-manager'
 import { broadcastToWindows } from '../src/utils/broadcast'
 import { absolutePathSchema, createValidatedHandler, idSchema } from '../utils/ipc-validator'
+import { createModuleLogger } from '../utils/logger'
+
+const log = createModuleLogger('ParallelTranscodeHandlers')
 
 /** Флаг для предотвращения повторной регистрации (утечка памяти) */
 let isRegistered = false
@@ -63,6 +66,9 @@ const batchAudioTrackSchema: z.ZodType<BatchAudioTrackInput> = z.object({
   isExternal: z.boolean().optional(),
   title: z.string().optional(),
   language: z.string().optional(),
+  // Passthrough режим — копировать без транскодирования (AAC/MP3 с хорошим качеством)
+  passthrough: z.boolean().optional(),
+  originalCodec: z.string().optional(),
 })
 
 /** Схема для BatchImportItem (compile-time проверка типа) */
@@ -115,12 +121,25 @@ function onVideoCompleted(itemId: string, episodeId: string, outputPath: string,
   broadcastToWindows('parallelTranscode:videoCompleted', itemId, episodeId, outputPath, meta)
 }
 
-function onAudioTrackCompleted(trackId: string, outputPath: string, episodeId: string): void {
-  broadcastToWindows('parallelTranscode:audioTrackCompleted', trackId, outputPath, episodeId)
+function onAudioTrackCompleted(
+  trackId: string,
+  outputPath: string,
+  episodeId: string,
+  passthrough?: boolean,
+  originalCodec?: string,
+): void {
+  broadcastToWindows(
+    'parallelTranscode:audioTrackCompleted',
+    trackId,
+    outputPath,
+    episodeId,
+    passthrough,
+    originalCodec,
+  )
 }
 
 function onItemCompleted(itemId: string, episodeId: string, success: boolean, errorMessage?: string): void {
-  console.warn(`[ParallelTranscode:IPC] Broadcasting itemCompleted: ${itemId}, success=${success}`)
+  log.info('Broadcasting itemCompleted', { itemId, success })
   broadcastToWindows('parallelTranscode:itemCompleted', itemId, episodeId, success, errorMessage)
 }
 
@@ -155,7 +174,7 @@ function onVmafProgress(itemId: string, progress: CqSearchProgress): void {
 /** Событие для real-time логов (зарезервировано для будущего использования) */
 function _onVideoLogEntry(
   taskId: string,
-  entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string }
+  entry: { timestamp: number; level: 'info' | 'warning' | 'error'; message: string },
 ): void {
   broadcastToWindows('parallelTranscode:videoLogEntry', taskId, entry)
 }
@@ -169,7 +188,7 @@ function _onVideoLogEntry(
 export function registerParallelTranscodeHandlers(): void {
   // Предотвращаем повторную регистрацию (утечка event listeners)
   if (isRegistered) {
-    console.warn('[ParallelTranscode] Handlers already registered, skipping')
+    log.warn('Handlers already registered, skipping')
     return
   }
 
@@ -201,7 +220,7 @@ export function registerParallelTranscodeHandlers(): void {
     'parallelTranscode:addBatch',
     createValidatedHandler(addBatchSchema, async (items: BatchImportItem[]) => {
       manager.addBatch(items)
-    })
+    }),
   )
 
   // Добавить batch эпизодов с batchId
@@ -211,8 +230,8 @@ export function registerParallelTranscodeHandlers(): void {
       addBatchWithIdSchema,
       async ({ items, batchId }: { items: BatchImportItem[]; batchId?: string }) => {
         manager.addBatch(items, batchId)
-      }
-    )
+      },
+    ),
   )
 
   // Начать новый batch с полным сбросом
@@ -222,8 +241,8 @@ export function registerParallelTranscodeHandlers(): void {
       addBatchWithIdSchema,
       async ({ items, batchId }: { items: BatchImportItem[]; batchId?: string }) => {
         manager.startNewBatch(items, batchId)
-      }
-    )
+      },
+    ),
   )
 
   // Получить текущий batch ID
@@ -262,7 +281,7 @@ export function registerParallelTranscodeHandlers(): void {
     createValidatedHandler(concurrencySchema, async (value: number) => {
       manager.setAudioMaxConcurrent(value)
       return manager.getAudioMaxConcurrent()
-    })
+    }),
   )
 
   // Установить лимит параллельных видео-задач
@@ -271,7 +290,7 @@ export function registerParallelTranscodeHandlers(): void {
     createValidatedHandler(concurrencySchema, async (value: number) => {
       manager.setVideoMaxConcurrent(value)
       return manager.getVideoMaxConcurrent()
-    })
+    }),
   )
 
   // Добавить один элемент
@@ -279,7 +298,7 @@ export function registerParallelTranscodeHandlers(): void {
     'parallelTranscode:addItem',
     createValidatedHandler(batchImportItemSchema, async (item: BatchImportItem) => {
       manager.addImportItem(item)
-    })
+    }),
   )
 
   // Получить агрегированный прогресс (без валидации — нет входных данных)
@@ -300,7 +319,7 @@ export function registerParallelTranscodeHandlers(): void {
     'parallelTranscode:getItem',
     createValidatedHandler(itemIdSchema, async (itemId: string) => {
       return manager.getItem(itemId)
-    })
+    }),
   )
 
   // Получить все элементы
@@ -360,7 +379,7 @@ export function registerParallelTranscodeHandlers(): void {
     'parallelTranscode:cancelItem',
     createValidatedHandler(itemIdSchema, async (itemId: string) => {
       return manager.cancelItem(itemId)
-    })
+    }),
   )
 
   // Отменить всё
@@ -399,7 +418,7 @@ export function registerParallelTranscodeHandlers(): void {
         return manager.getVmafProgress(itemId)
       }
       return manager.getAllVmafProgress()
-    })
+    }),
   )
 
   // Получить все VMAF прогрессы

@@ -8,13 +8,24 @@
  */
 
 import type { BrowserWindow } from 'electron'
-import { app } from 'electron'
-import { net } from 'electron'
+import { app, net } from 'electron'
 import { autoUpdater, type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
+
+import { createModuleLogger } from './utils/logger'
+
+const log = createModuleLogger('Updater')
 
 // Настройки автообновления
 autoUpdater.autoDownload = false // Не скачивать автоматически
 autoUpdater.autoInstallOnAppQuit = true // Установить при выходе
+
+// Перенаправляем логгер electron-updater через наш логгер
+autoUpdater.logger = {
+  info: (message: string) => log.info(message),
+  warn: (message: string) => log.warn(message),
+  error: (message: string) => log.error(message),
+  debug: (message: string) => log.debug(message),
+}
 
 /**
  * Статус обновления для UI
@@ -49,6 +60,42 @@ let mainWindowRef: BrowserWindow | null = null
 
 // Кэш changelog для текущей версии
 let changelogCache: { version: string; changelog: string } | null = null
+
+/**
+ * Форматирует ошибку electron-updater в понятное сообщение
+ */
+function formatUpdateError(error: Error): string {
+  const msg = error.message || ''
+
+  // 404 — latest.yml не найден (нет релизов на GitHub)
+  if (msg.includes('Cannot find latest') || msg.includes('404')) {
+    return 'Обновления пока недоступны'
+  }
+
+  // Нет интернета или DNS ошибка
+  if (msg.includes('ENOTFOUND') || msg.includes('getaddrinfo')) {
+    return 'Нет подключения к интернету'
+  }
+
+  // Таймаут
+  if (msg.includes('ETIMEDOUT') || msg.includes('timeout')) {
+    return 'Превышено время ожидания'
+  }
+
+  // SSL ошибка
+  if (msg.includes('certificate') || msg.includes('SSL')) {
+    return 'Ошибка безопасного соединения'
+  }
+
+  // Ошибка записи файла
+  if (msg.includes('EACCES') || msg.includes('EPERM')) {
+    return 'Нет прав для записи файла обновления'
+  }
+
+  // Для остальных — первая строка без HTTP headers
+  const firstLine = msg.split('\n')[0]
+  return firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine
+}
 
 /**
  * Получить текущий статус обновления
@@ -113,7 +160,7 @@ export async function fetchChangelog(version: string): Promise<string | null> {
       request.end()
     })
   } catch (error) {
-    console.error('[Updater] Ошибка получения changelog:', error)
+    log.error('Failed to fetch changelog', { error })
     return null
   }
 }
@@ -136,20 +183,20 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
 
   // В development режиме не проверяем обновления
   if (!app.isPackaged) {
-    console.warn('[Updater] Пропуск проверки обновлений в development режиме')
+    log.info('Skipping update check in development mode')
     return
   }
 
   // Обработчики событий
   autoUpdater.on('checking-for-update', () => {
-    console.warn('[Updater] Проверка наличия обновлений...')
+    log.info('Checking for updates...')
     updateStatus = { ...updateStatus, status: 'checking', error: null }
     mainWindow.webContents.send('updater:checking')
     notifyRenderer()
   })
 
   autoUpdater.on('update-available', (info: UpdateInfo) => {
-    console.warn(`[Updater] Доступно обновление: v${info.version}`)
+    log.info('Update available', { version: info.version })
     updateStatus = { ...updateStatus, status: 'available', updateInfo: info, error: null }
     mainWindow.webContents.send('updater:available', info)
     notifyRenderer()
@@ -162,19 +209,19 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
         }
       })
       .catch((error) => {
-        console.error('[Updater] Не удалось загрузить changelog:', error)
+        log.error('Failed to load changelog', { error })
       })
   })
 
   autoUpdater.on('update-not-available', () => {
-    console.warn('[Updater] Обновлений нет')
+    log.info('No updates available')
     updateStatus = { ...updateStatus, status: 'not-available', error: null }
     mainWindow.webContents.send('updater:not-available')
     notifyRenderer()
   })
 
   autoUpdater.on('download-progress', (progress: ProgressInfo) => {
-    console.warn(`[Updater] Прогресс загрузки: ${progress.percent.toFixed(1)}%`)
+    log.info('Download progress', { percent: progress.percent.toFixed(1) })
     updateStatus = {
       ...updateStatus,
       status: 'downloading',
@@ -188,7 +235,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   })
 
   autoUpdater.on('update-downloaded', (info: UpdateDownloadedEvent) => {
-    console.warn(`[Updater] Обновление загружено: v${info.version}`)
+    log.info('Update downloaded', { version: info.version })
     updateStatus = {
       ...updateStatus,
       status: 'downloaded',
@@ -204,16 +251,16 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   })
 
   autoUpdater.on('error', (error) => {
-    console.error('[Updater] Ошибка:', error.message)
-    updateStatus = { ...updateStatus, status: 'error', error: error.message }
-    mainWindow.webContents.send('updater:error', error.message)
+    const friendlyMessage = formatUpdateError(error)
+    log.error('Update error', { message: friendlyMessage })
+    updateStatus = { ...updateStatus, status: 'error', error: friendlyMessage }
+    mainWindow.webContents.send('updater:error', friendlyMessage)
     notifyRenderer()
   })
 
-  // Проверяем обновления при запуске (с задержкой)
-  setTimeout(() => {
-    checkForUpdates()
-  }, 5000)
+  // НЕ проверяем обновления автоматически!
+  // Renderer сам вызовет checkForUpdates() если autoCheck включён в настройках
+  // См. use-update-notifications.ts
 }
 
 /**

@@ -12,7 +12,9 @@ import { readdir } from 'fs/promises'
 import path from 'path'
 import { promisify } from 'util'
 import { scanDirectoryRecursive } from '../utils/fs-utils'
+import { createModuleLogger } from '../utils/logger'
 
+const log = createModuleLogger('AudioScanner')
 const execAsync = promisify(exec)
 
 /** Паттерны папок аудио (case-insensitive) */
@@ -78,6 +80,19 @@ export interface ExternalAudioScanResult {
 }
 
 /**
+ * Извлечь имя группы из квадратных скобок в имени папки аудио
+ * Например: "RUS Sound [badPuss]" → "badPuss", "[negaushi]" → "negaushi"
+ *
+ * Ищет ТОЛЬКО в basename папки, чтобы не подхватить скобки из родительского пути
+ * (например [BDRip] или [1080p] из имени аниме)
+ */
+export function extractGroupNameFromAudioDir(audioDir: string): string | undefined {
+  const baseName = path.basename(audioDir)
+  const match = baseName.match(/\[([^\]]+)\]/)
+  return match ? match[1].trim() : undefined
+}
+
+/**
  * Проверить является ли директория папкой аудио
  */
 function isAudioFolder(dirName: string): boolean {
@@ -110,7 +125,7 @@ interface MatchResult {
  *
  * Суффикс формата `.ru_Anilibria` содержит язык и имя группы перевода.
  */
-function fuzzyMatchToVideo(
+export function fuzzyMatchToVideo(
   audioFileName: string,
   videoFiles: Array<{ path: string; episodeNumber: number }>
 ): MatchResult | null {
@@ -163,7 +178,7 @@ function fuzzyMatchToVideo(
  *
  * @returns Название дорожки или null если не найдено
  */
-function extractTitleFromAudioFilename(fileName: string): string | null {
+export function extractTitleFromAudioFilename(fileName: string): string | null {
   const ext = path.extname(fileName) // .mka, .m4a, etc.
   const nameWithoutExt = path.basename(fileName, ext)
 
@@ -191,7 +206,7 @@ function extractTitleFromAudioFilename(fileName: string): string | null {
  * Нормализовать код языка в ISO 639-1 (2 буквы)
  * ru, rus → ru | en, eng → en | ja, jp, jpn → ja
  */
-function normalizeLanguageCode(code: string): string {
+export function normalizeLanguageCode(code: string): string {
   const lower = code.toLowerCase()
 
   // Русский
@@ -213,7 +228,7 @@ function normalizeLanguageCode(code: string): string {
 /**
  * Определить язык по названию папки
  */
-function detectLanguageFromFolder(folderName: string): string {
+export function detectLanguageFromFolder(folderName: string): string {
   const lower = folderName.toLowerCase()
 
   if (lower.includes('rus') || lower.includes('рус') || lower.includes('озвучк')) {
@@ -251,7 +266,7 @@ async function probeAudioFile(filePath: string): Promise<{ codec: string; channe
       bitrate: parseInt(stream.bit_rate || '0', 10),
     }
   } catch (e) {
-    console.warn(`[ExternalAudioScanner] FFprobe error for ${filePath}:`, e)
+    log.warn('FFprobe error', { file: filePath, error: String(e) })
     return { codec: 'unknown', channels: 2, bitrate: 0 }
   }
 }
@@ -266,8 +281,7 @@ export async function scanForExternalAudio(
   videoFolderPath: string,
   videoFiles: Array<{ path: string; episodeNumber: number }>
 ): Promise<ExternalAudioScanResult> {
-  console.warn(`[ExternalAudioScanner] Scanning: ${videoFolderPath}`)
-  console.warn(`[ExternalAudioScanner] Video files: ${videoFiles.length}`)
+  log.info('Scanning for external audio', { path: videoFolderPath, videoCount: videoFiles.length })
 
   const result: ExternalAudioScanResult = {
     audioDirs: [],
@@ -289,7 +303,7 @@ export async function scanForExternalAudio(
       // Проверяем по паттерну
       if (isAudioFolder(entry.name)) {
         result.audioDirs.push(dirPath)
-        console.warn(`[ExternalAudioScanner] Found audio dir (pattern): ${entry.name}`)
+        log.info('Found audio directory (pattern)', { name: entry.name })
         continue
       }
 
@@ -300,7 +314,7 @@ export async function scanForExternalAudio(
 
         if (hasAudioFiles) {
           result.audioDirs.push(dirPath)
-          console.warn(`[ExternalAudioScanner] Found audio dir (by content): ${entry.name}`)
+          log.info('Found audio directory (by content)', { name: entry.name })
         }
       } catch {
         // Игнорируем ошибки чтения подпапок
@@ -308,14 +322,15 @@ export async function scanForExternalAudio(
     }
 
     if (result.audioDirs.length === 0) {
-      console.warn('[ExternalAudioScanner] No audio folders found')
+      log.info('No audio folders found')
       return result
     }
 
     // 2. Сканировать каждую папку аудио (рекурсивно до глубины 3)
     for (const audioDir of result.audioDirs) {
-      const groupName = path.basename(audioDir)
-      const language = detectLanguageFromFolder(groupName)
+      const dirBaseName = path.basename(audioDir)
+      const topGroupName = extractGroupNameFromAudioDir(audioDir) || dirBaseName
+      const language = detectLanguageFromFolder(dirBaseName)
 
       try {
         // Используем рекурсивный сканер для поиска аудио в подпапках
@@ -327,17 +342,23 @@ export async function scanForExternalAudio(
 
           if (matchResult === null) {
             result.unmatchedFiles.push(audioPath)
-            console.warn(`[ExternalAudioScanner] Unmatched: ${audioFileName}`)
+            log.debug('Unmatched audio file', { file: audioFileName })
             continue
           }
 
           // Получаем информацию об аудио
           const audioInfo = await probeAudioFile(audioPath)
 
+          // Определяем groupName: проверяем непосредственного родителя файла
+          // Структура: RUS Sound/[badPuss]/episode.mka → groupName = "badPuss"
+          const parentDir = path.dirname(audioPath)
+          const groupName =
+            parentDir !== audioDir ? extractGroupNameFromAudioDir(parentDir) || topGroupName : topGroupName
+
           // Приоритет извлечения:
           // 1. Суффикс .lang_group из имени файла (Anilibria паттерн)
           // 2. Название в скобках: .[5.1].mka, .[Commentary].mka
-          // 3. Название папки
+          // 3. Имя подпапки (если есть скобки) или имя корневой аудио-папки
           const finalLanguage = matchResult.suffix?.lang ? normalizeLanguageCode(matchResult.suffix.lang) : language
           const titleFromFilename = extractTitleFromAudioFilename(audioFileName)
           const finalTitle = matchResult.suffix?.group || titleFromFilename || groupName
@@ -348,26 +369,32 @@ export async function scanForExternalAudio(
             episodeNumber: matchResult.episodeNumber,
             language: finalLanguage,
             title: finalTitle, // Название дорожки (5.1, Commentary, etc.)
-            groupName: finalGroupName, // Группа озвучки (JAP Sound, RUS Sound, etc.)
+            groupName: finalGroupName, // Группа озвучки (badPuss, negaushi, etc.)
             codec: audioInfo.codec,
             channels: audioInfo.channels,
             bitrate: audioInfo.bitrate,
           })
 
-          console.warn(
-            `[ExternalAudioScanner] Matched: ${audioFileName} → ep${matchResult.episodeNumber} [${finalLanguage}/${finalTitle}] (${audioInfo.codec}, ${audioInfo.channels}ch)`
-          )
+          log.info('Audio track matched', {
+            file: audioFileName,
+            episode: matchResult.episodeNumber,
+            language: finalLanguage,
+            title: finalTitle,
+            codec: audioInfo.codec,
+            channels: audioInfo.channels,
+          })
         }
       } catch (e) {
-        console.warn(`[ExternalAudioScanner] Cannot read audio dir: ${audioDir}`, e)
+        log.warn('Cannot read audio directory', { dir: audioDir, error: String(e) })
       }
     }
 
-    console.warn(
-      `[ExternalAudioScanner] Result: ${result.audioTracks.length} matched, ${result.unmatchedFiles.length} unmatched`
-    )
+    log.info('Audio scan complete', {
+      matched: result.audioTracks.length,
+      unmatched: result.unmatchedFiles.length,
+    })
   } catch (e) {
-    console.error('[ExternalAudioScanner] Error:', e)
+    log.error('Audio scan error', { error: String(e) })
   }
 
   return result

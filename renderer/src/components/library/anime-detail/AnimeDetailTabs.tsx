@@ -20,6 +20,8 @@ export interface AnimeDetailTabsProps {
   hasVideos: boolean
   /** Показывать таб франшизы (требует shikimoriId) */
   hasFranchise?: boolean
+  /** Показывать таб дорожек */
+  hasTracks?: boolean
   /** Контент табов */
   children: {
     episodes: ReactNode
@@ -27,10 +29,11 @@ export interface AnimeDetailTabsProps {
     related: ReactNode
     franchise?: ReactNode
     videos?: ReactNode
+    tracks?: ReactNode
   }
 }
 
-export function AnimeDetailTabs({ episodeCount, hasVideos, hasFranchise, children }: AnimeDetailTabsProps) {
+export function AnimeDetailTabs({ episodeCount, hasVideos, hasFranchise, hasTracks, children }: AnimeDetailTabsProps) {
   return (
     <Tabs.Root defaultValue="episodes" lazyMount unmountOnExit={false}>
       <Tabs.List mb={4}>
@@ -41,6 +44,7 @@ export function AnimeDetailTabs({ episodeCount, hasVideos, hasFranchise, childre
           </Badge>
         </Tabs.Trigger>
         <Tabs.Trigger value="about">О сериале</Tabs.Trigger>
+        {hasTracks && <Tabs.Trigger value="tracks">Дорожки</Tabs.Trigger>}
         <Tabs.Trigger value="related">Связанные</Tabs.Trigger>
         {hasFranchise && <Tabs.Trigger value="franchise">Франшиза</Tabs.Trigger>}
         {hasVideos && <Tabs.Trigger value="videos">Видео</Tabs.Trigger>}
@@ -50,6 +54,8 @@ export function AnimeDetailTabs({ episodeCount, hasVideos, hasFranchise, childre
         <Tabs.Content value="episodes">{children.episodes}</Tabs.Content>
 
         <Tabs.Content value="about">{children.about}</Tabs.Content>
+
+        {hasTracks && <Tabs.Content value="tracks">{children.tracks}</Tabs.Content>}
 
         <Tabs.Content value="related">{children.related}</Tabs.Content>
 

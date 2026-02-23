@@ -2,20 +2,23 @@
 
 /**
  * Страница настроек приложения
- * Разделена на 4 вкладки: Библиотека, Кодирование, Просмотр, Приложение
+ * Разделена на 5 вкладок: Библиотека, Кодирование, Просмотр, Приложение, P2P
  */
 
 import { Box, Tabs, Text, VStack } from '@chakra-ui/react'
-import { LuClapperboard, LuFolderOpen, LuPlay, LuSettings } from 'react-icons/lu'
+import { LuClapperboard, LuFolderOpen, LuPlay, LuSettings, LuShare2 } from 'react-icons/lu'
 
 import { Header } from '@/components/layout'
 
 import {
   EncodingProfilesCard,
+  FederationCard,
   LibrarySettingsCard,
+  MobileAccessCard,
+  P2PSharingCard,
   PlayerSettingsCard,
-  RestoreLibraryCard,
   ThemeSettingsCard,
+  TrackerPublishingCard,
   TranscodingSettingsCard,
   TraySettingsCard,
   useSettings,
@@ -36,13 +39,6 @@ export default function SettingsPage() {
     defaultPaths,
     handleSave,
     handleSaveWithTray,
-
-    // Обновления
-    appVersion,
-    updateStatus,
-    handleCheckUpdates,
-    handleDownloadUpdate,
-    handleInstallUpdate,
 
     // Профили
     profiles,
@@ -84,14 +80,17 @@ export default function SettingsPage() {
               <LuSettings />
               Приложение
             </Tabs.Trigger>
+            <Tabs.Trigger value="sharing">
+              <LuShare2 />
+              P2P
+            </Tabs.Trigger>
           </Tabs.List>
 
-          {/* Библиотека: пути к папкам + восстановление */}
+          {/* Библиотека: пути к папкам */}
           <Tabs.Content value="library">
-            <VStack gap={6} align="stretch" maxW="800px" py={6}>
+            <Box maxW="800px" py={6}>
               <LibrarySettingsCard settings={settings} defaultPaths={defaultPaths} onSave={handleSave} />
-              <RestoreLibraryCard settings={settings} defaultPaths={defaultPaths} />
-            </VStack>
+            </Box>
           </Tabs.Content>
 
           {/* Кодирование: GPU, битрейт, профили */}
@@ -109,12 +108,22 @@ export default function SettingsPage() {
             </Box>
           </Tabs.Content>
 
-          {/* Приложение: тема + трей + обновления */}
+          {/* Приложение: тема + трей + мобильный доступ + обновления */}
           <Tabs.Content value="app">
             <VStack gap={6} align="stretch" maxW="800px" py={6}>
               <ThemeSettingsCard />
               <TraySettingsCard settings={settings} onSaveWithTray={handleSaveWithTray} />
+              <MobileAccessCard />
               <UpdateSettingsCardNew />
+            </VStack>
+          </Tabs.Content>
+
+          {/* P2P Sharing: IPFS, публикация, подписки, федерация, трекер */}
+          <Tabs.Content value="sharing">
+            <VStack gap={6} align="stretch" maxW="800px" py={6}>
+              <P2PSharingCard />
+              <TrackerPublishingCard />
+              <FederationCard />
             </VStack>
           </Tabs.Content>
         </Tabs.Root>

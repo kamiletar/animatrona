@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LuFileVideo, LuHash, LuRefreshCw } from 'react-icons/lu'
 
 import { formatFileSize } from '@/lib/format-utils'
-import { parseEpisodeInfo, type EpisodeType, type ParsedEpisodeInfo } from '@/lib/parse-filename'
+import { type EpisodeType, type ParsedEpisodeInfo, parseEpisodeInfo } from '@/lib/parse-filename'
 import type { MediaFileInfo } from '@/types/electron'
 
 // Реэкспорт типов для обратной совместимости
@@ -81,16 +81,16 @@ export function FileScanStep({
       const newFiles = files.map((f, i) =>
         i === index
           ? {
-              ...f,
-              episodeNumber,
-              // Автоматически выбираем при назначении номера
-              selected: episodeNumber !== null ? true : f.selected,
-            }
+            ...f,
+            episodeNumber,
+            // Автоматически выбираем при назначении номера
+            selected: episodeNumber !== null ? true : f.selected,
+          }
           : f
       )
       onFilesChange(newFiles)
     },
-    [files, onFilesChange]
+    [files, onFilesChange],
   )
 
   /** Автонумерация всех файлов */
@@ -130,7 +130,7 @@ export function FileScanStep({
           {
             path: singleFilePath,
             name: fileName,
-            size: stat.success ? stat.size : 0,
+            size: stat.size ?? 0,
             extension: fileName.split('.').pop() || '',
             episodeNumber: 1, // Фильм = эпизод 1
             episodeType: 'movie',
@@ -143,9 +143,14 @@ export function FileScanStep({
       }
 
       // Обычный режим — сканируем папку
-      const result = await window.electronAPI.fs.scanFolder(folderPath, true)
-      if (result.success) {
-        let parsed: ParsedFile[] = result.files
+      // createHandler возвращает { success, data: { files } }
+      const result = await window.electronAPI.fs.scanFolder(folderPath, true) as {
+        success: boolean
+        data?: { files: Array<{ path: string; name: string; size: number; extension: string }> }
+      }
+      const files = result.data?.files || []
+      if (result.success && files.length > 0) {
+        let parsed: ParsedFile[] = files
           .map((file) => {
             const episodeInfo = parseEpisodeInfo(file.name)
             return {
@@ -207,7 +212,7 @@ export function FileScanStep({
       const newFiles = files.map((f, i) => (i === index ? { ...f, selected: !f.selected } : f))
       onFilesChange(newFiles)
     },
-    [files, onFilesChange]
+    [files, onFilesChange],
   )
 
   /** Выбрать только сериал */
@@ -353,7 +358,10 @@ export function FileScanStep({
               {files.map((file, index) => (
                 <Table.Row key={file.path} _hover={{ bg: 'bg.subtle' }}>
                   <Table.Cell>
-                    <Checkbox.Root checked={file.selected} onCheckedChange={() => toggleFile(index)}>
+                    <Checkbox.Root
+                      checked={file.selected}
+                      onCheckedChange={() => toggleFile(index)}
+                    >
                       <Checkbox.HiddenInput />
                       <Checkbox.Control>
                         <Checkbox.Indicator />
@@ -364,19 +372,21 @@ export function FileScanStep({
                     <NativeSelect.Root size="xs" width="70px" variant="outline">
                       <NativeSelect.Field
                         value={file.episodeNumber?.toString() ?? ''}
-                        onChange={(e) => handleEpisodeChange(index, e.target.value)}
+                        onChange={(e) =>
+                          handleEpisodeChange(index, e.target.value)}
                       >
                         <option value="">—</option>
                         {/* Генерируем опции 0, 1, 2, ... maxEpisode (0 для прологов/нулевых эпизодов) */}
-                        {Array.from({ length: maxEpisode + 1 }, (_, i) => i).map((num) => {
-                          const isUsed = usedEpisodes.has(num) && file.episodeNumber !== num
-                          return (
-                            <option key={num} value={num} disabled={isUsed}>
-                              {num === 0 ? '0 (пролог)' : num}
-                              {isUsed ? ' ✗' : ''}
-                            </option>
-                          )
-                        })}
+                        {Array.from({ length: maxEpisode + 1 }, (_, i) =>
+                          i).map((num) => {
+                            const isUsed = usedEpisodes.has(num) && file.episodeNumber !== num
+                            return (
+                              <option key={num} value={num} disabled={isUsed}>
+                                {num === 0 ? '0 (пролог)' : num}
+                                {isUsed ? ' ✗' : ''}
+                              </option>
+                            )
+                          })}
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
@@ -385,13 +395,11 @@ export function FileScanStep({
                     <HStack gap={2}>
                       <Icon
                         as={LuFileVideo}
-                        color={
-                          file.episodeType === 'movie'
-                            ? 'blue.400'
-                            : file.episodeType === 'ova'
-                              ? 'orange.400'
-                              : 'purple.400'
-                        }
+                        color={file.episodeType === 'movie'
+                          ? 'blue.400'
+                          : file.episodeType === 'ova'
+                          ? 'orange.400'
+                          : 'purple.400'}
                         flexShrink={0}
                       />
                       <Text truncate maxW="350px" title={file.name}>

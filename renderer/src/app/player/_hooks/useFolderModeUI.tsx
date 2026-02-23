@@ -10,11 +10,12 @@
 
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { TrackSelector, type TrackInfo, type VideoPlayerRef } from '@/components/player'
+import { type TrackInfo, TrackSelector, type VideoPlayerRef } from '@/components/player'
+import { toMediaUrl } from '@/lib/media-url'
 
+import { useExternalAudio } from './useExternalAudio'
 import type { useFolderPlayer } from './useFolderPlayer'
 import type { useWatchProgress } from './useWatchProgress'
-import { useExternalAudio } from './useExternalAudio'
 
 interface UseFolderModeUIOptions {
   /** Данные из useFolderPlayer */
@@ -41,6 +42,9 @@ interface UseFolderModeUIReturn {
   // Субтитры для плеера
   currentSubtitlePath: string | undefined
   currentSubtitleFonts: string[] | undefined
+
+  // Флаг использования внешнего аудио (для VideoPlayer.externalAudioManaged)
+  usesExternalAudio: boolean
 
   // TrackSelector элемент
   trackSelectorElement: React.ReactNode
@@ -73,7 +77,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
 
   /** Объединённый список аудиодорожек (встроенные + внешние) */
   const allAudioTracks: TrackInfo[] = useMemo(() => {
-    if (!folderPlayer.isFolderMode) {return []}
+    if (!folderPlayer.isFolderMode) return []
     const tracks: TrackInfo[] = []
 
     // Встроенные аудиодорожки из MKV (prefix: 'embedded:')
@@ -83,6 +87,8 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
         label: t.title || `Audio ${i + 1}`,
         language: t.language,
         codec: t.codec,
+        // 'local' помечает дорожку как доступную для воспроизведения (без IPFS)
+        transcodedCid: 'local',
       })
     })
 
@@ -93,6 +99,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
         label: t.title || t.filePath.split(/[/\\]/).pop() || 'Аудио',
         language: t.language,
         dubGroup: t.groupName,
+        transcodedCid: 'local',
       })
     })
 
@@ -101,7 +108,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
 
   /** Объединённый список субтитров (встроенные + внешние) */
   const allSubtitleTracks: TrackInfo[] = useMemo(() => {
-    if (!folderPlayer.isFolderMode) {return []}
+    if (!folderPlayer.isFolderMode) return []
     const tracks: TrackInfo[] = []
 
     // Встроенные субтитры из MKV (prefix: 'embedded:')
@@ -114,6 +121,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
           label: t.title || `Subtitle ${i + 1}`,
           language: t.language,
           codec: t.codec,
+          transcodedCid: 'local',
         })
       })
 
@@ -123,6 +131,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
         id: `external:${i}`,
         label: t.title || t.filePath.split(/[/\\]/).pop() || 'Субтитры',
         language: t.language,
+        transcodedCid: 'local',
       })
     })
 
@@ -133,7 +142,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
 
   /** Определение пути к внешнему аудио для синхронизации */
   const externalAudioPath = useMemo(() => {
-    if (!selectedAudioId?.startsWith('external:')) {return null}
+    if (!selectedAudioId?.startsWith('external:')) return null
     const index = parseInt(selectedAudioId.split(':')[1], 10)
     return folderPlayer.externalTracks.audio[index]?.filePath ?? null
   }, [selectedAudioId, folderPlayer.externalTracks.audio])
@@ -169,11 +178,15 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
   // === Текущий субтитр ===
 
   /** Текущий выбранный субтитр (только внешние пока поддерживаются) */
-  const currentSubtitleTrack =
-    selectedSubtitleIndex !== null ? folderPlayer.externalTracks.subtitles[selectedSubtitleIndex] : null
+  const currentSubtitleTrack = selectedSubtitleIndex !== null
+    ? folderPlayer.externalTracks.subtitles[selectedSubtitleIndex]
+    : null
 
-  const currentSubtitlePath = currentSubtitleTrack?.filePath ?? undefined
-  const currentSubtitleFonts = currentSubtitleTrack?.matchedFonts.map((f) => f.path) ?? undefined
+  // Конвертируем пути в media:// URL (file:// заблокирован Electron)
+  const currentSubtitlePath = currentSubtitleTrack?.filePath
+    ? (toMediaUrl(currentSubtitleTrack.filePath) ?? undefined)
+    : undefined
+  const currentSubtitleFonts = currentSubtitleTrack?.matchedFonts.map((f) => toMediaUrl(f.path) ?? f.path)
 
   // === TrackSelector элемент ===
 
@@ -184,12 +197,15 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
       return undefined
     }
 
+    // Формируем полный ID субтитра для TrackSelector (он сравнивает с track.id)
+    const selectedSubtitleId = selectedSubtitleIndex !== null ? `external:${selectedSubtitleIndex}` : null
+
     return (
       <TrackSelector
         audioTracks={allAudioTracks}
         subtitleTracks={allSubtitleTracks}
         selectedAudioTrack={selectedAudioId ?? undefined}
-        selectedSubtitleTrack={selectedSubtitleIndex ?? undefined}
+        selectedSubtitleTrack={selectedSubtitleId}
         onAudioTrackChange={(trackId) => {
           setSelectedAudioId(trackId === null ? null : String(trackId))
         }}
@@ -239,7 +255,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
       resetTrackSelection()
       folderPlayer.goToEpisode(index)
     },
-    [folderPlayer, saveProgressBeforeSwitch, resetTrackSelection]
+    [folderPlayer, saveProgressBeforeSwitch, resetTrackSelection],
   )
 
   /** Переход к бонусу */
@@ -249,7 +265,7 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
       resetTrackSelection()
       folderPlayer.goToBonus(index)
     },
-    [folderPlayer, saveProgressBeforeSwitch, resetTrackSelection]
+    [folderPlayer, saveProgressBeforeSwitch, resetTrackSelection],
   )
 
   /** Предыдущий эпизод */
@@ -278,6 +294,9 @@ export function useFolderModeUI(options: UseFolderModeUIOptions): UseFolderModeU
     // Субтитры для плеера
     currentSubtitlePath,
     currentSubtitleFonts,
+
+    // Флаг внешнего аудио (для VideoPlayer.externalAudioManaged)
+    usesExternalAudio: !!externalAudioPath,
 
     // TrackSelector элемент
     trackSelectorElement,

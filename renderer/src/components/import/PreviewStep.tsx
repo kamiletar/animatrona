@@ -7,19 +7,19 @@
  * VMAF подбор CQ теперь выполняется в очереди импорта, не здесь.
  */
 
-import { Badge, Box, Button, HStack, Icon, Progress, Text, VStack } from '@chakra-ui/react'
-import { LuCheck, LuRefreshCw, LuX } from 'react-icons/lu'
+import { Badge, Box, Button, HStack, Icon, Progress, Tabs, Text, VStack } from '@chakra-ui/react'
+import { LuAudioLines, LuCheck, LuRefreshCw, LuSettings2, LuX } from 'react-icons/lu'
 
 import {
-  EncodingSettingsCard,
-  FileCard,
-  useEncodingSettings,
-  usePreviewAnalysis,
   type AudioRecommendation,
+  EncodingSettingsCard,
   type FileAnalysis,
+  FileCard,
   type ImportSettings,
   type PreviewStepProps,
   type SubtitleRecommendation,
+  useEncodingSettings,
+  usePreviewAnalysis,
 } from './preview'
 
 /**
@@ -91,30 +91,72 @@ export function PreviewStep({ files, folderPath, onAnalysisComplete, onSettingsC
         </HStack>
       )}
 
-      {/* Настройки импорта */}
-      {!analysis.isAnalyzing && analysis.analyzedCount > 0 && <EncodingSettingsCard settings={encodingSettings} />}
-
-      {/* Список файлов */}
-      <VStack gap={3} align="stretch" maxH="300px" overflowY="auto">
-        {analysis.analyses.map((item) => (
-          <FileCard
-            key={item.file.path}
-            analysis={item}
-            folderPath={folderPath}
-            onToggleTrack={analysis.handleToggleTrack}
-            onToggleSubtitle={analysis.handleToggleSubtitle}
-          />
-        ))}
-      </VStack>
-
-      {/* Легенда */}
+      {/* Вкладки: Дорожки / Кодирование */}
       {!analysis.isAnalyzing && analysis.analyzedCount > 0 && (
-        <Box p={3} bg="bg.subtle" borderRadius="md">
-          <Text fontSize="xs" color="fg.subtle">
-            💡 <strong>Пропустить</strong> — дорожка уже в оптимальном формате. <strong>Транскодировать</strong> — будет
-            перекодировано в AAC 256 kbps для уменьшения размера.
-          </Text>
-        </Box>
+        <Tabs.Root defaultValue="tracks" variant="line" colorPalette="purple">
+          <Tabs.List>
+            <Tabs.Trigger value="tracks">
+              <Icon as={LuAudioLines} boxSize={4} />
+              Дорожки
+            </Tabs.Trigger>
+            <Tabs.Trigger value="encoding">
+              <Icon as={LuSettings2} boxSize={4} />
+              Кодирование
+            </Tabs.Trigger>
+          </Tabs.List>
+
+          {/* Вкладка: Дорожки */}
+          <Tabs.Content value="tracks">
+            <VStack gap={3} align="stretch" pt={3}>
+              {/* Список файлов */}
+              <VStack gap={3} align="stretch" maxH="45vh" overflowY="auto">
+                {analysis.analyses.map((item) => (
+                  <FileCard
+                    key={item.file.path}
+                    analysis={item}
+                    folderPath={folderPath}
+                    onToggleTrack={analysis.handleToggleTrack}
+                    onToggleSubtitle={analysis.handleToggleSubtitle}
+                    onTrackGroupEdit={analysis.handleTrackGroupEdit}
+                    onApplyToAll={analysis.applyTrackGroupToAll}
+                  />
+                ))}
+              </VStack>
+
+              {/* Легенда */}
+              <Box p={3} bg="bg.subtle" borderRadius="md">
+                <Text fontSize="xs" color="fg.subtle">
+                  💡 <strong>Пропустить</strong> — дорожка уже в оптимальном формате. <strong>Транскодировать</strong> —
+                  будет перекодировано в AAC 256 kbps для уменьшения размера.
+                </Text>
+              </Box>
+            </VStack>
+          </Tabs.Content>
+
+          {/* Вкладка: Кодирование */}
+          <Tabs.Content value="encoding">
+            <Box pt={3}>
+              <EncodingSettingsCard settings={encodingSettings} />
+            </Box>
+          </Tabs.Content>
+        </Tabs.Root>
+      )}
+
+      {/* Список файлов во время анализа (без вкладок) */}
+      {(analysis.isAnalyzing || analysis.analyzedCount === 0) && (
+        <VStack gap={3} align="stretch" maxH="45vh" overflowY="auto">
+          {analysis.analyses.map((item) => (
+            <FileCard
+              key={item.file.path}
+              analysis={item}
+              folderPath={folderPath}
+              onToggleTrack={analysis.handleToggleTrack}
+              onToggleSubtitle={analysis.handleToggleSubtitle}
+              onTrackGroupEdit={analysis.handleTrackGroupEdit}
+              onApplyToAll={analysis.applyTrackGroupToAll}
+            />
+          ))}
+        </VStack>
       )}
     </VStack>
   )

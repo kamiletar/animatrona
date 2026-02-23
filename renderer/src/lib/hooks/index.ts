@@ -12,3 +12,6 @@ export type {
   UseScanFolderOptions,
   UseScanFolderResult,
 } from './use-scan-folder'
+
+// AnimeManifest из IPFS (v0.28.0)
+export { useAnimeManifest } from './use-anime-manifest'

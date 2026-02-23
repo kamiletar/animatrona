@@ -166,9 +166,9 @@ export function ImportWizardDialog({
   useEffect(() => {
     const processInitialPath = async () => {
       // Проверяем условия для обработки
-      if (!open || !initialFolderPath) {return}
-      if (processedInitialPathRef.current === initialFolderPath) {return}
-      if (!window.electronAPI) {return}
+      if (!open || !initialFolderPath) return
+      if (processedInitialPathRef.current === initialFolderPath) return
+      if (!window.electronAPI) return
 
       // Запоминаем обработанный путь
       processedInitialPathRef.current = initialFolderPath
@@ -199,9 +199,9 @@ export function ImportWizardDialog({
   useEffect(() => {
     const processInitialData = async () => {
       // Проверяем условия для обработки
-      if (!open || !initialData?.skipFolderSelect) {return}
-      if (processedInitialDataRef.current) {return}
-      if (!window.electronAPI) {return}
+      if (!open || !initialData?.skipFolderSelect) return
+      if (processedInitialDataRef.current) return
+      if (!window.electronAPI) return
 
       // Запоминаем что обработали
       processedInitialDataRef.current = true
@@ -361,6 +361,8 @@ export function ImportWizardDialog({
         audioMaxConcurrent: importSettings.audioMaxConcurrent,
         videoMaxConcurrent: importSettings.videoMaxConcurrent,
       },
+      // Принудительное использование CPU
+      forceCpu: importSettings.forceCpu ?? false,
       // VMAF настройки (подбор CQ выполняется в очереди)
       vmafSettings: importSettings.vmafEnabled
         ? {
@@ -403,6 +405,8 @@ export function ImportWizardDialog({
           }))
         : [],
       syncOffset: donorEnabled ? syncOffset : 0,
+      // Режим импорта одиночного файла — не сканировать внешние субтитры
+      isFileMode,
       // Анализ файлов с рекомендациями по аудиодорожкам
       fileAnalyses: fileAnalyses
         .filter((a): a is typeof a & { file: { episodeNumber: number } } => a.file.episodeNumber !== null)
@@ -418,6 +422,7 @@ export function ImportWizardDialog({
               externalPath: r.externalPath,
               groupName: r.groupName,
               language: r.language,
+              dubGroup: r.dubGroup,
             })),
         })),
     }

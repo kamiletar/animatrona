@@ -11,14 +11,14 @@ export const ImportQueueItemCreateFormSchema = z.object({
   status: ImportQueueItemStatusFormSchema,
   priority: z.number().int().default(0),
   addedAt: z.date(),
-  startedAt: z.date().optional(),
-  completedAt: z.date().optional(),
+  startedAt: z.date().nullable().optional(),
+  completedAt: z.date().nullable().optional(),
   dataJson: z.string(),
-  error: z.string().optional(),
+  error: z.string().nullable().optional(),
   progress: z.number().int().default(0),
-  currentFileName: z.string().optional(),
-  createdAnimeId: z.string().optional(),
-  createdAnimeFolder: z.string().optional()
+  currentFileName: z.string().nullable().optional(),
+  createdAnimeId: z.string().nullable().optional(),
+  createdAnimeFolder: z.string().nullable().optional()
 })
 
 /**

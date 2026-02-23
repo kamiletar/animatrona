@@ -18,7 +18,10 @@
       "*": ["./*"],
       "@/*": ["./renderer/src/*"],
       "@lena/chakra-provider": ["../../libs/chakra-provider/src/index.ts"],
-      "@lena/query-provider": ["../../libs/query-provider/src/index.ts"]
+      "@lena/query-provider": ["../../libs/query-provider/src/index.ts"],
+      "@lena/form-components": ["../../libs/form-components/src/index.ts"],
+      "@lena/ui": ["../../libs/ui/src/index.ts"],
+      "@lena/video-player-react": ["../../libs/video-player-react/src/index.ts"]
     }
   },
   "include": [
@@ -32,7 +35,13 @@
     "../../libs/query-provider/src/**/*.ts",
     "../../libs/query-provider/src/**/*.tsx",
     "../../libs/chakra-provider/src/**/*.ts",
-    "../../libs/chakra-provider/src/**/*.tsx"
+    "../../libs/chakra-provider/src/**/*.tsx",
+    "../../libs/form-components/src/**/*.ts",
+    "../../libs/form-components/src/**/*.tsx",
+    "../../libs/ui/src/**/*.ts",
+    "../../libs/ui/src/**/*.tsx",
+    "../../libs/video-player-react/src/**/*.ts",
+    "../../libs/video-player-react/src/**/*.tsx"
   ],
   "exclude": [
     "node_modules",

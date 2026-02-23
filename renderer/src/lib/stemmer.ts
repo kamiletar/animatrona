@@ -24,7 +24,7 @@ const CYRILLIC_CHAR_REGEX = /[а-яёА-ЯЁ]/
  * @returns Стеммированное слово
  */
 export function stemWord(word: string): string {
-  if (!word || word.length < 2) {return word.toLowerCase()}
+  if (!word || word.length < 2) return word.toLowerCase()
 
   // Стеммируем только кириллические слова
   if (CYRILLIC_CHAR_REGEX.test(word)) {
@@ -46,7 +46,7 @@ export function stemWord(word: string): string {
  * // → 'головоломк для мозг'
  */
 export function stemText(text: string): string {
-  if (!text) {return ''}
+  if (!text) return ''
 
   // Разбиваем на слова (кириллица + латиница + цифры)
   const words = text.toLowerCase().split(/[\s\-_.,;:!?()[\]{}'"«»]+/)
@@ -64,20 +64,21 @@ export function stemText(text: string): string {
 }
 
 /**
- * Стеммирует поисковый запрос для FTS5
+ * Стеммирует поисковый запрос с prefix matching
  *
+ * @deprecated Не используется после миграции на Fuse.js (v0.28.9)
  * @param query - Поисковый запрос пользователя
- * @returns Стеммированный запрос для FTS5 MATCH
+ * @returns Стеммированный запрос с wildcard
  *
  * @example
  * stemSearchQuery('головоломки')
  * // → 'головоломк*'
  */
 export function stemSearchQuery(query: string): string {
-  if (!query) {return ''}
+  if (!query) return ''
 
   const stemmed = stemText(query.trim())
-  if (!stemmed) {return ''}
+  if (!stemmed) return ''
 
   // Добавляем * для prefix matching
   return stemmed

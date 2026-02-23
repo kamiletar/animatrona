@@ -1,25 +1,18 @@
 'use client'
 
 import { Box, Card, Grid, HStack, Icon, Text, VStack } from '@chakra-ui/react'
-import {
-  LuActivity,
-  LuClock,
-  LuGauge,
-  LuHardDrive,
-  LuTimer,
-  LuTrendingDown,
-} from 'react-icons/lu'
+import { LuActivity, LuClock, LuGauge, LuHardDrive, LuTimer, LuTrendingDown } from 'react-icons/lu'
 
-import type { TranscodeProgressExtended } from '../../../../shared/types'
 import {
   calculateCompressionRatio,
-  formatBitrate,
+  formatBitrateKbps,
   formatBytes,
-  formatDuration,
+  formatDurationHuman,
   formatDurationMs,
   formatFps,
   formatSpeed,
-} from '@/utils/format'
+} from '@/lib/format-utils'
+import type { TranscodeProgressExtended } from '../../../../shared/types'
 
 interface TranscodeStatsProps {
   /** Прогресс транскодирования */
@@ -72,21 +65,17 @@ export function TranscodeStats({ progress, inputSize }: TranscodeStatsProps) {
   }
 
   const compressionRatio = calculateCompressionRatio(inputSize, progress.outputSize)
-  const eta = progress.speed && progress.currentTime && progress.totalDuration
-    ? (progress.totalDuration - progress.currentTime) / progress.speed
-    : undefined
+  const eta =
+    progress.speed && progress.currentTime && progress.totalDuration
+      ? (progress.totalDuration - progress.currentTime) / progress.speed
+      : undefined
 
   return (
     <Card.Root bg="bg.subtle" border="1px" borderColor="border.subtle">
       <Card.Body py={3}>
         <Grid templateColumns="repeat(3, 1fr)" gap={4}>
           {/* FPS */}
-          <StatItem
-            icon={LuActivity}
-            label="FPS"
-            value={formatFps(progress.fps)}
-            color="status.success"
-          />
+          <StatItem icon={LuActivity} label="FPS" value={formatFps(progress.fps)} color="status.success" />
 
           {/* Скорость */}
           <StatItem
@@ -100,25 +89,15 @@ export function TranscodeStats({ progress, inputSize }: TranscodeStatsProps) {
           <StatItem
             icon={LuTrendingDown}
             label="Битрейт"
-            value={formatBitrate(progress.bitrate)}
+            value={formatBitrateKbps(progress.bitrate)}
             color="status.info"
           />
 
           {/* Прошло времени */}
-          <StatItem
-            icon={LuClock}
-            label="Прошло"
-            value={formatDurationMs(progress.elapsedTime)}
-            color="primary.fg"
-          />
+          <StatItem icon={LuClock} label="Прошло" value={formatDurationMs(progress.elapsedTime)} color="primary.fg" />
 
           {/* ETA */}
-          <StatItem
-            icon={LuTimer}
-            label="Осталось"
-            value={formatDuration(eta)}
-            color="accent.fg"
-          />
+          <StatItem icon={LuTimer} label="Осталось" value={formatDurationHuman(eta)} color="accent.fg" />
 
           {/* Размер и сжатие */}
           <StatItem

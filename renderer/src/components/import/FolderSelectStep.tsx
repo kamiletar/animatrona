@@ -8,7 +8,7 @@ import { Box, Button, HStack, Icon, Text, VStack } from '@chakra-ui/react'
 import { useCallback, useState } from 'react'
 import { LuFile, LuFileVideo, LuFolder, LuFolderOpen, LuLoader } from 'react-icons/lu'
 
-import { parseFileNameForMovie, parseFolderName, type ParsedFolderInfo } from '@/lib/shikimori/parse-folder'
+import { type ParsedFolderInfo, parseFileNameForMovie, parseFolderName } from '@/lib/shikimori/parse-folder'
 
 interface FolderSelectStepProps {
   folderPath: string | null
@@ -42,13 +42,24 @@ export function FolderSelectStep({
       return
     }
 
-    const path = await window.electronAPI.dialog.selectFolder()
+    // createHandler возвращает { success, data: path }, но типы в preload указывают string
+    const rawResult = await window.electronAPI.dialog.selectFolder()
+    console.log('[FolderSelectStep] selectFolder result:', rawResult, typeof rawResult)
+
+    // Определяем формат ответа — может быть string напрямую или { success, data }
+    const path =
+      typeof rawResult === 'string' ? rawResult : (rawResult as { success: boolean; data?: string } | null)?.data
+
     if (path) {
       setIsScanning(true)
       try {
         // Сканируем файлы в папке
-        const scanResult = await window.electronAPI.fs.scanFolder(path, false)
-        const fileNames = scanResult.success ? scanResult.files.map((f) => f.name) : []
+        // createHandler возвращает { success, data: { files } }
+        const scanResult = (await window.electronAPI.fs.scanFolder(path, false)) as {
+          success: boolean
+          data?: { files: Array<{ name: string }> }
+        }
+        const fileNames = scanResult.success && scanResult.data?.files ? scanResult.data.files.map((f) => f.name) : []
 
         // Парсим с учётом имён файлов
         const info = parseFolderName(path, fileNames)
@@ -66,9 +77,14 @@ export function FolderSelectStep({
       return
     }
 
-    const filePath = await window.electronAPI.dialog.selectFile([
+    // preload.dialog.selectFile возвращает string | null (уже unwrapped)
+    const rawResult = await window.electronAPI.dialog.selectFile([
       { name: 'Видео', extensions: ['mkv', 'mp4', 'avi', 'webm'] },
     ])
+
+    // Определяем формат ответа — может быть string напрямую или { success, data }
+    const filePath =
+      typeof rawResult === 'string' ? rawResult : (rawResult as { success: boolean; data?: string } | null)?.data
 
     if (filePath) {
       // Получаем директорию файла (для внешних субтитров)

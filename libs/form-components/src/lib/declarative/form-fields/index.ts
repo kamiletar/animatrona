@@ -1,12 +1,12 @@
 // Auto field
-export { FieldAuto, camelCaseToLabel, type AutoFieldConfig, type AutoFieldProps } from './auto'
+export { camelCaseToLabel, FieldAuto, type AutoFieldConfig, type AutoFieldProps } from './auto'
 // Базовые утилиты из base/
 export {
+  createField,
   FieldError,
   FieldLabel,
   FieldTooltip,
   FieldWrapper,
-  createField,
   formatFieldErrors,
   hasFieldErrors,
   useDebounce,
@@ -58,6 +58,27 @@ export { FieldRadioCard, type RadioCardFieldProps } from './selection/field-radi
 export { FieldRadioGroup, type RadioGroupFieldProps } from './selection/field-radio-group'
 export { FieldSegmentedGroup, type SegmentedGroupFieldProps } from './selection/field-segmented-group'
 export { FieldSelect, type SelectFieldProps } from './selection/field-select'
+export { FieldTags, type TagsFieldProps } from './selection/field-tags'
+export { FieldAddress } from './specialized/field-address'
+export { FieldCity, type CityFieldProps } from './specialized/field-city'
+export { FieldColorPicker, type ColorPickerFieldProps } from './specialized/field-color-picker'
+export { FieldFileUpload, type FileUploadFieldProps } from './specialized/field-file-upload'
+export { FieldOTPInput } from './specialized/field-otp-input'
+export { FieldPhone } from './specialized/field-phone'
+export { FieldPinInput, type PinInputFieldProps } from './specialized/field-pin-input'
+export { FieldEditable, type EditableFieldProps } from './text/field-editable'
+export { FieldMaskedInput } from './text/field-masked-input'
+export { FieldPassword } from './text/field-password'
+export { FieldPasswordStrength } from './text/field-password-strength'
+export { FieldRichText, type RichTextFieldProps } from './text/field-rich-text'
+export { FieldString } from './text/field-string'
+export { FieldTextarea } from './text/field-textarea'
+export {
+  DEFAULT_TOOLBAR_BUTTONS,
+  TOOLBAR_CONFIG,
+  type ToolbarButton,
+  type ToolbarButtonConfig,
+} from './text/toolbar-config'
 
 // Deprecated type aliases — для обратной совместимости
 // @deprecated Используй базовые типы: BaseOption, GroupableOption, RichOption
@@ -85,18 +106,3 @@ export type RadioOption<T = string> = _RadioOption<T>
 export type SegmentedGroupOption<T = string> = _SegmentedGroupOption<T>
 /** @deprecated Используй BaseOption */
 export type SelectOption<T = string> = _SelectOption<T>
-export { FieldTags, type TagsFieldProps } from './selection/field-tags'
-export { FieldAddress } from './specialized/field-address'
-export { FieldColorPicker, type ColorPickerFieldProps } from './specialized/field-color-picker'
-export { FieldFileUpload, type FileUploadFieldProps } from './specialized/field-file-upload'
-export { FieldOTPInput } from './specialized/field-otp-input'
-export { FieldPhone } from './specialized/field-phone'
-export { FieldPinInput, type PinInputFieldProps } from './specialized/field-pin-input'
-export { FieldEditable, type EditableFieldProps } from './text/field-editable'
-export { FieldMaskedInput } from './text/field-masked-input'
-export { FieldPassword } from './text/field-password'
-export { FieldPasswordStrength } from './text/field-password-strength'
-export { FieldRichText, type RichTextFieldProps } from './text/field-rich-text'
-export { type ToolbarButton, type ToolbarButtonConfig, TOOLBAR_CONFIG, DEFAULT_TOOLBAR_BUTTONS } from './text/toolbar-config'
-export { FieldString } from './text/field-string'
-export { FieldTextarea } from './text/field-textarea'

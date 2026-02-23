@@ -5,7 +5,6 @@
 
 datasource db {
     provider = "sqlite"
-    url = "file:../../../prisma/data/app.db"
 }
 
 generator client {
@@ -55,19 +54,6 @@ enum AgeRating {
     R_PLUS
     /// Хентай (18+)
     RX
-}
-
-enum TranscodeStatus {
-    /// В очереди
-    QUEUED
-    /// Транскодируется
-    PROCESSING
-    /// Готово
-    COMPLETED
-    /// Пропущено (AAC ≤ 256kbps, не нужно транскодировать)
-    SKIPPED
-    /// Ошибка
-    ERROR
 }
 
 enum VideoCodec {
@@ -195,71 +181,6 @@ enum RelationKind {
     OTHER
 }
 
-enum PersonRole {
-    /// Режиссёр
-    DIRECTOR
-    /// Сценарист
-    WRITER
-    /// Автор оригинала
-    ORIGINAL_CREATOR
-    /// Дизайн персонажей
-    CHARACTER_DESIGN
-    /// Композитор
-    MUSIC
-    /// Продюсер
-    PRODUCER
-    /// Режиссёр анимации
-    ANIMATION_DIRECTOR
-    /// Главный аниматор
-    KEY_ANIMATOR
-    /// Арт-директор
-    ART_DIRECTOR
-    /// Звукорежиссёр
-    SOUND_DIRECTOR
-    /// Другое
-    OTHER
-}
-
-enum ExternalLinkKind {
-    /// MyAnimeList
-    MYANIMELIST
-    /// AniDB
-    ANIDB
-    /// AniList
-    ANILIST
-    /// Wikipedia
-    WIKIPEDIA
-    /// Официальный сайт
-    OFFICIAL_SITE
-    /// Twitter/X
-    TWITTER
-    /// World Art
-    WORLDART
-    /// КиноПоиск
-    KINOPOISK
-    /// Anime News Network
-    ANIME_NEWS_NETWORK
-    /// Другое
-    OTHER
-}
-
-enum VideoKind {
-    /// Опенинг
-    OP
-    /// Эндинг
-    ED
-    /// Промо-видео / Трейлер
-    PV
-    /// Рекламный ролик
-    CM
-    /// Клип
-    CLIP
-    /// Эпизод (отрывок)
-    EPISODE_PREVIEW
-    /// Другое
-    OTHER
-}
-
 /// Статус просмотра аниме (как на Shikimori)
 enum WatchStatus {
     /// Не начато
@@ -296,6 +217,56 @@ enum ImportQueueItemStatus {
     CANCELLED
 }
 
+/// Уровень доверия к трекеру
+enum TrustLevel {
+    /// Заблокирован — никакие операции не разрешены
+    BLOCKED
+    /// Не доверенный — по умолчанию
+    UNTRUSTED
+    /// Известный — проверен пользователем
+    KNOWN
+    /// Доверенный — автоматический импорт
+    TRUSTED
+    /// Верифицированный — полное доверие
+    VERIFIED
+}
+
+/// Ранги пользователя (для репутации)
+enum UserRank {
+    /// 0-19 очков — новичок
+    NEWCOMER
+    /// 20-39 очков — контрибьютор
+    CONTRIBUTOR
+    /// 40-59 очков — постоянный участник
+    REGULAR
+    /// 60-79 очков — ветеран
+    VETERAN
+    /// 80-100 очков — легенда
+    LEGEND
+}
+
+/// Тип транзакции бонусных очков
+enum BonusTransactionType {
+    /// Заработок за раздачу
+    EARNING
+    /// Награда за достижение
+    ACHIEVEMENT
+    /// Трата очков
+    SPENDING
+    /// Бонус (промо, ивенты)
+    BONUS
+    /// Корректировка (админ)
+    ADJUSTMENT
+}
+
+/// Уровень достижения
+enum AchievementTier {
+    BRONZE
+    SILVER
+    GOLD
+    PLATINUM
+}
+
 /// Файл (изображения, шрифты и т.д.)
 model File {
     id String @id() @default(cuid())
@@ -317,6 +288,8 @@ model File {
     category FileCategory
     /// Источник (например, "shikimori")
     source String?
+    /// CID файла в IPFS (заполняется при миграции)
+    cid String?
     uploadedAt DateTime @default(now())
     animePoster Anime[]
 
@@ -383,6 +356,9 @@ model Anime {
     /// Постер аниме (связь с File)
     posterId String?
     poster File? @relation(fields: [posterId], references: [id], onDelete: SetNull)
+    /// @form.exclude
+    /// CID постера в IPFS
+    posterCid String?
     /// @form.title("Рейтинг")
     /// @form.fieldType("slider")
     /// @form.props({ min: 0, max: 10, step: 0.1, showValue: true })
@@ -406,6 +382,9 @@ model Anime {
     /// Источник — BDRemux/Bluray Remux (lossless качество)
     isBdRemux Boolean @default(false)
     /// @form.exclude
+    /// CID манифеста аниме в IPFS (AnimeManifest с полными метаданными)
+    manifestCid String?
+    /// @form.exclude
     /// ID на Shikimori для синхронизации метаданных
     shikimoriId Int? @unique()
     /// @form.exclude
@@ -421,20 +400,8 @@ model Anime {
     sourceRelations AnimeRelation[] @relation("SourceRelations")
     /// Связи с другими аниме (это аниме как цель)
     targetRelations AnimeRelation[] @relation("TargetRelations")
-    /// Студии анимации
-    studios StudioOnAnime[]
-    /// Персоны (режиссёры, сценаристы и т.д.)
-    staff PersonOnAnime[]
-    /// Персонажи
-    characters CharacterOnAnime[]
-    /// Внешние ссылки (MAL, AniDB и т.д.)
-    externalLinks ExternalLink[]
-    /// Команды озвучки
-    fandubbers FandubberOnAnime[]
-    /// Команды субтитров
-    fansubbers FansubberOnAnime[]
-    /// Видео (трейлеры, опенинги, эндинги) — v0.5.3
-    videos Video[]
+    /// Федеративный контент (импортирован из других трекеров) — v0.24.0
+    federatedContent FederatedContent[]
     /// @form.exclude
     /// Дата следующего эпизода (для онгоингов)
     nextEpisodeAt DateTime?
@@ -484,199 +451,6 @@ model Genre {
     /// ID на Shikimori (для синхронизации)
     shikimoriId Int? @unique()
     animes GenreOnAnime[]
-}
-
-/// Студия анимации
-model Studio {
-    id String @id() @default(cuid())
-    /// @form.title("Название")
-    name String @unique()
-    /// ID на Shikimori
-    shikimoriId Int? @unique()
-    /// URL логотипа студии
-    imageUrl String?
-    animes StudioOnAnime[]
-    createdAt DateTime @default(now())
-
-    @@index([name])
-}
-
-/// Связь студий и аниме (many-to-many)
-model StudioOnAnime {
-    anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
-    animeId String
-    studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
-    studioId String
-
-    @@id([animeId, studioId])
-}
-
-/// Персона (режиссёр, сейю, аниматор и т.д.)
-model Person {
-    id String @id() @default(cuid())
-    /// @form.title("Имя")
-    name String
-    /// Имя на русском
-    nameRu String?
-    /// ID на Shikimori
-    shikimoriId Int? @unique()
-    /// URL изображения
-    imageUrl String?
-    /// Роли в аниме
-    animeRoles PersonOnAnime[]
-    /// Озвученные персонажи
-    voicedCharacters CharacterVoice[]
-    createdAt DateTime @default(now())
-
-    @@index([name])
-    @@index([nameRu])
-}
-
-/// Связь персон с аниме (режиссёры, сценаристы и т.д.)
-model PersonOnAnime {
-    id String @id() @default(cuid())
-    anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
-    animeId String
-    person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
-    personId String
-    /// Роль в проекте
-    role PersonRole
-    /// Текст роли (оригинальный из API)
-    roleText String?
-
-    @@unique([animeId, personId, role])
-    @@index([animeId])
-    @@index([personId])
-    @@index([role])
-}
-
-/// Персонаж аниме
-model Character {
-    id String @id() @default(cuid())
-    /// @form.title("Имя")
-    name String
-    /// Имя на русском
-    nameRu String?
-    /// ID на Shikimori
-    shikimoriId Int? @unique()
-    /// URL изображения
-    imageUrl String?
-    /// В каких аниме появляется
-    animeAppearances CharacterOnAnime[]
-    /// Кто озвучивает
-    voices CharacterVoice[]
-    createdAt DateTime @default(now())
-
-    @@index([name])
-    @@index([nameRu])
-}
-
-/// Связь персонажей с аниме
-model CharacterOnAnime {
-    id String @id() @default(cuid())
-    anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
-    animeId String
-    character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-    characterId String
-    /// Роль (главный/второстепенный)
-    roleText String?
-
-    @@unique([animeId, characterId])
-    @@index([animeId])
-    @@index([characterId])
-}
-
-/// Связь персонажа с сейю (кто озвучивает)
-model CharacterVoice {
-    id String @id() @default(cuid())
-    character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-    characterId String
-    person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
-    personId String
-    /// ID аниме (для контекста, один сейю может озвучивать в разных аниме)
-    animeId String?
-
-    @@unique([characterId, personId, animeId])
-    @@index([characterId])
-    @@index([personId])
-}
-
-/// Внешняя ссылка (MAL, AniDB, официальный сайт)
-model ExternalLink {
-    id String @id() @default(cuid())
-    anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
-    animeId String
-    /// Тип ссылки
-    kind ExternalLinkKind
-    /// URL
-    url String
-    /// ID на Shikimori
-    shikimoriId Int?
-    createdAt DateTime @default(now())
-
-    @@unique([animeId, kind])
-    @@index([animeId])
-}
-
-/// Видео (трейлеры, опенинги, эндинги) — v0.5.3
-model Video {
-    id String @id() @default(cuid())
-    anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
-    animeId String
-    /// ID видео на Shikimori
-    shikimoriId Int? @unique()
-    /// Название видео
-    name String?
-    /// Тип видео (OP, ED, PV, CM и т.д.)
-    kind VideoKind @default(OTHER)
-    /// URL видео (обычно YouTube)
-    url String
-    /// URL для embed плеера (YouTube embed)
-    playerUrl String?
-    /// URL превью изображения
-    imageUrl String?
-    /// Хостинг видео (youtube, vk, etc.)
-    hosting String?
-    createdAt DateTime @default(now())
-
-    @@index([animeId])
-    @@index([kind])
-}
-
-/// Команда озвучки (fandub)
-model Fandubber {
-    id String @id() @default(cuid())
-    /// @form.title("Название")
-    name String @unique()
-    animes FandubberOnAnime[]
-}
-
-/// Связь команд озвучки с аниме
-model FandubberOnAnime {
-    anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
-    animeId String
-    fandubber Fandubber @relation(fields: [fandubberId], references: [id], onDelete: Cascade)
-    fandubberId String
-
-    @@id([animeId, fandubberId])
-}
-
-/// Команда субтитров (fansub)
-model Fansubber {
-    id String @id() @default(cuid())
-    /// @form.title("Название")
-    name String @unique()
-    animes FansubberOnAnime[]
-}
-
-/// Связь команд субтитров с аниме
-model FansubberOnAnime {
-    anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
-    animeId String
-    fansubber Fansubber @relation(fields: [fansubberId], references: [id], onDelete: Cascade)
-    fansubberId String
-
-    @@id([animeId, fansubberId])
 }
 
 /// Связь жанров и аниме (many-to-many)
@@ -796,14 +570,8 @@ model AudioTrack {
     bitrate Int?
     /// Дорожка по умолчанию
     isDefault Boolean @default(false)
-    /// Путь к извлечённому файлу (после demux)
-    extractedPath String?
-    /// Путь к транскодированному файлу (AAC) или к копии
-    transcodedPath String?
-    /// Статус транскодирования аудио
-    transcodeStatus TranscodeStatus @default(QUEUED)
-    /// Ошибка транскодирования
-    transcodeError String?
+    /// CID транскодированного аудио в IPFS
+    transcodedCid String?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt()
 
@@ -824,10 +592,12 @@ model SubtitleTrack {
     /// Название группы субтитров (имя папки-сабберов)
     /// Отображается в меню плеера как "Русский (AniDUB)"
     dubGroup String?
+    /// Тип субтитров: full (полные), signs (надписи), songs (песни)
+    subtitleType String @default("full")
     /// Формат (ass, srt, vtt)
     format String
-    /// Путь к извлечённому файлу субтитров
-    filePath String?
+    /// CID файла субтитров в IPFS
+    fileCid String?
     /// Дорожка по умолчанию
     isDefault Boolean @default(false)
     /// Шрифты для ASS субтитров
@@ -844,8 +614,8 @@ model SubtitleFont {
     subtitleTrackId String
     /// Имя шрифта (как в ASS файле)
     fontName String
-    /// Путь к файлу шрифта
-    filePath String
+    /// CID файла шрифта в IPFS
+    fileCid String?
     createdAt DateTime @default(now())
 
     @@index([subtitleTrackId])
@@ -888,20 +658,9 @@ model Episode {
     /// @form.title("Длительность (мс)")
     /// @form.fieldType("numberInput")
     durationMs Int?
-    /// @form.title("Путь к исходному файлу")
-    sourcePath String?
-    /// @form.title("Путь к транскодированному файлу")
-    transcodedPath String?
     /// @form.exclude
-    /// Путь к манифесту эпизода (JSON с метаданными для плеера)
-    manifestPath String?
-    /// @form.exclude
-    /// Путь к извлечённому видео (после demux, без аудио)
-    extractedVideoPath String?
-    /// @form.title("Статус транскодирования")
-    transcodeStatus TranscodeStatus @default(QUEUED)
-    /// @form.exclude
-    transcodeError String?
+    /// Путь к папке эпизода (для сохранения прогресса в _user/)
+    folderPath String?
     /// @form.exclude
     videoCodec String?
     /// @form.exclude
@@ -913,12 +672,6 @@ model Episode {
     /// @form.exclude
     /// Битность цвета видео (8, 10, 12)
     videoBitDepth Int?
-    /// @form.exclude
-    /// JSON массив путей к thumbnail-ам (320px для карточек)
-    thumbnailPaths String?
-    /// @form.exclude
-    /// JSON массив путей к полноразмерным скриншотам (1280px для лайтбокса)
-    screenshotPaths String?
     audioTracks AudioTrack[]
     subtitleTracks SubtitleTrack[]
     chapters Chapter[]
@@ -936,13 +689,24 @@ model Episode {
     /// @form.exclude
     /// Размер транскодированного файла в байтах
     transcodedSize BigInt?
+    /// @form.exclude
+    /// CID транскодированного видео в IPFS
+    transcodedCid String?
+    /// @form.exclude
+    /// CID манифеста эпизода в IPFS
+    manifestCid String?
+    /// @form.exclude
+    /// JSON массив CID thumbnail'ов в IPFS
+    thumbnailCids String?
+    /// @form.exclude
+    /// JSON массив CID скриншотов в IPFS
+    screenshotCids String?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt()
 
     @@unique([animeId, number])
     @@index([animeId])
     @@index([seasonId])
-    @@index([transcodeStatus])
 }
 
 /// Прогресс просмотра
@@ -1038,6 +802,15 @@ model Settings {
     /// Профиль кодирования по умолчанию
     defaultProfileId String?
     defaultProfile EncodingProfile? @relation(fields: [defaultProfileId], references: [id], onDelete: SetNull)
+    /// @form.title("Мобильный доступ")
+    /// @form.fieldType("switch")
+    /// @form.description("Доступ к библиотеке с мобильных устройств в локальной сети")
+    mobileAccessEnabled Boolean @default(false)
+    /// @form.title("Порт мобильного сервера")
+    /// @form.fieldType("numberInput")
+    /// @form.props({ min: 1024, max: 65535 })
+    /// @form.description("HTTP порт для мобильного доступа")
+    mobileServerPort Int @default(4000)
     updatedAt DateTime @updatedAt()
 }
 
@@ -1165,4 +938,329 @@ model ImportQueueItem {
     @@index([status])
     @@index([priority])
     @@index([addedAt])
+}
+
+/// Подписка на библиотеку другого пользователя (P2P Sharing)
+model Subscription {
+    id String @id() @default(cuid())
+    /// IPNS имя (PeerId) владельца библиотеки
+    ipnsName String @unique()
+    /// Имя для отображения (задаётся пользователем)
+    displayName String
+    /// Последний известный CID библиотеки
+    lastKnownCid String?
+    /// Когда последний раз проверяли обновления
+    lastCheckedAt DateTime?
+    /// Автоматически пиннить контент из этой подписки
+    autoPin Boolean @default(false)
+    /// Лимит автопининга в байтах (0 = без лимита)
+    autoPinLimit Int @default(0)
+    /// Дата создания подписки
+    createdAt DateTime @default(now())
+    /// Дата обновления
+    updatedAt DateTime @updatedAt()
+
+    @@index([ipnsName])
+    @@index([lastCheckedAt])
+}
+
+/// Удалённый трекер в федеративной сети
+model Tracker {
+    id String @id() @default(cuid())
+    /// URL трекера (уникальный идентификатор)
+    url String @unique()
+    /// Название трекера
+    name String
+    /// Описание трекера
+    description String?
+    /// Тема контента (anime, drama, movie и т.д.)
+    theme String @default("anime")
+    /// Основной язык контента
+    language String @default("ru")
+    /// PEM-кодированный публичный ключ для верификации подписей
+    publicKeyPem String?
+    /// Уровень доверия
+    trustLevel TrustLevel @default(UNTRUSTED)
+    /// Процент uptime (0-100)
+    uptimePercent Float @default(0)
+    /// Среднее время ответа в мс
+    avgResponseTimeMs Int @default(0)
+    /// Качество контента (0-1)
+    contentQuality Float @default(0)
+    /// Количество успешных синхронизаций
+    successfulSyncs Int @default(0)
+    /// Количество неудачных синхронизаций
+    failedSyncs Int @default(0)
+    /// Количество синхронизированного контента
+    contentSynced Int @default(0)
+    /// Последняя успешная синхронизация
+    lastSyncAt DateTime?
+    /// Последняя проверка доступности
+    lastCheckedAt DateTime?
+    /// Импортированный контент
+    importedContent FederatedContent[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt()
+
+    @@index([trustLevel])
+    @@index([lastSyncAt])
+    @@index([lastCheckedAt])
+}
+
+/// Федеративный контент — импортированный из другого трекера
+model FederatedContent {
+    id String @id() @default(cuid())
+    /// Трекер-источник
+    trackerId String
+    tracker Tracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+    /// ID контента на удалённом трекере
+    remoteId String
+    /// Связь с локальным аниме (если было импортировано)
+    animeId String?
+    anime Anime? @relation(fields: [animeId], references: [id], onDelete: SetNull)
+    /// JSON данные VideoSeriesObject
+    contentJson String
+    /// MyAnimeList ID
+    malId Int?
+    /// AniList ID
+    anilistId Int?
+    /// Shikimori ID
+    shikimoriId Int?
+    /// AniDB ID
+    anidbId Int?
+    /// Когда был получен контент
+    receivedAt DateTime @default(now())
+    /// Когда был обновлён
+    updatedAt DateTime @updatedAt()
+
+    @@unique([trackerId, remoteId])
+    @@index([trackerId])
+    @@index([animeId])
+    @@index([malId])
+    @@index([anilistId])
+    @@index([shikimoriId])
+}
+
+/// Настройки федерации (singleton)
+model FederationSettings {
+    id String @id() @default("default")
+    /// Федерация включена
+    enabled Boolean @default(false)
+    /// Название этого трекера в сети
+    trackerName String @default("My Animatrona")
+    /// Описание этого трекера
+    trackerDescription String?
+    /// Тема контента (anime, drama, movie)
+    theme String @default("anime")
+    /// Основной язык контента
+    language String @default("ru")
+    /// Автоматическая синхронизация с доверенными трекерами
+    autoSync Boolean @default(true)
+    /// Интервал автосинхронизации в минутах
+    syncIntervalMinutes Int @default(60)
+    /// Минимальный trust level для автоимпорта (1=UNTRUSTED, 2=KNOWN, 3=TRUSTED, 4=VERIFIED)
+    minTrustForAutoImport Int @default(3)
+    /// Приватный ключ RSA-2048 (PEM, зашифрован)
+    privateKeyPem String?
+    /// Публичный ключ RSA-2048 (PEM)
+    publicKeyPem String?
+    updatedAt DateTime @updatedAt()
+}
+
+/// Статистика пользователя (singleton)
+model UserStats {
+    id String @id() @default("default")
+    /// Всего байт загружено (upload)
+    bytesUploaded BigInt @default(0)
+    /// Всего байт скачано (download)
+    bytesDownloaded BigInt @default(0)
+    /// Общее время раздачи в мс
+    totalSeedingTimeMs BigInt @default(0)
+    /// Время текущей сессии раздачи в мс
+    currentSessionMs BigInt @default(0)
+    /// Количество уникального контента (CID), который раздаётся
+    uniqueContentSeeded Int @default(0)
+    /// Общее количество пиров, которым помогли
+    peersHelped Int @default(0)
+    /// Дата первой раздачи
+    firstSeedAt DateTime?
+    /// Дата последней активности
+    lastActiveAt DateTime @default(now())
+    /// Дневная статистика
+    dailyStats DailyStats[]
+    updatedAt DateTime @updatedAt()
+}
+
+/// Дневная статистика
+model DailyStats {
+    id String @id() @default(cuid())
+    /// Связь с UserStats
+    userStatsId String @default("default")
+    userStats UserStats @relation(fields: [userStatsId], references: [id], onDelete: Cascade)
+    /// Дата в формате YYYY-MM-DD
+    date String
+    /// Байты загружено (upload)
+    bytesUploaded BigInt @default(0)
+    /// Байты скачано (download)
+    bytesDownloaded BigInt @default(0)
+    /// Время раздачи в мс
+    seedingTimeMs BigInt @default(0)
+    /// Количество уникальных пиров, которым помогли
+    peersHelped Int @default(0)
+
+    @@unique([userStatsId, date])
+    @@index([date])
+}
+
+/// Репутация пользователя (singleton)
+model UserReputation {
+    id String @id() @default("default")
+    /// Общий score (0-100)
+    score Int @default(0)
+    /// Текущий ранг
+    rank UserRank @default(NEWCOMER)
+    /// Score за соотношение upload/download (0-30)
+    ratioScore Int @default(0)
+    /// Score за время раздачи (0-25)
+    seedingTimeScore Int @default(0)
+    /// Score за количество уникального контента (0-20)
+    uniqueContentScore Int @default(0)
+    /// Score за помощь пирам (0-15)
+    helpedPeersScore Int @default(0)
+    /// Score за время в сообществе (0-10)
+    longevityScore Int @default(0)
+    updatedAt DateTime @updatedAt()
+}
+
+/// Разблокированное достижение пользователя
+model UserAchievement {
+    id String @id() @default(cuid())
+    /// ID достижения (из enum AchievementId)
+    achievementId String
+    /// Дата получения
+    unlockedAt DateTime @default(now())
+    /// Было ли показано уведомление
+    notified Boolean @default(false)
+
+    @@unique([achievementId])
+    @@index([unlockedAt])
+}
+
+/// Прогресс достижения
+model AchievementProgress {
+    id String @id() @default(cuid())
+    /// ID достижения
+    achievementId String @unique()
+    /// Прогресс (0-100)
+    progress Int @default(0)
+    updatedAt DateTime @updatedAt()
+}
+
+/// Бонусные очки пользователя (singleton)
+model UserBonusPoints {
+    id String @id() @default("default")
+    /// Текущий баланс
+    balance Int @default(0)
+    /// Всего заработано
+    totalEarned Int @default(0)
+    /// Всего потрачено
+    totalSpent Int @default(0)
+    /// История транзакций
+    transactions BonusTransaction[]
+    updatedAt DateTime @updatedAt()
+}
+
+/// Транзакция бонусных очков
+model BonusTransaction {
+    id String @id() @default(cuid())
+    /// Связь с UserBonusPoints
+    bonusPointsId String @default("default")
+    bonusPoints UserBonusPoints @relation(fields: [bonusPointsId], references: [id], onDelete: Cascade)
+    /// Тип транзакции
+    type BonusTransactionType
+    /// Сумма (положительная для начисления, отрицательная для траты)
+    amount Int
+    /// Баланс после транзакции
+    balanceAfter Int
+    /// Описание
+    description String
+    /// Метаданные в JSON (achievementId, contentCid, itemId, multipliers)
+    metadataJson String?
+    createdAt DateTime @default(now())
+
+    @@index([type])
+    @@index([createdAt])
+}
+
+/// Профиль пользователя для P2P синхронизации (singleton)
+/// Заменяет OrbitDB UserProfileDB — хранится в SQLite, публикуется через IPNS
+model LocalUserProfile {
+    id String @id() @default("default")
+    /// PeerId ноды (из Kubo или Helia)
+    peerId String
+    /// Friend Code (XXXX-XXXX) для добавления в друзья
+    friendCode String @unique()
+    /// Отображаемое имя
+    displayName String @default("Анонимус")
+    /// URL аватара (data URL, IPFS CID или внешний URL)
+    avatarUrl String?
+    /// Цвет аватара (для генерации дефолтного)
+    avatarColor String?
+    /// Статус (пользовательский текст)
+    status String?
+    /// IPNS ключ для публикации профиля (CID последней публикации)
+    ipnsPublishedCid String?
+    /// Время последней IPNS публикации
+    ipnsPublishedAt DateTime?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt()
+}
+
+/// Друг в P2P сети
+/// Хранит информацию о принятых друзьях для PresenceSync
+model Friend {
+    /// PeerId друга (уникальный идентификатор)
+    peerId String @id()
+    /// Friend Code друга
+    friendCode String
+    /// Отображаемое имя
+    displayName String
+    /// URL аватара
+    avatarUrl String?
+    /// Онлайн-статус
+    isOnline Boolean @default(false)
+    /// JSON-encoded WatchingInfo (что смотрит)
+    watchingJson String?
+    /// Последний раз видели онлайн
+    lastSeenAt DateTime?
+    /// Когда стали друзьями
+    friendsSince DateTime @default(now())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt()
+
+    @@index([isOnline])
+}
+
+/// Запрос в друзья (входящий/исходящий)
+model FriendRequest {
+    id String @id() @default(cuid())
+    /// PeerId отправителя
+    fromPeerId String
+    /// Friend Code отправителя
+    fromFriendCode String
+    /// Имя отправителя
+    fromDisplayName String
+    /// PeerId получателя
+    toPeerId String
+    /// Статус: pending, accepted, rejected, blocked
+    status String @default("pending")
+    /// Время отправки
+    sentAt DateTime @default(now())
+    /// Время ответа
+    respondedAt DateTime?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt()
+
+    @@index([fromPeerId, toPeerId, status])
+    @@index([toPeerId, status])
 }

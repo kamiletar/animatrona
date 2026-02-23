@@ -9,7 +9,8 @@ interface AudioTrack {
   language: string
   title?: string | null
   dubGroup?: string | null
-  transcodeStatus: string
+  /** CID в IPFS — дорожка готова к воспроизведению */
+  transcodedCid?: string | null
 }
 
 interface SubtitleTrack {
@@ -30,11 +31,11 @@ const RUSSIAN_LANGUAGES = ['ru', 'rus', 'russian']
  */
 function isRussianTrack(track: { language: string; title?: string | null }): boolean {
   const lang = track.language.toLowerCase()
-  if (RUSSIAN_LANGUAGES.includes(lang)) {return true}
+  if (RUSSIAN_LANGUAGES.includes(lang)) return true
 
   // Проверяем title на русские слова
   const title = track.title?.toLowerCase() || ''
-  if (title.includes('рус') || title.includes('rus')) {return true}
+  if (title.includes('рус') || title.includes('rus')) return true
 
   return false
 }
@@ -55,10 +56,10 @@ function isSignsSubtitle(track: SubtitleTrack): boolean {
   const dubGroup = track.dubGroup?.toLowerCase() || ''
 
   return (
-    title.includes('sign') ||
-    title.includes('надпис') ||
-    dubGroup.includes('sign') ||
-    dubGroup.includes('надпис')
+    title.includes('sign')
+    || title.includes('надпис')
+    || dubGroup.includes('sign')
+    || dubGroup.includes('надпис')
   )
 }
 
@@ -75,14 +76,12 @@ function isFullSubtitle(track: SubtitleTrack): boolean {
  */
 export function selectAudioTrack(
   tracks: AudioTrack[],
-  preference: TrackPreference
+  preference: TrackPreference,
 ): AudioTrack | null {
-  // Только готовые дорожки
-  const readyTracks = tracks.filter(
-    (t) => t.transcodeStatus === 'COMPLETED' || t.transcodeStatus === 'SKIPPED'
-  )
+  // Только готовые дорожки (с CID в IPFS)
+  const readyTracks = tracks.filter((t) => t.transcodedCid)
 
-  if (readyTracks.length === 0) {return tracks[0] || null}
+  if (readyTracks.length === 0) return tracks[0] || null
 
   switch (preference) {
     case 'RUSSIAN_DUB': {
@@ -101,7 +100,7 @@ export function selectAudioTrack(
     default: {
       // Сначала пробуем русскую, потом оригинал
       const russianTrack = readyTracks.find(isRussianTrack)
-      if (russianTrack) {return russianTrack}
+      if (russianTrack) return russianTrack
 
       const originalTrack = readyTracks.find(isOriginalTrack)
       return originalTrack || readyTracks[0]
@@ -115,9 +114,9 @@ export function selectAudioTrack(
 export function selectSubtitleTrack(
   tracks: SubtitleTrack[],
   preference: TrackPreference,
-  selectedAudioIsRussian: boolean
+  selectedAudioIsRussian: boolean,
 ): SubtitleTrack | null {
-  if (tracks.length === 0) {return null}
+  if (tracks.length === 0) return null
 
   switch (preference) {
     case 'RUSSIAN_DUB': {
@@ -128,7 +127,7 @@ export function selectSubtitleTrack(
       }
       // Если нет русской озвучки — полные субтитры
       const fullTrack = tracks.find(
-        (t) => isRussianTrack(t) && isFullSubtitle(t)
+        (t) => isRussianTrack(t) && isFullSubtitle(t),
       )
       return fullTrack || tracks.find(isFullSubtitle) || tracks[0]
     }
@@ -136,9 +135,9 @@ export function selectSubtitleTrack(
     case 'ORIGINAL_SUB': {
       // Полные субтитры (русские если есть)
       const russianFullTrack = tracks.find(
-        (t) => isRussianTrack(t) && isFullSubtitle(t)
+        (t) => isRussianTrack(t) && isFullSubtitle(t),
       )
-      if (russianFullTrack) {return russianFullTrack}
+      if (russianFullTrack) return russianFullTrack
 
       return tracks.find(isFullSubtitle) || tracks[0]
     }
@@ -153,7 +152,7 @@ export function selectSubtitleTrack(
 
       // Полные субтитры
       const russianFullTrack = tracks.find(
-        (t) => isRussianTrack(t) && isFullSubtitle(t)
+        (t) => isRussianTrack(t) && isFullSubtitle(t),
       )
       return russianFullTrack || tracks.find(isFullSubtitle) || tracks[0]
     }
@@ -164,6 +163,6 @@ export function selectSubtitleTrack(
  * Проверяет является ли аудио дорожка русской (для проверки выбора субтитров)
  */
 export function checkIsRussianAudio(track: AudioTrack | undefined): boolean {
-  if (!track) {return false}
+  if (!track) return false
   return isRussianTrack(track)
 }

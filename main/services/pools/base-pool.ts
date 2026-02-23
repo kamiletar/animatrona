@@ -14,8 +14,11 @@
 
 import type { ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
+import { createModuleLogger } from '../../utils/logger'
 import { resumeChildProcess, suspendChildProcess, terminateChildProcess } from '../../utils/process-control'
 import type { BasePoolTask, EpisodeProgress, PoolStatus, RunningTask } from './types'
+
+const log = createModuleLogger('BasePool')
 
 /**
  * Абстрактный базовый класс для пулов транскодирования
@@ -225,9 +228,13 @@ export abstract class BasePool<TTask extends BasePoolTask> extends EventEmitter 
 
   /** Очистить очередь */
   clear(): void {
-    // Отменить все запущенные
+    // Отменить все запущенные (try-catch чтобы onClear() вызывался всегда)
     for (const [taskId] of this.runningTasks) {
-      this.cancelTask(taskId)
+      try {
+        this.cancelTask(taskId)
+      } catch (err) {
+        log.warn('Ошибка при отмене задачи в clear()', { taskId, error: String(err) })
+      }
     }
     // Очистить очередь, завершённые и счётчик pending
     this.queue = []
@@ -259,9 +266,13 @@ export abstract class BasePool<TTask extends BasePoolTask> extends EventEmitter 
 
     // Логируем состояние очереди для диагностики
     if (this.queue.length > 0) {
-      console.warn(
-        `[${this.constructor.name}] processQueue: maxConcurrent=${this.maxConcurrent}, running=${this.runningTasks.size}, pending=${this.pendingTasks}, queued=${this.queue.length}`
-      )
+      log.debug('Обработка очереди', {
+        pool: this.constructor.name,
+        maxConcurrent: this.maxConcurrent,
+        running: this.runningTasks.size,
+        pending: this.pendingTasks,
+        queued: this.queue.length,
+      })
     }
 
     // ВАЖНО: Учитываем pendingTasks для предотвращения race condition
@@ -311,6 +322,7 @@ export abstract class BasePool<TTask extends BasePoolTask> extends EventEmitter 
     }
     this.completedTasks.push(task)
     this.emit('taskCompleted', task)
+    this.onTaskCompleted(task)
     this.processQueue()
   }
 
@@ -324,6 +336,7 @@ export abstract class BasePool<TTask extends BasePoolTask> extends EventEmitter 
     task.error = error
     this.completedTasks.push(task)
     this.emit('taskError', task)
+    this.onTaskCompleted(task)
     this.processQueue()
   }
 
@@ -356,6 +369,11 @@ export abstract class BasePool<TTask extends BasePoolTask> extends EventEmitter 
 
   /** Хук при добавлении задачи в очередь */
   protected onTaskQueued(_task: TTask): void {
+    // Переопределяется в наследниках
+  }
+
+  /** Хук при завершении задачи (успех или ошибка) */
+  protected onTaskCompleted(_task: TTask): void {
     // Переопределяется в наследниках
   }
 

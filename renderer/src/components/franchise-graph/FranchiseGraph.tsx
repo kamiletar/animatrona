@@ -5,7 +5,6 @@
  * Использует React Flow для визуализации связей между аниме
  */
 
-/* eslint-disable @nx/enforce-module-boundaries */
 import {
   Background,
   Controls,
@@ -22,7 +21,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './franchise-graph.css'
-/* eslint-enable @nx/enforce-module-boundaries */
+
 import {
   Badge,
   Box,
@@ -48,13 +47,13 @@ import { AnimeNode as AnimeNodeComponent } from './nodes/AnimeNode'
 import type { AnimeNodeData, FranchiseGraphProps, ViewMode } from './types'
 
 /** Регистрируем кастомные типы узлов */
- 
+
 const nodeTypes: NodeTypes = {
   anime: AnimeNodeComponent as any,
 }
 
 /** Регистрируем кастомные типы связей */
- 
+
 const edgeTypes: EdgeTypes = {
   relation: RelationEdgeComponent as any,
 }
@@ -104,7 +103,7 @@ function FranchiseGraphInner({
         onNodeClick(data.shikimoriId)
       }
     },
-    [onNodeClick],
+    [onNodeClick]
   )
 
   return (
@@ -138,12 +137,7 @@ function FranchiseGraphInner({
       >
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
-            <IconButton
-              aria-label="Пересчитать layout"
-              onClick={() => runLayout()}
-              size="sm"
-              variant="ghost"
-            >
+            <IconButton aria-label="Пересчитать layout" onClick={() => runLayout()} size="sm" variant="ghost">
               <LuRefreshCw />
             </IconButton>
           </Tooltip.Trigger>
@@ -159,8 +153,12 @@ function FranchiseGraphInner({
       <MiniMap
         nodeColor={(node) => {
           const data = node.data as AnimeNodeData
-          if (data.isCurrent) {return 'var(--chakra-colors-blue-500)'}
-          if (data.isInLibrary) {return 'var(--chakra-colors-green-500)'}
+          if (data.isCurrent) {
+            return 'var(--chakra-colors-blue-500)'
+          }
+          if (data.isInLibrary) {
+            return 'var(--chakra-colors-green-500)'
+          }
           return 'var(--chakra-colors-gray-400)'
         }}
         maskColor="var(--chakra-colors-bg-muted/80)"
@@ -299,8 +297,12 @@ function TimelineView({
     // Сортируем года и аниме внутри года
     return [...groups.entries()]
       .sort((a, b) => {
-        if (a[0] === 'unknown') {return 1}
-        if (b[0] === 'unknown') {return -1}
+        if (a[0] === 'unknown') {
+          return 1
+        }
+        if (b[0] === 'unknown') {
+          return -1
+        }
         return (a[0] as number) - (b[0] as number)
       })
       .map(([year, nodes]) => ({
@@ -390,9 +392,7 @@ export function FranchiseGraph({
   const stats = useMemo(() => {
     const total = graph.nodes.length
     const inLibrary = graph.nodes.filter((n: ShikimoriFranchiseNode) => libraryAnimeIds?.has(n.id)).length
-    const watched = watchStatuses
-      ? [...watchStatuses.values()].filter((s) => s.status === 'completed').length
-      : 0
+    const watched = watchStatuses ? [...watchStatuses.values()].filter((s) => s.status === 'completed').length : 0
 
     return { total, inLibrary, watched }
   }, [graph, libraryAnimeIds, watchStatuses])

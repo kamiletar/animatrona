@@ -202,7 +202,9 @@ export function createField<P extends BaseFieldProps, TValue = unknown, TState =
       <form.Field name={fullPath}>
         {(field: AnyFieldApi) => {
           const errors = field.state.meta.errors
-          const hasError = hasFieldErrors(errors)
+          const isTouched = field.state.meta.isTouched
+          // Показываем ошибки только если поле было touched (после blur или программной валидации)
+          const hasError = isTouched && hasFieldErrors(errors)
           const errorMessage = hasError ? formatFieldErrors(errors) : ''
 
           return render({

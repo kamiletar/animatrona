@@ -2,7 +2,6 @@
 // DO NOT EDIT MANUALLY
 
 import { z } from 'zod/v4'
-import { TranscodeStatusFormSchema } from './enums/TranscodeStatus.form'
 
 /**
  * Схема создания AudioTrack с UI метаданными
@@ -14,19 +13,16 @@ export const AudioTrackCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Язык', placeholder: 'ru, en, ja' }
     }),
-  title: z.string().optional()
+  title: z.string().nullable().optional()
     .meta({
       ui: { title: 'Название', placeholder: 'Например: Japanese 5.1' }
     }),
-  dubGroup: z.string().optional(),
+  dubGroup: z.string().nullable().optional(),
   codec: z.string(),
   channels: z.string(),
-  bitrate: z.number().int().optional(),
+  bitrate: z.number().int().nullable().optional(),
   isDefault: z.boolean().default(false),
-  extractedPath: z.string().optional(),
-  transcodedPath: z.string().optional(),
-  transcodeStatus: TranscodeStatusFormSchema,
-  transcodeError: z.string().optional()
+  transcodedCid: z.string().nullable().optional()
 })
 
 /**

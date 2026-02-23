@@ -22,8 +22,32 @@ import type {
   TranscodeProgressExtended,
   VideoTranscodeOptions,
 } from '../../../shared/types'
+import type {
+  AchievementUnlockedEvent,
+  AchievementWithProgress,
+  UserAchievements,
+} from '../../../shared/types/achievements'
 import type { SelectedTrack, TrackPreferences, WatchStatusMeta } from '../../../shared/types/backup'
-import type { ExportResult, NamingPattern, SeasonType, SeriesExportProgress } from '../../../shared/types/export'
+import type { BonusPoints, BonusTransaction } from '../../../shared/types/bonus-points'
+import type { NamingPattern, SeasonType } from '../../../shared/types/export'
+import type {
+  ExportQueueResult,
+  ExportQueueSettings,
+  ExportTask,
+  ExportTaskCreateData,
+  QueueExportConfig,
+} from '../../../shared/types/export-queue'
+import type {
+  AddTrackerOptions,
+  DiscoverResult,
+  FederationOperationResult,
+  FederationSettings,
+  GlobalSeederStats,
+  SyncOptions,
+  SyncResult,
+  TrackerInfo,
+  TrustLevel,
+} from '../../../shared/types/federation'
 import type {
   ImportHistoryCreateData,
   ImportHistoryEntry,
@@ -44,7 +68,53 @@ import type {
   ImportTemplateCreateData,
   ImportTemplateUpdateData,
 } from '../../../shared/types/import-template'
+import type {
+  GatewayStatus,
+  IpfsAddResult,
+  IpfsServiceStatus,
+  IpfsStatResult,
+  IpnsPublishResult,
+  IpnsResolveResult,
+  KuboMode,
+  KuboServiceStatus,
+  P2PDiagnostics,
+  PinInfo,
+  PinStats,
+  PublishedLibrary,
+  PublisherConfig,
+  PublishProgress,
+  PublishResult,
+  SchedulerConfig,
+  SchedulerStatus,
+  Subscription,
+  SubscriptionCreateData,
+  SubscriptionRefreshResult,
+} from '../../../shared/types/ipfs'
+import type {
+  Friend,
+  FriendRequest,
+  PresenceMessage,
+  PresenceSettings,
+  UserProfile,
+  UserProfileUpdate,
+  WatchingInfo,
+  WatchPartyChatMessage,
+  WatchPartyInvite,
+  WatchPartyParticipant,
+  WatchPartyPlaybackState,
+  WatchPartyRoom,
+} from '../../../shared/types/orbitdb'
 import type { AggregatedProgress, BatchImportItem, ImportQueueItem } from '../../../shared/types/parallel-transcode'
+import type {
+  PinataConfig,
+  PinataPinJob,
+  PinataStats,
+  RemotePin,
+  RemotePinConfig,
+  RemotePinOptions,
+} from '../../../shared/types/remote-pinning'
+import type { RankChangedEvent, UserReputation } from '../../../shared/types/reputation'
+import type { DailyStats, StatsUpdatedEvent, UserStats } from '../../../shared/types/stats'
 import type { UserAnimeData, UserEpisodeData } from '../../../shared/types/user-data'
 import type {
   CqSearchOptions,
@@ -53,8 +123,32 @@ import type {
   VmafOptions,
   VmafResult,
 } from '../../../shared/types/vmaf'
+import type { WebExportOptions, WebExportProgress, WebExportResult } from '../../../shared/types/web-player'
 
 export type { NamingPattern, SeasonType }
+
+/** Информация об IP адресе */
+export interface IpInfo {
+  ip: string
+  type: 'lan' | 'vpn' | 'other'
+  interface: string
+}
+
+/** Статус мобильного сервера */
+export interface MobileServerStatus {
+  /** Запущен ли сервер */
+  isRunning: boolean
+  /** Порт сервера */
+  port: number | null
+  /** Локальный IP адрес (предпочтительный) */
+  localIp: string | null
+  /** Все доступные IP адреса */
+  allIps: IpInfo[]
+  /** Полный URL для доступа (по предпочтительному IP) */
+  url: string | null
+  /** Количество обработанных запросов */
+  requestCount: number
+}
 
 /** Информация о медиафайле */
 export interface MediaFileInfo {
@@ -63,6 +157,9 @@ export interface MediaFileInfo {
   size: number
   extension: string
 }
+
+/** Тип субтитров */
+export type SubtitleType = 'full' | 'signs' | 'songs'
 
 /** Результат матчинга внешнего субтитра */
 export interface ExternalSubtitleMatch {
@@ -83,6 +180,10 @@ export interface ExternalSubtitleMatch {
     name: string
     path: string
   }>
+  /** Название группы субтитров (из квадратных скобок в имени папки) */
+  groupName?: string
+  /** Тип субтитров (полные, надписи, песни) */
+  subtitleType: SubtitleType
 }
 
 /** Результат сканирования внешних субтитров */
@@ -137,22 +238,21 @@ export interface EpisodeExportData {
   seasonNumber: number
   /** Название эпизода */
   name?: string | null
-  /** Путь к транскодированному видео (или source) */
-  videoPath: string
+  /** CID транскодированного видео в IPFS */
+  videoCid: string
   /** Аудиодорожки */
   audioTracks: Array<{
     language: string
     title: string | null
-    transcodedPath: string | null
+    transcodedCid: string | null
     streamIndex: number
-    inputPath: string
   }>
   /** Субтитры */
   subtitleTracks: Array<{
     language: string
     title: string | null
-    filePath: string | null
-    fonts: string[]
+    fileCid: string | null
+    fonts: Array<{ fontName: string; fileCid: string | null }>
   }>
   /** Главы */
   chapters: Array<{
@@ -488,6 +588,8 @@ export interface ManifestAudioTrack {
   channels: string
   bitrate?: number
   isDefault: boolean
+  /** Группа озвучки (AniDUB, AniLibria и т.д.) */
+  dubGroup?: string
 }
 
 /** Субтитры в манифесте */
@@ -500,6 +602,8 @@ export interface ManifestSubtitleTrack {
   filePath: string
   isDefault: boolean
   fonts?: { name: string; path: string }[]
+  /** Группа субтитров (HorribleSubs, FanSub Team и т.д.) */
+  dubGroup?: string
 }
 
 /** Тип главы */
@@ -522,6 +626,16 @@ export interface ManifestInfo {
   episodeName?: string
 }
 
+/** Переопределение дорожки (для передачи language/dubGroup из UI в манифест) */
+export interface TrackOverride {
+  /** Индекс потока (или -1 для внешних) */
+  streamIndex: number
+  /** Язык (ISO 639-1) */
+  language?: string
+  /** Группа озвучки/субтитров */
+  dubGroup?: string
+}
+
 /** Полный манифест эпизода */
 export interface EpisodeManifest {
   version: 1
@@ -540,6 +654,139 @@ export interface EpisodeManifest {
     prevEpisode?: { id: string; manifestPath: string }
   }
   generatedAt: string
+}
+
+// === AnimeManifest Types ===
+
+/** Параметры генерации AnimeManifest */
+export interface GenerateAnimeManifestInput {
+  /** ID аниме в БД */
+  animeId: string
+  /** Создавать манифесты эпизодов если их нет */
+  createEpisodeManifests?: boolean
+  /** PeerId создателя (из IPFS) */
+  creatorPeerId?: string
+}
+
+/** Результат генерации AnimeManifest */
+export interface GenerateAnimeManifestResult {
+  success: boolean
+  /** CID манифеста в IPFS */
+  manifestCid?: string
+  /** Сгенерированный манифест */
+  manifest?: AnimeManifest
+  /** Сообщение об ошибке */
+  error?: string
+}
+
+/** Ссылка на эпизод в AnimeManifest */
+export interface AnimeManifestEpisode {
+  number: number
+  season?: number
+  name?: string
+  manifestCid: string
+  videoCid?: string
+  size: number
+  durationMs?: number
+}
+
+/** Жанр/Тема в AnimeManifest */
+export interface AnimeManifestGenre {
+  name: string
+  nameRu?: string
+}
+
+/** Студия в AnimeManifest */
+export interface AnimeManifestStudio {
+  name: string
+  imageUrl?: string
+}
+
+/** Персона в AnimeManifest */
+export interface AnimeManifestPerson {
+  name: string
+  nameRu?: string
+  role: string
+  imageUrl?: string
+}
+
+/** Персонаж в AnimeManifest */
+export interface AnimeManifestCharacter {
+  name: string
+  nameRu?: string
+  role?: string
+  imageUrl?: string
+  voiceActor?: {
+    name: string
+    nameRu?: string
+  }
+}
+
+/** Внешние ID */
+export interface AnimeManifestExternalIds {
+  mal?: number
+  anilist?: number
+  shikimori?: number
+  anidb?: number
+}
+
+/** Внешняя ссылка */
+export interface AnimeManifestExternalLink {
+  kind: string
+  url: string
+}
+
+/** Видео материал */
+export interface AnimeManifestVideo {
+  kind: string
+  name?: string
+  url: string
+  imageUrl?: string
+}
+
+/** AnimeManifest — Полные метаданные аниме для IPFS */
+export interface AnimeManifest {
+  version: 1
+  // Базовое
+  name: string
+  originalName?: string
+  nameEn?: string
+  synonyms?: string[]
+  year?: number
+  // Полные данные
+  description?: string
+  ageRating?: string
+  duration?: number
+  episodeCount?: number
+  status?: string
+  kind?: string
+  source?: string
+  licensor?: string
+  rating?: number
+  // Медиа
+  posterCid?: string
+  // Классификация
+  genres?: AnimeManifestGenre[]
+  themes?: AnimeManifestGenre[]
+  // Производство
+  studios?: AnimeManifestStudio[]
+  staff?: AnimeManifestPerson[]
+  characters?: AnimeManifestCharacter[]
+  // Озвучка
+  fandubbers?: string[]
+  fansubbers?: string[]
+  // Внешние ссылки
+  externalIds: AnimeManifestExternalIds
+  externalLinks?: AnimeManifestExternalLink[]
+  // Видео
+  videos?: AnimeManifestVideo[]
+  // Эпизоды
+  episodes: AnimeManifestEpisode[]
+  // Метаданные
+  isBdRemux?: boolean
+  creatorPeerId?: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** Информация о диске */
@@ -786,7 +1033,7 @@ export interface ElectronAPI {
     /** Проверить существование пути */
     exists: (targetPath: string) => Promise<boolean>
     /** Получить информацию о файле (размер, дата модификации) */
-    stat: (filePath: string) => Promise<{ success: boolean; size: number; mtime?: Date; error?: string }>
+    stat: (filePath: string) => Promise<{ size?: number; mtime?: Date; error?: string }>
     /** Копировать файл (создаёт родительские директории автоматически) */
     copyFile: (sourcePath: string, destPath: string) => Promise<{ success: boolean; error?: string }>
     /** Сканировать внешние субтитры (Rus Sub/, Eng Sub/ и т.д.) */
@@ -835,13 +1082,18 @@ export interface ElectronAPI {
   // === Библиотека ===
   library: {
     /** Получить путь к библиотеке по умолчанию (Videos/Animatrona) */
-    getDefaultPath: () => Promise<string>
+    getDefaultPath: () => Promise<{ success: boolean; data?: string; error?: string }>
     /** Получить путь к папке эпизода */
-    resolveOutputPath: (options: LibraryPathOptions) => Promise<string>
+    resolveOutputPath: (options: LibraryPathOptions) => Promise<{ success: boolean; data?: string; error?: string }>
     /** Создать структуру папок для эпизода */
-    ensureEpisodeDirectory: (options: LibraryPathOptions) => Promise<string>
+    ensureEpisodeDirectory: (
+      options: LibraryPathOptions,
+    ) => Promise<{ success: boolean; data?: string; error?: string }>
     /** Создать папку для аниме (для постера и других общих файлов) */
-    ensureAnimeDirectory: (libraryPath: string, animeName: string) => Promise<string>
+    ensureAnimeDirectory: (
+      libraryPath: string,
+      animeName: string,
+    ) => Promise<{ success: boolean; data?: string; error?: string }>
   }
 
   // === Shikimori API ===
@@ -926,6 +1178,62 @@ export interface ElectronAPI {
     }>
   }
 
+  // === AnimeManifest (IPFS) ===
+  animeManifest: {
+    /** Генерировать манифест аниме и опубликовать в IPFS */
+    generate: (input: GenerateAnimeManifestInput) => Promise<{
+      success: boolean
+      data?: GenerateAnimeManifestResult
+      error?: string
+    }>
+
+    /** Обновить манифест аниме и сохранить CID в БД */
+    update: (animeId: string) => Promise<{
+      success: boolean
+      data?: GenerateAnimeManifestResult
+      error?: string
+    }>
+
+    /** Получить манифест из IPFS по CID */
+    get: (manifestCid: string) => Promise<{
+      success: boolean
+      data?: AnimeManifest
+      error?: string
+    }>
+
+    /** Получить манифест аниме по ID аниме (из IPFS или сгенерировать) */
+    getByAnimeId: (animeId: string) => Promise<{
+      success: boolean
+      data?: AnimeManifest
+      error?: string
+    }>
+
+    /** Batch-генерация манифестов для нескольких аниме */
+    generateBatch: (animeIds: string[]) => Promise<{
+      success: boolean
+      data?: {
+        success: number
+        failed: number
+        errors: Array<{ animeId: string; error: string }>
+      }
+      error?: string
+    }>
+
+    /** Получить список аниме без manifestCid */
+    getAnimesWithoutManifest: () => Promise<{
+      success: boolean
+      data?: Array<{ id: string; name: string }>
+      error?: string
+    }>
+
+    /** Импортировать аниме из IPFS манифеста */
+    import: (manifestCid: string) => Promise<{
+      success: boolean
+      data?: { animeId: string; animeName: string; episodeCount: number }
+      error?: string
+    }>
+  }
+
   // === Manifest ===
   manifest: {
     /** Сгенерировать манифест из результатов demux */
@@ -936,6 +1244,10 @@ export interface ElectronAPI {
         videoPath: string
         outputDir: string
         animeInfo: ManifestInfo
+        /** Переопределения для аудиодорожек (язык, dubGroup из UI) */
+        audioTrackOverrides?: TrackOverride[]
+        /** Переопределения для субтитров (язык, dubGroup из UI) */
+        subtitleTrackOverrides?: TrackOverride[]
       },
     ) => Promise<{
       success: boolean
@@ -957,12 +1269,48 @@ export interface ElectronAPI {
         prevEpisode?: { id: string; manifestPath: string }
       },
     ) => Promise<{ success: boolean; error?: string }>
-    /** Обновить thumbnails в манифесте */
+    /** Обновить thumbnails в манифесте (с CID для IPFS) */
     updateThumbnails: (
       manifestPath: string,
       thumbnails: {
-        vttPath: string
-        spritePath: string
+        vttCid: string
+        spriteCid: string
+      },
+    ) => Promise<{ success: boolean; error?: string }>
+    /** Batch-обновление навигации между эпизодами через IPFS */
+    updateNavigationBatch: (
+      episodes: Array<{ id: string; manifestCid: string }>,
+    ) => Promise<{ success: boolean; data?: Record<string, string>; error?: string }>
+    /** Обновить информацию о кодировании в манифесте */
+    updateEncoding: (
+      manifestPath: string,
+      encoding: {
+        profileName: string
+        codec: string
+        cq: number
+        preset: string
+        rateControl: string
+        tune?: string
+        multipass?: string
+        spatialAq?: boolean
+        temporalAq?: boolean
+        aqStrength?: number
+        gopSize?: number
+        lookahead?: number
+        bRefMode?: string
+        force10Bit?: boolean
+        vmafScore?: number
+        encoderType: 'gpu' | 'cpu'
+        hardwareModel?: string
+        ffmpegVersion?: string
+        ffmpegCommand?: string
+        transcodeDurationMs?: number
+        activeGpuWorkers?: number
+        videoMaxConcurrent?: number
+        audioMaxConcurrent?: number
+        sourceSize?: number
+        transcodedSize?: number
+        compressionRatio?: number
       },
     ) => Promise<{ success: boolean; error?: string }>
   }
@@ -1205,7 +1553,15 @@ export interface ElectronAPI {
     ) => () => void
 
     /** Подписка на завершение аудиодорожки */
-    onAudioTrackCompleted: (callback: (trackId: string, outputPath: string, episodeId: string) => void) => () => void
+    onAudioTrackCompleted: (
+      callback: (
+        trackId: string,
+        outputPath: string,
+        episodeId: string,
+        passthrough?: boolean,
+        originalCodec?: string,
+      ) => void,
+    ) => () => void
 
     /** Подписка на завершение элемента (видео + все аудио готовы) */
     onItemCompleted: (
@@ -1294,24 +1650,6 @@ export interface ElectronAPI {
     updateSettings: (settings: Partial<TraySettings>) => Promise<void>
     /** Подписка на изменение настроек трея из main process */
     onSettingsChanged: (callback: (settings: TraySettings) => void) => () => void
-  }
-
-  // === Экспорт сериала в MKV ===
-  export: {
-    /** Запустить экспорт сериала */
-    start: (config: ExportSeriesConfig) => Promise<ExportResult>
-    /** Отменить текущий экспорт */
-    cancel: () => Promise<{ success: boolean }>
-    /** Получить текущий прогресс */
-    getProgress: () => Promise<SeriesExportProgress>
-    /** Проверить, активен ли экспорт */
-    isActive: () => Promise<boolean>
-    /** Подписка на прогресс экспорта */
-    onProgress: (callback: (progress: SeriesExportProgress) => void) => () => void
-    /** Подписка на завершение экспорта */
-    onCompleted: (callback: (result: ExportResult) => void) => () => void
-    /** Подписка на ошибку экспорта */
-    onError: (callback: (error: string) => void) => () => void
   }
 
   // === Import Queue — Event-driven архитектура ===
@@ -1612,6 +1950,784 @@ export interface ElectronAPI {
     /** Подписка на получение changelog */
     onChangelog: (callback: (data: { version: string; changelog: string }) => void) => () => void
   }
+
+  // === IPFS (Kubo) ===
+  ipfs: {
+    /** Получить статус ноды */
+    status: () => Promise<{ success: boolean; data?: IpfsServiceStatus; error?: string }>
+
+    /** Получить P2P диагностику (inbound/outbound, транспорты, адреса) */
+    diagnostics: () => Promise<{ success: boolean; data?: P2PDiagnostics | null; error?: string }>
+
+    /** Получить PeerId текущей ноды */
+    getPeerId: () => Promise<{ success: boolean; data?: string | null; error?: string }>
+
+    /** Запустить ноду */
+    start: () => Promise<{ success: boolean; error?: string }>
+
+    /** Остановить ноду */
+    stop: () => Promise<{ success: boolean; error?: string }>
+
+    /** Подписка на изменение статуса */
+    onStatusChanged: (callback: (status: IpfsServiceStatus) => void) => () => void
+
+    /** Подписка на подключение пира */
+    onPeerConnected: (callback: (peerId: string) => void) => () => void
+
+    /** Подписка на отключение пира */
+    onPeerDisconnected: (callback: (peerId: string) => void) => () => void
+
+    /** Подписка на ошибки */
+    onError: (callback: (error: string) => void) => () => void
+
+    // === Операции с контентом ===
+
+    /** Добавить файл в IPFS */
+    addFile: (filePath: string) => Promise<{ success: boolean; data?: IpfsAddResult; error?: string }>
+
+    /** Добавить директорию в IPFS */
+    addDirectory: (
+      dirPath: string,
+      recursive?: boolean,
+    ) => Promise<{ success: boolean; data?: { files: IpfsAddResult[]; rootCid: string }; error?: string }>
+
+    /** Прочитать контент по CID (возвращает base64) */
+    cat: (cid: string) => Promise<{ success: boolean; data?: string; error?: string }>
+
+    /** Получить статистику по CID */
+    stat: (cid: string) => Promise<{ success: boolean; data?: IpfsStatResult; error?: string }>
+
+    /** Проверить наличие контента локально */
+    has: (cid: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+
+    /** Сохранить контент из IPFS в файл */
+    saveToFile: (cid: string, outputPath: string) => Promise<{ success: boolean; error?: string }>
+
+    // === HTTP Gateway ===
+
+    /** Запустить HTTP Gateway */
+    gatewayStart: (options?: { port?: number }) => Promise<{ success: boolean; error?: string }>
+
+    /** Остановить HTTP Gateway */
+    gatewayStop: () => Promise<{ success: boolean; error?: string }>
+
+    /** Получить статус Gateway */
+    gatewayStatus: () => Promise<{ success: boolean; data?: GatewayStatus; error?: string }>
+
+    /** Получить URL для CID через Gateway */
+    gatewayGetUrl: (cid: string, path?: string) => Promise<{ success: boolean; data?: string | null; error?: string }>
+
+    /** Подписка на запуск Gateway */
+    onGatewayStarted: (callback: (status: GatewayStatus) => void) => () => void
+
+    /** Подписка на остановку Gateway */
+    onGatewayStopped: (callback: () => void) => () => void
+
+    // === Repo ===
+
+    /** Запустить Garbage Collection — удалить неиспользуемые блоки */
+    repoGc: () => Promise<{ success: boolean; data?: { blocksRemoved: number }; error?: string }>
+
+    // === Pinning ===
+
+    /** Закрепить контент */
+    pin: (cid: string, name?: string) => Promise<{ success: boolean; data?: PinInfo; error?: string }>
+
+    /** Открепить контент */
+    unpin: (cid: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+
+    /** Проверить, закреплён ли контент */
+    isPinned: (cid: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+
+    /** Получить информацию о pin */
+    getPin: (cid: string) => Promise<{ success: boolean; data?: PinInfo | null; error?: string }>
+
+    /** Список всех pins */
+    listPins: () => Promise<{ success: boolean; data?: PinInfo[]; error?: string }>
+
+    /** Статистика pins */
+    pinStats: () => Promise<{ success: boolean; data?: PinStats; error?: string }>
+
+    /** Переименовать pin */
+    renamePin: (cid: string, name: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+
+    /** Подписка на закрепление контента */
+    onPinned: (callback: (pin: PinInfo) => void) => () => void
+
+    /** Подписка на открепление контента */
+    onUnpinned: (callback: (pin: PinInfo) => void) => () => void
+
+    // === IPNS ===
+
+    /** Опубликовать CID под IPNS именем текущей ноды */
+    ipnsPublish: (
+      cid: string,
+      lifetime?: string,
+    ) => Promise<{ success: boolean; data?: IpnsPublishResult; error?: string }>
+
+    /** Разрешить IPNS имя в CID */
+    ipnsResolve: (name: string) => Promise<{ success: boolean; data?: IpnsResolveResult; error?: string }>
+
+    /** Получить IPNS имя текущей ноды (PeerId) */
+    ipnsGetName: () => Promise<{ success: boolean; data?: string | null; error?: string }>
+
+    /** Переопубликовать все IPNS записи (продление срока жизни) */
+    ipnsRepublish: () => Promise<{ success: boolean; error?: string }>
+
+    /** Подписка на публикацию IPNS */
+    onIpnsPublished: (callback: (result: IpnsPublishResult) => void) => () => void
+
+    /** Подписка на разрешение IPNS */
+    onIpnsResolved: (callback: (result: { name: string } & IpnsResolveResult) => void) => () => void
+
+    // === P2P Sharing (Subscriptions) ===
+
+    /** Получить список всех подписок */
+    subscriptionList: () => Promise<{ success: boolean; data?: Subscription[]; error?: string }>
+
+    /** Получить подписку по ID */
+    subscriptionGet: (id: string) => Promise<{ success: boolean; data?: Subscription | null; error?: string }>
+
+    /** Добавить подписку */
+    subscriptionAdd: (
+      data: SubscriptionCreateData,
+    ) => Promise<{ success: boolean; data?: Subscription; error?: string }>
+
+    /** Удалить подписку */
+    subscriptionRemove: (id: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+
+    /** Обновить настройки подписки */
+    subscriptionUpdate: (
+      id: string,
+      data: Partial<Pick<Subscription, 'displayName' | 'autoPin' | 'autoPinLimit'>>,
+    ) => Promise<{ success: boolean; data?: Subscription | null; error?: string }>
+
+    /** Обновить данные подписки (проверить IPNS) */
+    subscriptionRefresh: (id: string) => Promise<{ success: boolean; data?: SubscriptionRefreshResult; error?: string }>
+
+    /** Обновить все подписки */
+    subscriptionRefreshAll: () => Promise<{ success: boolean; data?: SubscriptionRefreshResult[]; error?: string }>
+
+    /** Загрузить библиотеку подписки из IPFS по lastKnownCid */
+    subscriptionFetchLibrary: (
+      id: string,
+    ) => Promise<{ success: boolean; data?: PublishedLibrary | null; error?: string }>
+
+    /** Подписка на добавление подписки */
+    onSubscriptionAdded: (callback: (subscription: Subscription) => void) => () => void
+
+    /** Подписка на удаление подписки */
+    onSubscriptionRemoved: (callback: (subscription: Subscription) => void) => () => void
+
+    /** Подписка на обновление подписки */
+    onSubscriptionUpdated: (callback: (subscription: Subscription) => void) => () => void
+
+    /** Подписка на обновление данных подписки (refresh) */
+    onSubscriptionRefreshed: (callback: (result: SubscriptionRefreshResult) => void) => () => void
+
+    /** Подписка на обновление всех подписок */
+    onSubscriptionAllRefreshed: (callback: (results: SubscriptionRefreshResult[]) => void) => () => void
+
+    // === Library Publishing ===
+
+    /** Получить конфигурацию публикации */
+    publisherGetConfig: () => Promise<{ success: boolean; data?: PublisherConfig; error?: string }>
+
+    /** Обновить конфигурацию публикации */
+    publisherUpdateConfig: (
+      updates: Partial<PublisherConfig>,
+    ) => Promise<{ success: boolean; data?: PublisherConfig; error?: string }>
+
+    /** Опубликовать библиотеку (автоматически получает данные из БД) */
+    publisherPublish: () => Promise<{ success: boolean; data?: PublishResult; error?: string }>
+
+    /** Получить количество аниме для публикации */
+    publisherGetAnimeCount: () => Promise<{
+      success: boolean
+      data?: { animeCount: number; episodeCount: number }
+      error?: string
+    }>
+
+    /** Получить опубликованную библиотеку */
+    publisherGetPublished: () => Promise<{ success: boolean; data?: PublishedLibrary | null; error?: string }>
+
+    /** Подписка на прогресс публикации */
+    onPublisherProgress: (callback: (progress: PublishProgress) => void) => () => void
+
+    /** Подписка на завершение публикации */
+    onPublisherPublished: (callback: (result: PublishResult) => void) => () => void
+
+    /** Подписка на обновление конфигурации */
+    onPublisherConfigUpdated: (callback: (config: PublisherConfig) => void) => () => void
+
+    // === Миграция и очистка библиотеки ===
+
+    /** Получить количество эпизодов для миграции в IPFS */
+    publisherGetMigrationCount: () => Promise<{ success: boolean; data?: { count: number }; error?: string }>
+
+    /** Мигрировать контент в IPFS */
+    publisherMigrateToIpfs: () => Promise<{
+      success: boolean
+      data?: {
+        total: number
+        migrated: number
+        failed: number
+        errors: Array<{ episodeId: string; animeName: string; episodeNumber: number; error: string }>
+      }
+      error?: string
+    }>
+
+    /** Подписка на прогресс миграции */
+    onPublisherMigrationProgress: (
+      callback: (progress: { current: number; total: number; animeName: string; episodeNumber: number }) => void,
+    ) => () => void
+
+    /** Удалить контент конкретного аниме из IPFS (вызывать ПЕРЕД удалением из БД) */
+    publisherDeleteAnimeContent: (
+      animeId: string,
+    ) => Promise<{ success: boolean; data?: { deletedCids: number; cids: string[] }; error?: string }>
+
+    /** Очистить библиотеку (удалить все аниме из БД и IPFS) */
+    publisherClearLibrary: () => Promise<{
+      success: boolean
+      data?: { deletedCount: number; deletedBytes: number }
+      error?: string
+    }>
+
+    // === Tracker Integration ===
+
+    /** Получить конфигурацию tracker */
+    trackerGetConfig: () => Promise<{
+      success: boolean
+      data?: { baseUrl: string; apiKey: string; enabled: boolean }
+      error?: string
+    }>
+
+    /** Обновить конфигурацию tracker */
+    trackerUpdateConfig: (updates: { baseUrl?: string; apiKey?: string; enabled?: boolean }) => Promise<{
+      success: boolean
+      data?: { baseUrl: string; apiKey: string; enabled: boolean }
+      error?: string
+    }>
+
+    /** Проверить подключение к tracker */
+    trackerTestConnection: () => Promise<{
+      success: boolean
+      data?: { success: boolean; message: string; trackerName?: string }
+      error?: string
+    }>
+
+    /** Опубликовать аниме на tracker по manifestCid */
+    trackerPublish: (manifestCid: string) => Promise<{
+      success: boolean
+      data?: { success: boolean; animeId?: string; status?: string; episodeCount?: number; error?: string }
+      error?: string
+    }>
+
+    // === Subscription Scheduler ===
+
+    /** Получить статус планировщика */
+    schedulerGetStatus: () => Promise<{ success: boolean; data?: SchedulerStatus; error?: string }>
+
+    /** Получить конфигурацию планировщика */
+    schedulerGetConfig: () => Promise<{ success: boolean; data?: SchedulerConfig; error?: string }>
+
+    /** Обновить конфигурацию планировщика */
+    schedulerUpdateConfig: (
+      updates: Partial<SchedulerConfig>,
+    ) => Promise<{ success: boolean; data?: SchedulerConfig; error?: string }>
+
+    /** Запустить планировщик */
+    schedulerStart: () => Promise<{ success: boolean; error?: string }>
+
+    /** Остановить планировщик */
+    schedulerStop: () => Promise<{ success: boolean; error?: string }>
+
+    /** Проверить подписки сейчас */
+    schedulerCheckNow: () => Promise<{ success: boolean; data?: SubscriptionRefreshResult[]; error?: string }>
+
+    /** Подписка на изменение статуса планировщика */
+    onSchedulerStatusChanged: (callback: (status: SchedulerStatus) => void) => () => void
+
+    /** Подписка на обновление конфигурации планировщика */
+    onSchedulerConfigUpdated: (callback: (config: SchedulerConfig) => void) => () => void
+
+    /** Подписка на результаты проверки подписок */
+    onSchedulerChecked: (callback: (results: SubscriptionRefreshResult[]) => void) => () => void
+
+    // === Remote Pinning (Pinata) ===
+
+    /** Получить конфигурацию remote pinning */
+    remotePinGetConfig: () => Promise<{ success: boolean; data?: RemotePinConfig; error?: string }>
+
+    /** Обновить конфигурацию remote pinning */
+    remotePinUpdateConfig: (
+      updates: Partial<RemotePinConfig>,
+    ) => Promise<{ success: boolean; data?: RemotePinConfig; error?: string }>
+
+    /** Обновить конфигурацию Pinata */
+    remotePinUpdatePinataConfig: (
+      updates: Partial<PinataConfig>,
+    ) => Promise<{ success: boolean; data?: RemotePinConfig; error?: string }>
+
+    /** Проверить JWT токен Pinata */
+    remotePinTestAuth: (jwt: string) => Promise<{ success: boolean; data?: { valid: boolean }; error?: string }>
+
+    /** Закрепить CID на Pinata */
+    remotePinPin: (
+      cid: string,
+      options?: RemotePinOptions,
+    ) => Promise<{ success: boolean; data?: PinataPinJob; error?: string }>
+
+    /** Открепить CID с Pinata */
+    remotePinUnpin: (cid: string) => Promise<{ success: boolean; error?: string }>
+
+    /** Получить список пинов на Pinata */
+    remotePinList: (
+      limit?: number,
+      offset?: number,
+    ) => Promise<{ success: boolean; data?: RemotePin[]; error?: string }>
+
+    /** Получить информацию о пине */
+    remotePinGet: (cid: string) => Promise<{ success: boolean; data?: RemotePin | null; error?: string }>
+
+    /** Проверить, закреплён ли CID на Pinata */
+    remotePinIsPinned: (cid: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+
+    /** Получить статистику Pinata */
+    remotePinStats: () => Promise<{ success: boolean; data?: PinataStats; error?: string }>
+
+    /** Обновить метаданные пина */
+    remotePinUpdateMetadata: (
+      cid: string,
+      name: string,
+      keyvalues?: Record<string, string>,
+    ) => Promise<{ success: boolean; error?: string }>
+
+    /** Получить статус pin job */
+    remotePinGetJobStatus: (jobId: string) => Promise<{ success: boolean; data?: PinataPinJob; error?: string }>
+
+    /** Подписка на старт пининга */
+    onRemotePinStarted: (callback: (job: PinataPinJob) => void) => () => void
+
+    /** Подписка на открепление */
+    onRemotePinUnpinned: (callback: (data: { cid: string }) => void) => () => void
+
+    /** Подписка на обновление конфигурации */
+    onRemotePinConfigUpdated: (callback: (config: RemotePinConfig) => void) => () => void
+  }
+
+  // === Kubo (Go IPFS) ===
+  kubo: {
+    /** Получить статус Kubo сервиса */
+    status: () => Promise<{ success: boolean; data?: KuboServiceStatus; error?: string }>
+
+    /** Запустить Kubo (детекция IPFS Desktop → embedded fallback) */
+    start: () => Promise<{ success: boolean; error?: string }>
+
+    /** Остановить Kubo */
+    stop: () => Promise<{ success: boolean; error?: string }>
+
+    /** Получить PeerId ноды */
+    getPeerId: () => Promise<{ success: boolean; data?: string | null; error?: string }>
+
+    /** Получить режим работы (external/embedded/none) */
+    getMode: () => Promise<{ success: boolean; data?: KuboMode; error?: string }>
+
+    /** Получить URL Gateway */
+    getGatewayUrl: () => Promise<{ success: boolean; data?: string | null; error?: string }>
+
+    /** Подписка на изменение статуса */
+    onStatusChanged: (callback: (status: KuboServiceStatus) => void) => () => void
+
+    /** Подписка на подключение пира */
+    onPeerConnected: (callback: (peerId: string) => void) => () => void
+
+    /** Подписка на отключение пира */
+    onPeerDisconnected: (callback: (peerId: string) => void) => () => void
+
+    /** Подписка на ошибки */
+    onError: (callback: (error: string) => void) => () => void
+  }
+
+  // === Federation (Tracker Sync) ===
+  federation: {
+    /** Получить настройки федерации */
+    getSettings: () => Promise<FederationOperationResult<FederationSettings>>
+
+    /** Обновить настройки федерации */
+    updateSettings: (
+      update: Partial<Omit<FederationSettings, 'hasPrivateKey'>>,
+    ) => Promise<FederationOperationResult<FederationSettings>>
+
+    /** Сгенерировать ключи для HTTP Signatures */
+    generateKeys: () => Promise<FederationOperationResult<{ publicKeyPem: string }>>
+
+    /** Обнаружить трекер по URL (WebFinger) */
+    discover: (url: string) => Promise<FederationOperationResult<DiscoverResult>>
+
+    /** Получить список известных трекеров */
+    listTrackers: () => Promise<FederationOperationResult<TrackerInfo[]>>
+
+    /** Добавить трекер */
+    addTracker: (options: AddTrackerOptions) => Promise<FederationOperationResult<TrackerInfo>>
+
+    /** Удалить трекер */
+    removeTracker: (trackerId: string) => Promise<FederationOperationResult<void>>
+
+    /** Обновить информацию о трекере */
+    refreshTracker: (trackerId: string) => Promise<FederationOperationResult<TrackerInfo>>
+
+    /** Установить уровень доверия трекера */
+    setTrust: (trackerId: string, trustLevel: TrustLevel) => Promise<FederationOperationResult<TrackerInfo>>
+
+    /** Заблокировать трекер */
+    blockTracker: (trackerId: string) => Promise<FederationOperationResult<void>>
+
+    /** Разблокировать трекер */
+    unblockTracker: (trackerId: string) => Promise<FederationOperationResult<void>>
+
+    /** Синхронизировать контент с трекером */
+    sync: (trackerId: string, options?: SyncOptions) => Promise<FederationOperationResult<SyncResult>>
+
+    /** Синхронизировать со всеми доверенными трекерами */
+    syncAll: (options?: SyncOptions) => Promise<FederationOperationResult<SyncResult[]>>
+
+    /** Получить глобальную статистику сидеров для CID */
+    getGlobalSeeders: (cid: string) => Promise<FederationOperationResult<GlobalSeederStats>>
+
+    /** Получить trust score трекера */
+    getTrustScore: (trackerId: string) => Promise<FederationOperationResult<number>>
+  }
+
+  // === Stats — Статистика пользователя ===
+  stats: {
+    /** Получить текущую статистику */
+    get: () => Promise<{ success: boolean; data?: UserStats; error?: string }>
+    /** Получить историю по дням */
+    getDailyHistory: (days?: number) => Promise<{ success: boolean; data?: DailyStats[]; error?: string }>
+    /** Сбросить статистику (для тестов) */
+    reset: () => Promise<{ success: boolean; data?: UserStats; error?: string }>
+    /** Получить текущую сессию */
+    getCurrentSession: () => Promise<{
+      success: boolean
+      data?: { durationMs: string; isActive: boolean }
+      error?: string
+    }>
+    /** Подписка на обновление статистики */
+    onUpdated: (callback: (event: StatsUpdatedEvent) => void) => () => void
+    /** Подписка на начало сессии */
+    onSessionStarted: (callback: () => void) => () => void
+    /** Подписка на конец сессии */
+    onSessionEnded: (callback: () => void) => () => void
+  }
+
+  // === Reputation — Репутация пользователя ===
+  reputation: {
+    /** Получить репутацию */
+    get: () => Promise<{ success: boolean; data?: UserReputation; error?: string }>
+    /** Пересчитать репутацию */
+    recalculate: () => Promise<{ success: boolean; data?: UserReputation; error?: string }>
+    /** Сбросить репутацию (для тестов) */
+    reset: () => Promise<{ success: boolean; data?: UserReputation; error?: string }>
+    /** Получить текущий score */
+    getScore: () => Promise<{ success: boolean; data?: number; error?: string }>
+    /** Подписка на обновление репутации */
+    onUpdated: (callback: (reputation: UserReputation) => void) => () => void
+    /** Подписка на изменение ранга */
+    onRankChanged: (callback: (event: RankChangedEvent) => void) => () => void
+  }
+
+  // === Achievements — Достижения пользователя ===
+  achievements: {
+    /** Получить все достижения с прогрессом */
+    getAll: () => Promise<{ success: boolean; data?: AchievementWithProgress[]; error?: string }>
+    /** Получить разблокированные достижения */
+    getUnlocked: () => Promise<{ success: boolean; data?: AchievementWithProgress[]; error?: string }>
+    /** Получить данные достижений */
+    get: () => Promise<{ success: boolean; data?: UserAchievements; error?: string }>
+    /** Отметить достижение как показанное */
+    markNotified: (id: string) => Promise<{ success: boolean; error?: string }>
+    /** Проверить все достижения */
+    check: () => Promise<{ success: boolean; error?: string }>
+    /** Сбросить достижения (для тестов) */
+    reset: () => Promise<{ success: boolean; data?: UserAchievements; error?: string }>
+    /** Подписка на разблокировку достижения */
+    onUnlocked: (callback: (event: AchievementUnlockedEvent) => void) => () => void
+    /** Подписка на обновление прогресса */
+    onProgress: (callback: (data: { id: string; progress: number }) => void) => () => void
+  }
+
+  // === Bonus — Бонусные очки ===
+  bonus: {
+    /** Получить бонусные очки */
+    get: () => Promise<{ success: boolean; data?: BonusPoints; error?: string }>
+    /** Получить баланс */
+    getBalance: () => Promise<{ success: boolean; data?: number; error?: string }>
+    /** Получить историю транзакций */
+    getTransactions: (limit?: number) => Promise<{ success: boolean; data?: BonusTransaction[]; error?: string }>
+    /** Потратить очки */
+    spend: (
+      amount: number,
+      description: string,
+      metadata?: Record<string, unknown>,
+    ) => Promise<{
+      success: boolean
+      data?: { success: boolean; error?: string; transaction?: BonusTransaction; newBalance?: number }
+      error?: string
+    }>
+    /** Сбросить бонусы (для тестов) */
+    reset: () => Promise<{ success: boolean; data?: BonusPoints; error?: string }>
+    /** Подписка на изменение баланса */
+    onBalanceChanged: (
+      callback: (event: { oldBalance: number; newBalance: number; transaction: BonusTransaction }) => void,
+    ) => () => void
+    /** Подписка на заработок очков */
+    onPointsEarned: (callback: (data: { amount: number; type: string; description: string }) => void) => () => void
+    /** Подписка на трату очков */
+    onPointsSpent: (callback: (data: { amount: number; description: string }) => void) => () => void
+  }
+
+  // === Export Queue — Очередь экспорта ===
+  exportQueue: {
+    /** Добавить задачу в очередь */
+    add: (data: ExportTaskCreateData) => Promise<ExportQueueResult<ExportTask>>
+    /** Отменить задачу */
+    cancel: (taskId: string) => Promise<ExportQueueResult>
+    /** Приостановить задачу */
+    pause: (taskId: string) => Promise<ExportQueueResult>
+    /** Возобновить задачу */
+    resume: (taskId: string) => Promise<ExportQueueResult>
+    /** Повторить неудавшуюся задачу */
+    retry: (taskId: string) => Promise<ExportQueueResult>
+    /** Получить список задач */
+    list: () => Promise<ExportQueueResult<ExportTask[]>>
+    /** Получить задачу по ID */
+    get: (taskId: string) => Promise<ExportQueueResult<ExportTask>>
+    /** Очистить завершённые/отменённые задачи */
+    clear: () => Promise<ExportQueueResult<number>>
+    /** Получить настройки */
+    getSettings: () => Promise<ExportQueueResult<ExportQueueSettings>>
+    /** Обновить настройки */
+    updateSettings: (settings: Partial<ExportQueueSettings>) => Promise<ExportQueueResult>
+    /** Подписка на прогресс задачи */
+    onProgress: (callback: (task: ExportTask) => void) => () => void
+    /** Подписка на завершение задачи */
+    onCompleted: (callback: (task: ExportTask) => void) => () => void
+    /** Подписка на ошибку задачи */
+    onFailed: (callback: (task: ExportTask) => void) => () => void
+    /** Подписка на изменение очереди */
+    onUpdated: (callback: (tasks: ExportTask[]) => void) => () => void
+  }
+
+  // === Web Export — Экспорт для Web Player ===
+  webExport: {
+    /** Запуск экспорта для Web Player */
+    start: (config: QueueExportConfig, options: WebExportOptions) => Promise<WebExportResult>
+    /** Отмена экспорта */
+    cancel: () => Promise<void>
+    /** Проверка статуса */
+    isRunning: () => Promise<boolean>
+    /** Подписка на прогресс */
+    onProgress: (callback: (progress: WebExportProgress) => void) => () => void
+  }
+
+  // === Profile — Профиль пользователя и Friend Code ===
+  profile: {
+    /** Получить профиль пользователя */
+    get: () => Promise<{ success: boolean; data?: UserProfile | null; error?: string }>
+    /** Обновить профиль пользователя */
+    update: (updates: UserProfileUpdate) => Promise<{ success: boolean; data?: UserProfile | null; error?: string }>
+    /** Получить PeerId текущего пользователя */
+    getPeerId: () => Promise<{ success: boolean; data?: string | null; error?: string }>
+    /** Получить Friend Code текущего пользователя */
+    getFriendCode: () => Promise<{ success: boolean; data?: string | null; error?: string }>
+    /** Сгенерировать Friend Code из PeerId */
+    generateFriendCode: (peerId: string) => Promise<{ success: boolean; data?: string; error?: string }>
+    /** Верифицировать Friend Code */
+    verifyFriendCode: (code: string, peerId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Проверить формат Friend Code */
+    validateFriendCodeFormat: (code: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Подписка на обновления профиля */
+    onUpdated: (callback: (profile: UserProfile) => void) => () => void
+  }
+
+  // === Друзья ===
+  friends: {
+    /** Получить список друзей */
+    list: () => Promise<{ success: boolean; data?: Friend[]; error?: string }>
+    /** Удалить из друзей */
+    remove: (peerId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Заблокировать пользователя */
+    block: (peerId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Проверить блокировку */
+    isBlocked: (peerId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Отправить запрос в друзья */
+    sendRequest: (targetPeerId: string) => Promise<{ success: boolean; data?: FriendRequest | null; error?: string }>
+    /** Получить входящие запросы */
+    getIncomingRequests: () => Promise<{ success: boolean; data?: FriendRequest[]; error?: string }>
+    /** Получить исходящие запросы */
+    getOutgoingRequests: () => Promise<{ success: boolean; data?: FriendRequest[]; error?: string }>
+    /** Принять запрос */
+    acceptRequest: (requestId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Отклонить запрос */
+    rejectRequest: (requestId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Подписка на новые запросы в друзья */
+    onRequestReceived: (callback: (request: FriendRequest) => void) => () => void
+    /** Подписка на обновление статуса запроса */
+    onRequestUpdated: (callback: (request: FriendRequest) => void) => () => void
+    /** Подписка на обновление списка друзей */
+    onFriendsUpdated: (callback: (friends: Friend[]) => void) => () => void
+  }
+
+  // === Presence (онлайн-статусы) ===
+  presence: {
+    /** Запустить presence сервис */
+    start: () => Promise<{ success: boolean; error?: string }>
+    /** Остановить presence сервис */
+    stop: () => Promise<{ success: boolean; error?: string }>
+    /** Обновить настройки presence */
+    updateSettings: (settings: Partial<PresenceSettings>) => Promise<{ success: boolean; error?: string }>
+    /** Обновить watching статус */
+    setWatching: (watching: WatchingInfo | undefined) => Promise<{ success: boolean; error?: string }>
+    /** Получить presence друга */
+    getFriendPresence: (peerId: string) => Promise<{ success: boolean; data?: PresenceMessage | null; error?: string }>
+    /** Получить все presence */
+    getAllPresence: () => Promise<{ success: boolean; data?: Record<string, PresenceMessage>; error?: string }>
+    /** Проверить онлайн-статус друга */
+    isFriendOnline: (peerId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Подписка на обновление presence */
+    onPresenceUpdated: (callback: (data: { peerId: string; presence: PresenceMessage }) => void) => () => void
+    /** Подписка на переход друга в онлайн */
+    onFriendOnline: (callback: (peerId: string) => void) => () => void
+    /** Подписка на переход друга в оффлайн */
+    onFriendOffline: (callback: (peerId: string) => void) => () => void
+  }
+
+  // === Watch Party (совместный просмотр) ===
+  watchParty: {
+    /** Создать комнату */
+    create: (options: {
+      name: string
+      animeName: string
+      episodeNumber: number
+      filePath?: string
+      contentCid?: string
+      isPrivate?: boolean
+      maxParticipants?: number
+    }) => Promise<{ success: boolean; data?: WatchPartyRoom | null; error?: string }>
+    /** Присоединиться к комнате */
+    join: (roomId: string) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Покинуть комнату */
+    leave: () => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Закрыть комнату (только хост) */
+    close: () => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Получить текущую комнату */
+    getCurrent: () => Promise<{ success: boolean; data?: string | null; error?: string }>
+    /** Получить участников */
+    getParticipants: () => Promise<{ success: boolean; data?: WatchPartyParticipant[]; error?: string }>
+    /** Получить состояние playback */
+    getPlaybackState: () => Promise<{ success: boolean; data?: WatchPartyPlaybackState | null; error?: string }>
+    /** Play */
+    play: () => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Pause */
+    pause: () => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Seek */
+    seek: (position: number) => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Отправить сообщение */
+    sendMessage: (text: string) => Promise<{ success: boolean; data?: WatchPartyChatMessage | null; error?: string }>
+    /** Отправить реакцию */
+    sendReaction: (
+      reaction: string,
+    ) => Promise<{ success: boolean; data?: WatchPartyChatMessage | null; error?: string }>
+    /** Подписка на обновление playback */
+    onPlaybackUpdated: (callback: (data: { roomId: string; state: WatchPartyPlaybackState }) => void) => () => void
+    /** Подписка на присоединение участника */
+    onParticipantJoined: (
+      callback: (data: { roomId: string; participant: WatchPartyParticipant }) => void,
+    ) => () => void
+    /** Подписка на уход участника */
+    onParticipantLeft: (callback: (data: { roomId: string; peerId: string }) => void) => () => void
+    /** Подписка на сообщения чата */
+    onMessageReceived: (callback: (data: { roomId: string; message: WatchPartyChatMessage }) => void) => () => void
+    /** Подписка на закрытие комнаты */
+    onRoomClosed: (callback: (data: { roomId: string }) => void) => () => void
+  }
+
+  // === Deep Link — animatrona:// URL ===
+  deepLink: {
+    /** Подписаться на deep links */
+    subscribe: () => Promise<{ success: boolean; error?: string }>
+    /** Отписаться от deep links */
+    unsubscribe: () => Promise<{ success: boolean; error?: string }>
+    /** Сгенерировать invite для Watch Party */
+    generateWatchPartyInvite: (
+      roomId: string,
+      roomName: string,
+      hostName: string,
+      animeName: string,
+    ) => Promise<{ success: boolean; data?: WatchPartyInvite; error?: string }>
+    /** Сгенерировать link для добавления друга */
+    generateFriendLink: (friendCode: string) => Promise<{ success: boolean; data?: string; error?: string }>
+    /** Показать уведомление о приглашении */
+    showInviteNotification: (invite: WatchPartyInvite) => Promise<{ success: boolean; error?: string }>
+    /** Проверить, поддерживаются ли уведомления */
+    notificationsSupported: () => Promise<{ success: boolean; data?: boolean; error?: string }>
+    /** Подписка на получение deep link */
+    onReceived: (
+      callback: (data: { type: 'party_join' | 'friend_add' | 'unknown'; data: Record<string, string> }) => void,
+    ) => () => void
+  }
+
+  // === Mobile Server (доступ к библиотеке с телефона) ===
+  mobileServer: {
+    /** Запустить мобильный сервер */
+    start: (port?: number) => Promise<MobileServerStatus>
+    /** Остановить мобильный сервер */
+    stop: () => Promise<void>
+    /** Получить статус сервера */
+    getStatus: () => Promise<MobileServerStatus>
+    /** Получить QR-код для подключения (base64 PNG) */
+    getQRCode: () => Promise<string | null>
+    /** Обновить локальный IP (при смене сети) */
+    refreshIp: () => Promise<MobileServerStatus>
+  }
+
+  // === Автоопределение OP/ED ===
+  introDetector: {
+    /** Определить OP/ED для списка эпизодов (минимум 2) */
+    detect: (episodes: IntroDetectorEpisodeInput[]) => Promise<IntroDetectorResult[]>
+    /** Определить OP/ED из IPFS (скачивает видео во temp файлы) */
+    detectFromIpfs: (episodes: IntroDetectorIpfsInput[]) => Promise<IntroDetectorResult[]>
+    /** Подписка на прогресс определения */
+    onProgress: (callback: (percent: number, stage: string) => void) => () => void
+  }
+}
+
+/** Результат детекции OP/ED для одного эпизода */
+export interface IntroDetectorResult {
+  episodeId: string
+  introStartMs: number | null
+  introEndMs: number | null
+  outroStartMs: number | null
+  outroEndMs: number | null
+}
+
+/** Входные данные эпизода для intro-detector */
+export interface IntroDetectorEpisodeInput {
+  id: string
+  sourcePath: string
+  /** Длительность в миллисекундах */
+  duration: number
+}
+
+/** Входные данные эпизода для intro-detector из IPFS */
+export interface IntroDetectorIpfsInput {
+  id: string
+  /** CID аудиодорожки (AudioTrack.transcodedCid) */
+  audioCid: string
+  /** Длительность в миллисекундах */
+  duration: number
 }
 
 declare global {

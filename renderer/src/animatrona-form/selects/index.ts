@@ -12,11 +12,9 @@ export { SelectVideoCodec } from './select-video-codec'
 // Chapters & Media
 export { SelectChapterType } from './select-chapter-type'
 export { SelectFileCategory } from './select-file-category'
-export { SelectTranscodeStatus } from './select-transcode-status'
 export { SelectTrackPreference } from './select-track-preference'
-export { SelectVideoKind } from './select-video-kind'
+// v0.28.0: SelectVideoKind удалён — VideoKind теперь в AnimeManifest (IPFS)
 
 // Metadata
-export { SelectExternalLinkKind } from './select-external-link-kind'
-export { SelectPersonRole } from './select-person-role'
+// v0.28.0: SelectExternalLinkKind и SelectPersonRole удалены — данные теперь в AnimeManifest (IPFS)
 export { SelectRelationKind } from './select-relation-kind'

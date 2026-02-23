@@ -7,7 +7,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 
 const {
   Decimal,
-  objectEnumValues,
+  DbNull,
+  JsonNull,
+  AnyNull,
+  NullTypes,
   makeStrictEnum,
   Public,
   getRuntime,
@@ -21,12 +24,12 @@ exports.Prisma = Prisma
 exports.$Enums = {}
 
 /**
- * Prisma Client JS version: 6.19.1
- * Query Engine version: c2990dca591cba766e3b7ef5d9e8a84796e47ab7
+ * Prisma Client JS version: 7.4.1
+ * Query Engine version: 55ae170b1ced7fc6ed07a15f110549408c501bb3
  */
 Prisma.prismaVersion = {
-  client: "6.19.1",
-  engine: "c2990dca591cba766e3b7ef5d9e8a84796e47ab7"
+  client: "7.4.1",
+  engine: "55ae170b1ced7fc6ed07a15f110549408c501bb3"
 }
 
 Prisma.PrismaClientKnownRequestError = () => {
@@ -98,15 +101,11 @@ In case this error is unexpected for you, please report it in https://pris.ly/pr
 /**
  * Shorthand utilities for JSON filtering
  */
-Prisma.DbNull = objectEnumValues.instances.DbNull
-Prisma.JsonNull = objectEnumValues.instances.JsonNull
-Prisma.AnyNull = objectEnumValues.instances.AnyNull
+Prisma.DbNull = DbNull
+Prisma.JsonNull = JsonNull
+Prisma.AnyNull = AnyNull
 
-Prisma.NullTypes = {
-  DbNull: objectEnumValues.classes.DbNull,
-  JsonNull: objectEnumValues.classes.JsonNull,
-  AnyNull: objectEnumValues.classes.AnyNull
-}
+Prisma.NullTypes = NullTypes
 
 
 
@@ -129,6 +128,7 @@ exports.Prisma.FileScalarFieldEnum = {
   blurDataURL: 'blurDataURL',
   category: 'category',
   source: 'source',
+  cid: 'cid',
   uploadedAt: 'uploadedAt'
 };
 
@@ -154,6 +154,7 @@ exports.Prisma.AnimeScalarFieldEnum = {
   episodeCount: 'episodeCount',
   description: 'description',
   posterId: 'posterId',
+  posterCid: 'posterCid',
   rating: 'rating',
   source: 'source',
   ageRating: 'ageRating',
@@ -161,6 +162,7 @@ exports.Prisma.AnimeScalarFieldEnum = {
   licensor: 'licensor',
   folderPath: 'folderPath',
   isBdRemux: 'isBdRemux',
+  manifestCid: 'manifestCid',
   shikimoriId: 'shikimoriId',
   franchiseId: 'franchiseId',
   nextEpisodeAt: 'nextEpisodeAt',
@@ -181,101 +183,6 @@ exports.Prisma.GenreScalarFieldEnum = {
   name: 'name',
   slug: 'slug',
   shikimoriId: 'shikimoriId'
-};
-
-exports.Prisma.StudioScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  shikimoriId: 'shikimoriId',
-  imageUrl: 'imageUrl',
-  createdAt: 'createdAt'
-};
-
-exports.Prisma.StudioOnAnimeScalarFieldEnum = {
-  animeId: 'animeId',
-  studioId: 'studioId'
-};
-
-exports.Prisma.PersonScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  nameRu: 'nameRu',
-  shikimoriId: 'shikimoriId',
-  imageUrl: 'imageUrl',
-  createdAt: 'createdAt'
-};
-
-exports.Prisma.PersonOnAnimeScalarFieldEnum = {
-  id: 'id',
-  animeId: 'animeId',
-  personId: 'personId',
-  role: 'role',
-  roleText: 'roleText'
-};
-
-exports.Prisma.CharacterScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  nameRu: 'nameRu',
-  shikimoriId: 'shikimoriId',
-  imageUrl: 'imageUrl',
-  createdAt: 'createdAt'
-};
-
-exports.Prisma.CharacterOnAnimeScalarFieldEnum = {
-  id: 'id',
-  animeId: 'animeId',
-  characterId: 'characterId',
-  roleText: 'roleText'
-};
-
-exports.Prisma.CharacterVoiceScalarFieldEnum = {
-  id: 'id',
-  characterId: 'characterId',
-  personId: 'personId',
-  animeId: 'animeId'
-};
-
-exports.Prisma.ExternalLinkScalarFieldEnum = {
-  id: 'id',
-  animeId: 'animeId',
-  kind: 'kind',
-  url: 'url',
-  shikimoriId: 'shikimoriId',
-  createdAt: 'createdAt'
-};
-
-exports.Prisma.VideoScalarFieldEnum = {
-  id: 'id',
-  animeId: 'animeId',
-  shikimoriId: 'shikimoriId',
-  name: 'name',
-  kind: 'kind',
-  url: 'url',
-  playerUrl: 'playerUrl',
-  imageUrl: 'imageUrl',
-  hosting: 'hosting',
-  createdAt: 'createdAt'
-};
-
-exports.Prisma.FandubberScalarFieldEnum = {
-  id: 'id',
-  name: 'name'
-};
-
-exports.Prisma.FandubberOnAnimeScalarFieldEnum = {
-  animeId: 'animeId',
-  fandubberId: 'fandubberId'
-};
-
-exports.Prisma.FansubberScalarFieldEnum = {
-  id: 'id',
-  name: 'name'
-};
-
-exports.Prisma.FansubberOnAnimeScalarFieldEnum = {
-  animeId: 'animeId',
-  fansubberId: 'fansubberId'
 };
 
 exports.Prisma.GenreOnAnimeScalarFieldEnum = {
@@ -332,10 +239,7 @@ exports.Prisma.AudioTrackScalarFieldEnum = {
   channels: 'channels',
   bitrate: 'bitrate',
   isDefault: 'isDefault',
-  extractedPath: 'extractedPath',
-  transcodedPath: 'transcodedPath',
-  transcodeStatus: 'transcodeStatus',
-  transcodeError: 'transcodeError',
+  transcodedCid: 'transcodedCid',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -347,8 +251,9 @@ exports.Prisma.SubtitleTrackScalarFieldEnum = {
   language: 'language',
   title: 'title',
   dubGroup: 'dubGroup',
+  subtitleType: 'subtitleType',
   format: 'format',
-  filePath: 'filePath',
+  fileCid: 'fileCid',
   isDefault: 'isDefault',
   createdAt: 'createdAt'
 };
@@ -357,7 +262,7 @@ exports.Prisma.SubtitleFontScalarFieldEnum = {
   id: 'id',
   subtitleTrackId: 'subtitleTrackId',
   fontName: 'fontName',
-  filePath: 'filePath',
+  fileCid: 'fileCid',
   createdAt: 'createdAt'
 };
 
@@ -379,23 +284,20 @@ exports.Prisma.EpisodeScalarFieldEnum = {
   number: 'number',
   name: 'name',
   durationMs: 'durationMs',
-  sourcePath: 'sourcePath',
-  transcodedPath: 'transcodedPath',
-  manifestPath: 'manifestPath',
-  extractedVideoPath: 'extractedVideoPath',
-  transcodeStatus: 'transcodeStatus',
-  transcodeError: 'transcodeError',
+  folderPath: 'folderPath',
   videoCodec: 'videoCodec',
   videoWidth: 'videoWidth',
   videoHeight: 'videoHeight',
   videoBitrate: 'videoBitrate',
   videoBitDepth: 'videoBitDepth',
-  thumbnailPaths: 'thumbnailPaths',
-  screenshotPaths: 'screenshotPaths',
   encodingSettingsJson: 'encodingSettingsJson',
   encodingProfileId: 'encodingProfileId',
   sourceSize: 'sourceSize',
   transcodedSize: 'transcodedSize',
+  transcodedCid: 'transcodedCid',
+  manifestCid: 'manifestCid',
+  thumbnailCids: 'thumbnailCids',
+  screenshotCids: 'screenshotCids',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -432,6 +334,8 @@ exports.Prisma.SettingsScalarFieldEnum = {
   autoplay: 'autoplay',
   trackPreference: 'trackPreference',
   defaultProfileId: 'defaultProfileId',
+  mobileAccessEnabled: 'mobileAccessEnabled',
+  mobileServerPort: 'mobileServerPort',
   updatedAt: 'updatedAt'
 };
 
@@ -476,6 +380,176 @@ exports.Prisma.ImportQueueItemScalarFieldEnum = {
   currentFileName: 'currentFileName',
   createdAnimeId: 'createdAnimeId',
   createdAnimeFolder: 'createdAnimeFolder'
+};
+
+exports.Prisma.SubscriptionScalarFieldEnum = {
+  id: 'id',
+  ipnsName: 'ipnsName',
+  displayName: 'displayName',
+  lastKnownCid: 'lastKnownCid',
+  lastCheckedAt: 'lastCheckedAt',
+  autoPin: 'autoPin',
+  autoPinLimit: 'autoPinLimit',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TrackerScalarFieldEnum = {
+  id: 'id',
+  url: 'url',
+  name: 'name',
+  description: 'description',
+  theme: 'theme',
+  language: 'language',
+  publicKeyPem: 'publicKeyPem',
+  trustLevel: 'trustLevel',
+  uptimePercent: 'uptimePercent',
+  avgResponseTimeMs: 'avgResponseTimeMs',
+  contentQuality: 'contentQuality',
+  successfulSyncs: 'successfulSyncs',
+  failedSyncs: 'failedSyncs',
+  contentSynced: 'contentSynced',
+  lastSyncAt: 'lastSyncAt',
+  lastCheckedAt: 'lastCheckedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.FederatedContentScalarFieldEnum = {
+  id: 'id',
+  trackerId: 'trackerId',
+  remoteId: 'remoteId',
+  animeId: 'animeId',
+  contentJson: 'contentJson',
+  malId: 'malId',
+  anilistId: 'anilistId',
+  shikimoriId: 'shikimoriId',
+  anidbId: 'anidbId',
+  receivedAt: 'receivedAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.FederationSettingsScalarFieldEnum = {
+  id: 'id',
+  enabled: 'enabled',
+  trackerName: 'trackerName',
+  trackerDescription: 'trackerDescription',
+  theme: 'theme',
+  language: 'language',
+  autoSync: 'autoSync',
+  syncIntervalMinutes: 'syncIntervalMinutes',
+  minTrustForAutoImport: 'minTrustForAutoImport',
+  privateKeyPem: 'privateKeyPem',
+  publicKeyPem: 'publicKeyPem',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserStatsScalarFieldEnum = {
+  id: 'id',
+  bytesUploaded: 'bytesUploaded',
+  bytesDownloaded: 'bytesDownloaded',
+  totalSeedingTimeMs: 'totalSeedingTimeMs',
+  currentSessionMs: 'currentSessionMs',
+  uniqueContentSeeded: 'uniqueContentSeeded',
+  peersHelped: 'peersHelped',
+  firstSeedAt: 'firstSeedAt',
+  lastActiveAt: 'lastActiveAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.DailyStatsScalarFieldEnum = {
+  id: 'id',
+  userStatsId: 'userStatsId',
+  date: 'date',
+  bytesUploaded: 'bytesUploaded',
+  bytesDownloaded: 'bytesDownloaded',
+  seedingTimeMs: 'seedingTimeMs',
+  peersHelped: 'peersHelped'
+};
+
+exports.Prisma.UserReputationScalarFieldEnum = {
+  id: 'id',
+  score: 'score',
+  rank: 'rank',
+  ratioScore: 'ratioScore',
+  seedingTimeScore: 'seedingTimeScore',
+  uniqueContentScore: 'uniqueContentScore',
+  helpedPeersScore: 'helpedPeersScore',
+  longevityScore: 'longevityScore',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserAchievementScalarFieldEnum = {
+  id: 'id',
+  achievementId: 'achievementId',
+  unlockedAt: 'unlockedAt',
+  notified: 'notified'
+};
+
+exports.Prisma.AchievementProgressScalarFieldEnum = {
+  id: 'id',
+  achievementId: 'achievementId',
+  progress: 'progress',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserBonusPointsScalarFieldEnum = {
+  id: 'id',
+  balance: 'balance',
+  totalEarned: 'totalEarned',
+  totalSpent: 'totalSpent',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.BonusTransactionScalarFieldEnum = {
+  id: 'id',
+  bonusPointsId: 'bonusPointsId',
+  type: 'type',
+  amount: 'amount',
+  balanceAfter: 'balanceAfter',
+  description: 'description',
+  metadataJson: 'metadataJson',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.LocalUserProfileScalarFieldEnum = {
+  id: 'id',
+  peerId: 'peerId',
+  friendCode: 'friendCode',
+  displayName: 'displayName',
+  avatarUrl: 'avatarUrl',
+  avatarColor: 'avatarColor',
+  status: 'status',
+  ipnsPublishedCid: 'ipnsPublishedCid',
+  ipnsPublishedAt: 'ipnsPublishedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.FriendScalarFieldEnum = {
+  peerId: 'peerId',
+  friendCode: 'friendCode',
+  displayName: 'displayName',
+  avatarUrl: 'avatarUrl',
+  isOnline: 'isOnline',
+  watchingJson: 'watchingJson',
+  lastSeenAt: 'lastSeenAt',
+  friendsSince: 'friendsSince',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.FriendRequestScalarFieldEnum = {
+  id: 'id',
+  fromPeerId: 'fromPeerId',
+  fromFriendCode: 'fromFriendCode',
+  fromDisplayName: 'fromDisplayName',
+  toPeerId: 'toPeerId',
+  status: 'status',
+  sentAt: 'sentAt',
+  respondedAt: 'respondedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -528,43 +602,6 @@ exports.WatchStatus = exports.$Enums.WatchStatus = {
   PLANNED: 'PLANNED'
 };
 
-exports.PersonRole = exports.$Enums.PersonRole = {
-  DIRECTOR: 'DIRECTOR',
-  WRITER: 'WRITER',
-  ORIGINAL_CREATOR: 'ORIGINAL_CREATOR',
-  CHARACTER_DESIGN: 'CHARACTER_DESIGN',
-  MUSIC: 'MUSIC',
-  PRODUCER: 'PRODUCER',
-  ANIMATION_DIRECTOR: 'ANIMATION_DIRECTOR',
-  KEY_ANIMATOR: 'KEY_ANIMATOR',
-  ART_DIRECTOR: 'ART_DIRECTOR',
-  SOUND_DIRECTOR: 'SOUND_DIRECTOR',
-  OTHER: 'OTHER'
-};
-
-exports.ExternalLinkKind = exports.$Enums.ExternalLinkKind = {
-  MYANIMELIST: 'MYANIMELIST',
-  ANIDB: 'ANIDB',
-  ANILIST: 'ANILIST',
-  WIKIPEDIA: 'WIKIPEDIA',
-  OFFICIAL_SITE: 'OFFICIAL_SITE',
-  TWITTER: 'TWITTER',
-  WORLDART: 'WORLDART',
-  KINOPOISK: 'KINOPOISK',
-  ANIME_NEWS_NETWORK: 'ANIME_NEWS_NETWORK',
-  OTHER: 'OTHER'
-};
-
-exports.VideoKind = exports.$Enums.VideoKind = {
-  OP: 'OP',
-  ED: 'ED',
-  PV: 'PV',
-  CM: 'CM',
-  CLIP: 'CLIP',
-  EPISODE_PREVIEW: 'EPISODE_PREVIEW',
-  OTHER: 'OTHER'
-};
-
 exports.RelationKind = exports.$Enums.RelationKind = {
   SEQUEL: 'SEQUEL',
   PREQUEL: 'PREQUEL',
@@ -586,14 +623,6 @@ exports.SeasonType = exports.$Enums.SeasonType = {
   ONA: 'ONA',
   MOVIE: 'MOVIE',
   SPECIAL: 'SPECIAL'
-};
-
-exports.TranscodeStatus = exports.$Enums.TranscodeStatus = {
-  QUEUED: 'QUEUED',
-  PROCESSING: 'PROCESSING',
-  COMPLETED: 'COMPLETED',
-  SKIPPED: 'SKIPPED',
-  ERROR: 'ERROR'
 };
 
 exports.ChapterType = exports.$Enums.ChapterType = {
@@ -654,24 +683,35 @@ exports.ImportQueueItemStatus = exports.$Enums.ImportQueueItemStatus = {
   CANCELLED: 'CANCELLED'
 };
 
+exports.TrustLevel = exports.$Enums.TrustLevel = {
+  BLOCKED: 'BLOCKED',
+  UNTRUSTED: 'UNTRUSTED',
+  KNOWN: 'KNOWN',
+  TRUSTED: 'TRUSTED',
+  VERIFIED: 'VERIFIED'
+};
+
+exports.UserRank = exports.$Enums.UserRank = {
+  NEWCOMER: 'NEWCOMER',
+  CONTRIBUTOR: 'CONTRIBUTOR',
+  REGULAR: 'REGULAR',
+  VETERAN: 'VETERAN',
+  LEGEND: 'LEGEND'
+};
+
+exports.BonusTransactionType = exports.$Enums.BonusTransactionType = {
+  EARNING: 'EARNING',
+  ACHIEVEMENT: 'ACHIEVEMENT',
+  SPENDING: 'SPENDING',
+  BONUS: 'BONUS',
+  ADJUSTMENT: 'ADJUSTMENT'
+};
+
 exports.Prisma.ModelName = {
   File: 'File',
   Franchise: 'Franchise',
   Anime: 'Anime',
   Genre: 'Genre',
-  Studio: 'Studio',
-  StudioOnAnime: 'StudioOnAnime',
-  Person: 'Person',
-  PersonOnAnime: 'PersonOnAnime',
-  Character: 'Character',
-  CharacterOnAnime: 'CharacterOnAnime',
-  CharacterVoice: 'CharacterVoice',
-  ExternalLink: 'ExternalLink',
-  Video: 'Video',
-  Fandubber: 'Fandubber',
-  FandubberOnAnime: 'FandubberOnAnime',
-  Fansubber: 'Fansubber',
-  FansubberOnAnime: 'FansubberOnAnime',
   GenreOnAnime: 'GenreOnAnime',
   Theme: 'Theme',
   ThemeOnAnime: 'ThemeOnAnime',
@@ -685,7 +725,21 @@ exports.Prisma.ModelName = {
   WatchProgress: 'WatchProgress',
   Settings: 'Settings',
   EncodingProfile: 'EncodingProfile',
-  ImportQueueItem: 'ImportQueueItem'
+  ImportQueueItem: 'ImportQueueItem',
+  Subscription: 'Subscription',
+  Tracker: 'Tracker',
+  FederatedContent: 'FederatedContent',
+  FederationSettings: 'FederationSettings',
+  UserStats: 'UserStats',
+  DailyStats: 'DailyStats',
+  UserReputation: 'UserReputation',
+  UserAchievement: 'UserAchievement',
+  AchievementProgress: 'AchievementProgress',
+  UserBonusPoints: 'UserBonusPoints',
+  BonusTransaction: 'BonusTransaction',
+  LocalUserProfile: 'LocalUserProfile',
+  Friend: 'Friend',
+  FriendRequest: 'FriendRequest'
 };
 
 /**

@@ -47,7 +47,11 @@ export function UpdateSettingsCardNew() {
   // Получить версию приложения
   useEffect(() => {
     if (window.electronAPI?.updater) {
-      window.electronAPI.updater.getVersion().then(setAppVersion)
+      window.electronAPI.updater.getVersion().then((version) => {
+        if (version) {
+          setAppVersion(version)
+        }
+      })
     }
   }, [])
 

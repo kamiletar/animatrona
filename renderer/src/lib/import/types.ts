@@ -7,6 +7,7 @@ import type { FileAnalysis, ImportSettings } from '@/components/import/PreviewSt
 import type { RelationKind } from '@/generated/prisma'
 import type { ShikimoriAnimeDetails, ShikimoriAnimeExtended, ShikimoriAnimePreview } from '@/types/electron'
 import type { DemuxResult } from '../../../../shared/types'
+import type { TrackOverride } from '../../../../shared/types/manifest'
 import type { AggregatedProgress } from '../../../../shared/types/parallel-transcode'
 import type { ParsedFolderInfo } from '../shikimori/parse-folder'
 
@@ -27,6 +28,7 @@ export type ProcessingStage =
   | 'transcoding_video'
   | 'transcoding_audio'
   | 'generating_manifests'
+  | 'detecting_intros'
   | 'syncing_relations'
   | 'done'
   | 'error'
@@ -84,6 +86,10 @@ export interface PostProcessData {
   videoMaxConcurrent?: number
   /** Максимальный лимит аудио потоков при кодировании */
   audioMaxConcurrent?: number
+  /** Переопределения для аудиодорожек (язык, dubGroup из UI) */
+  audioTrackOverrides?: TrackOverride[]
+  /** Переопределения для субтитров (язык, dubGroup из UI) */
+  subtitleTrackOverrides?: TrackOverride[]
 }
 
 /** Результат импорта */
@@ -116,6 +122,8 @@ export interface ImportOptions {
   useCpuFallback?: boolean
   /** VMAF скор (если был подобран) */
   vmafScore?: number
+  /** Режим импорта одиночного файла (не папки) — не сканировать внешние субтитры/аудио */
+  isFileMode?: boolean
 }
 
 /** Расширенная информация о прогрессе транскодирования */

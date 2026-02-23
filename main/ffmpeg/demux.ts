@@ -14,7 +14,10 @@ import type {
   DemuxResult,
 } from '../shared/types'
 import { spawnFFmpeg, spawnFFprobe } from '../utils/ffmpeg-spawn'
+import { createModuleLogger } from '../utils/logger'
 import { extractBitrate, getBitDepth, getLanguageName, needsAudioTranscode } from './utils'
+
+const log = createModuleLogger('Demux')
 
 /** Типизация для ffprobe JSON вывода */
 interface FFProbeOutput {
@@ -149,15 +152,14 @@ const FONT_EXTENSIONS = ['.ttf', '.otf', '.ttc', '.woff', '.woff2']
 async function extractAttachments(
   inputPath: string,
   outputDir: string,
-  streams: FFProbeOutput['streams']
+  streams: FFProbeOutput['streams'],
 ): Promise<string | null> {
   // Находим attachment streams (шрифты)
-  const attachmentStreams =
-    streams?.filter((s) => {
-      if (s.codec_type !== 'attachment') return false
-      const filename = s.tags?.filename?.toLowerCase() || ''
-      return FONT_EXTENSIONS.some((ext) => filename.endsWith(ext))
-    }) || []
+  const attachmentStreams = streams?.filter((s) => {
+    if (s.codec_type !== 'attachment') return false
+    const filename = s.tags?.filename?.toLowerCase() || ''
+    return FONT_EXTENSIONS.some((ext) => filename.endsWith(ext))
+  }) || []
 
   if (attachmentStreams.length === 0) {
     return null
@@ -200,7 +202,7 @@ async function extractAttachments(
         resolve(fontsDir)
       } else {
         // Не критическая ошибка — шрифты просто не извлеклись
-        console.warn(`[Demux] Failed to extract attachments: ${stderr}`)
+        log.warn('Failed to extract attachments', { stderr })
         resolve(null)
       }
     })
@@ -218,7 +220,7 @@ async function extractAttachments(
 export async function demuxFile(
   inputPath: string,
   outputDir: string,
-  options: DemuxOptions = {}
+  options: DemuxOptions = {},
 ): Promise<DemuxResult> {
   const { extractSubs = true, extractChapters = true, skipVideo = false, audioExtractMode = 'all' } = options
 
@@ -308,6 +310,14 @@ export async function demuxFile(
 
         const audioSize = await getFileSize(audioPath)
 
+        log.info('Audio track extracted (passthrough)', {
+          index: i,
+          codec,
+          language: lang,
+          path: audioPath,
+          size: audioSize,
+        })
+
         audioTracks.push({
           path: audioPath,
           index: i,
@@ -321,6 +331,13 @@ export async function demuxFile(
         })
       } else {
         // Не извлекаем — будет кодироваться напрямую из исходника
+        log.info('Audio track NOT extracted (needs transcode)', {
+          index: i,
+          codec,
+          language: lang,
+          bitrate,
+          sourceFile: inputPath,
+        })
 
         audioTracks.push({
           path: null, // Не извлечено
@@ -402,6 +419,19 @@ export async function demuxFile(
     }
 
     await writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8')
+
+    // DEBUG: Логируем финальный результат demux
+    log.info('Demux completed', {
+      source: inputPath.slice(-50),
+      audioTracksCount: audioTracks.length,
+      audioTracks: audioTracks.map((t) => ({
+        index: t.index,
+        codec: t.codec,
+        language: t.language,
+        path: t.path?.slice(-40) || null,
+        sourceFile: t.sourceFile?.slice(-40) || null,
+      })),
+    })
 
     return {
       success: true,

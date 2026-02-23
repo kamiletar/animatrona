@@ -18,6 +18,7 @@ import type {
   ManifestSubtitleFont,
   ManifestSubtitleTrack,
   ManifestVideo,
+  TrackOverride,
 } from '../../shared/types/manifest'
 import { matchFonts } from './font-matcher'
 import { getFontsFromASS } from './subtitle-parser'
@@ -125,6 +126,13 @@ function getSubtitleFonts(subtitlePath: string, fontsDir: string | null): Manife
 }
 
 /**
+ * Находит переопределение для дорожки по streamIndex
+ */
+function findTrackOverride(overrides: TrackOverride[] | undefined, streamIndex: number): TrackOverride | undefined {
+  return overrides?.find((o) => o.streamIndex === streamIndex)
+}
+
+/**
  * Генерирует манифест из результатов demux
  */
 export function generateManifestFromDemux(
@@ -132,7 +140,7 @@ export function generateManifestFromDemux(
   options: GenerateManifestOptions,
 ): GenerateManifestResult {
   try {
-    const { episodeId, outputDir, animeInfo } = options
+    const { episodeId, outputDir, animeInfo, audioTrackOverrides, subtitleTrackOverrides } = options
 
     // Проверяем наличие видео
     if (!demuxResult.video) {
@@ -149,35 +157,47 @@ export function generateManifestFromDemux(
       bitrate: demuxResult.video.bitrate,
     }
 
-    // Генерируем аудиодорожки
-    const audioTracks: ManifestAudioTrack[] = demuxResult.audioTracks.map((track, index) => ({
-      id: `audio-${track.index}`,
-      streamIndex: track.index,
-      language: track.language || 'und',
-      title: track.title || `Audio ${index + 1}`,
-      codec: track.codec,
-      channels: formatChannels(track.channels),
-      bitrate: track.bitrate,
-      isDefault: index === 0, // Первая дорожка по умолчанию
-      extractedPath: track.path,
-      // Пути к транскодированным файлам будут обновлены позже из БД
-      transcodedPath: undefined,
-      // Статус по умолчанию — queued, будет обновлён после транскодирования
-      transcodeStatus: 'queued' as const,
-    }))
+    // Генерируем аудиодорожки с применением переопределений из UI
+    const audioTracks: ManifestAudioTrack[] = demuxResult.audioTracks.map((track, index) => {
+      const override = findTrackOverride(audioTrackOverrides, track.index)
+      return {
+        id: `audio-${track.index}`,
+        streamIndex: track.index,
+        // Приоритет: override > demuxResult > fallback
+        language: override?.language || track.language || 'und',
+        title: track.title || `Audio ${index + 1}`,
+        codec: track.codec,
+        channels: formatChannels(track.channels),
+        bitrate: track.bitrate,
+        isDefault: index === 0, // Первая дорожка по умолчанию
+        extractedPath: track.path,
+        // Пути к транскодированным файлам будут обновлены позже из БД
+        transcodedPath: undefined,
+        // Статус по умолчанию — queued, будет обновлён после транскодирования
+        transcodeStatus: 'queued' as const,
+        // Группа озвучки из UI (AniDUB, AniLibria и т.д.)
+        dubGroup: override?.dubGroup,
+      }
+    })
 
-    // Генерируем субтитры с шрифтами
-    const subtitleTracks: ManifestSubtitleTrack[] = demuxResult.subtitles.map((track, index) => ({
-      id: `sub-${track.index}`,
-      streamIndex: track.index,
-      language: track.language || 'und',
-      title: track.title || `Subtitles ${index + 1}`,
-      format: track.format,
-      filePath: track.path,
-      isDefault: index === 0,
-      // Извлекаем шрифты из ASS файлов и сопоставляем с fontsDir
-      fonts: getSubtitleFonts(track.path, demuxResult.fontsDir),
-    }))
+    // Генерируем субтитры с шрифтами и переопределениями из UI
+    const subtitleTracks: ManifestSubtitleTrack[] = demuxResult.subtitles.map((track, index) => {
+      const override = findTrackOverride(subtitleTrackOverrides, track.index)
+      return {
+        id: `sub-${track.index}`,
+        streamIndex: track.index,
+        // Приоритет: override > demuxResult > fallback
+        language: override?.language || track.language || 'und',
+        title: track.title || `Subtitles ${index + 1}`,
+        format: track.format,
+        filePath: track.path,
+        isDefault: index === 0,
+        // Извлекаем шрифты из ASS файлов и сопоставляем с fontsDir
+        fonts: getSubtitleFonts(track.path, demuxResult.fontsDir),
+        // Группа субтитров из UI (HorribleSubs, FanSub Team и т.д.)
+        dubGroup: override?.dubGroup,
+      }
+    })
 
     // Генерируем главы
     const chapters: ManifestChapter[] = demuxResult.metadata.chapters.map((chapter: DemuxChapter) => {
@@ -205,7 +225,7 @@ export function generateManifestFromDemux(
     }
 
     // Записываем манифест в файл
-    const manifestFileName = `episode-${animeInfo.episodeNumber}-manifest.json`
+    const manifestFileName = 'manifest.json'
     const manifestPath = path.join(outputDir, manifestFileName)
 
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8')
@@ -268,6 +288,24 @@ export function updateManifestThumbnails(manifestPath: string, thumbnails: Episo
     }
 
     manifest.thumbnails = thumbnails
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Обновляет информацию о кодировании в манифесте
+ */
+export function updateManifestEncoding(manifestPath: string, encoding: EpisodeManifest['encoding']): boolean {
+  try {
+    const manifest = readManifest(manifestPath)
+    if (!manifest) {
+      return false
+    }
+
+    manifest.encoding = encoding
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8')
     return true
   } catch {

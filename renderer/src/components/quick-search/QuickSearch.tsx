@@ -5,7 +5,9 @@
  *
  * Открывается по Ctrl+K или /
  * - Пустой запрос — показывает команды (навигация, действия)
- * - С текстом — поиск аниме через FTS5
+ * - С текстом — поиск аниме через Fuse.js (клиентский поиск)
+ *
+ * v0.28.9: Миграция с FTS5 на Fuse.js
  */
 
 import { Box, Dialog, Flex, HStack, Icon, Image, Input, Kbd, Spinner, Text, VStack } from '@chakra-ui/react'
@@ -13,7 +15,8 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LuCommand, LuFilm, LuSearch } from 'react-icons/lu'
 
-import { quickSearchAnime, type SearchResult } from '@/app/_actions/search.action'
+import type { SearchResult } from '@/app/_actions/search.action'
+import { useSearch } from '@/app/_hooks/use-search'
 import { toMediaUrl } from '@/lib/media-url'
 import { NAV_PATHS } from '@/lib/shortcuts'
 
@@ -47,9 +50,8 @@ export function QuickSearch({ open, onOpenChange, onShowShortcuts, onImport }: Q
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResult[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  // Клиентский поиск через Fuse.js
+  const { query, setQuery, results, isSearching } = useSearch({ debounceMs: 150 })
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   // Режим: команды (пустой запрос) или поиск (с текстом)
@@ -71,36 +73,19 @@ export function QuickSearch({ open, onOpenChange, onShowShortcuts, onImport }: Q
   // Общее количество элементов для навигации
   const totalItems = displayMode === 'commands' ? flatCommands.length : results.length
 
-  // Debounced поиск аниме
+  // Сброс индекса при изменении результатов
   useEffect(() => {
-    if (!query || query.length < 2) {
-      setResults([])
-      return
-    }
-
-    const timeoutId = setTimeout(async () => {
-      setIsLoading(true)
-      try {
-        const data = await quickSearchAnime(query)
-        setResults(data)
-        setSelectedIndex(0)
-      } finally {
-        setIsLoading(false)
-      }
-    }, 150)
-
-    return () => clearTimeout(timeoutId)
-  }, [query])
+    setSelectedIndex(0)
+  }, [results])
 
   // Сброс при открытии
   useEffect(() => {
     if (open) {
       setQuery('')
-      setResults([])
       setSelectedIndex(0)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [open])
+  }, [open, setQuery])
 
   // Сброс индекса при смене режима
   useEffect(() => {
@@ -146,7 +131,7 @@ export function QuickSearch({ open, onOpenChange, onShowShortcuts, onImport }: Q
         case 'action:export':
           toaster.info({
             title: 'Экспорт аниме',
-            description: 'Откройте страницу аниме → меню ⋮ → «Экспорт в MKV»',
+            description: 'Откройте страницу аниме → меню ⋮ → «Экспорт»',
           })
           break
         case 'action:refresh-metadata':
@@ -190,7 +175,7 @@ export function QuickSearch({ open, onOpenChange, onShowShortcuts, onImport }: Q
   )
 
   // Показывать empty state только после ввода и загрузки
-  const showEmptyState = query.length >= 2 && !isLoading && results.length === 0
+  const showEmptyState = query.length >= 2 && !isSearching && results.length === 0
   const showSearchResults = displayMode === 'search' && results.length > 0
   const showCommands = displayMode === 'commands'
 
@@ -217,7 +202,7 @@ export function QuickSearch({ open, onOpenChange, onShowShortcuts, onImport }: Q
         >
           {/* Поле поиска */}
           <Flex px={4} py={3} borderBottomWidth={1} borderColor="border.subtle" align="center" gap={3}>
-            {isLoading ? <Spinner size="sm" color="primary.fg" /> : <Icon as={LuSearch} color="fg.subtle" />}
+            {isSearching ? <Spinner size="sm" color="primary.fg" /> : <Icon as={LuSearch} color="fg.subtle" />}
             <Input
               ref={inputRef}
               data-testid="search-input"
@@ -407,7 +392,7 @@ export function QuickSearch({ open, onOpenChange, onShowShortcuts, onImport }: Q
             )}
 
             {/* Placeholder для короткого запроса */}
-            {displayMode === 'search' && query.length > 0 && query.length < 2 && !isLoading && (
+            {displayMode === 'search' && query.length > 0 && query.length < 2 && !isSearching && (
               <Flex py={8} justify="center" align="center" color="fg.subtle" direction="column" gap={2}>
                 <Icon as={LuSearch} boxSize={6} />
                 <Text fontSize="sm">Введите минимум 2 символа</Text>

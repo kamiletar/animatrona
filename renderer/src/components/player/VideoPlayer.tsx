@@ -16,14 +16,17 @@
 import { Box } from '@chakra-ui/react'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
+import { getAudioUrl } from '@/lib/media-url'
+
+import { SubtitleOverlay } from '@lena/video-player-react'
 import {
   PLAYBACK_SPEEDS,
+  type PlaybackSpeed,
   PlayerControls,
   PlayerHeader,
   PlayerLoadingOverlay,
-  VideoInfoOverlay,
-  type PlaybackSpeed,
   type VideoInfo,
+  VideoInfoOverlay,
 } from './_components'
 import {
   useAudioSync,
@@ -34,19 +37,10 @@ import {
   useShakaPlayer,
   useSubtitleManagement,
 } from './_hooks'
-import { NativeSubtitleOverlay } from './NativeSubtitleOverlay'
-import { SubtitleOverlay } from './SubtitleOverlay'
-import type { VideoPlayerProps, VideoPlayerRef } from './types'
 
-/**
- * Конвертирует локальный путь в media:// URL для audio элемента
- */
-function toMediaUrl(path: string): string {
-  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('media://')) {
-    return path
-  }
-  return `media://${path.replace(/\\/g, '/')}`
-}
+import { NativeSubtitleOverlay } from './NativeSubtitleOverlay'
+import { PlayerContextProvider } from './PlayerContext'
+import type { VideoPlayerProps, VideoPlayerRef } from './types'
 
 /**
  * VideoPlayer компонент
@@ -66,6 +60,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
     currentAudioTrackId,
     onAudioTrackChange: _onAudioTrackChange,
     subtitlePath,
+    subtitleFormat: subtitleFormatProp,
     subtitleFonts = [],
     chapters,
     onChapterSeek,
@@ -78,8 +73,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
     headerLeft,
     headerCenter,
     headerRight,
+    externalAudioManaged = false,
   },
-  ref
+  ref,
 ) {
   // Refs
   const containerRef = useRef<HTMLDivElement>(null)
@@ -111,6 +107,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
     audioTracks,
     currentAudioTrackId,
     subtitlePath,
+    subtitleFormatOverride: subtitleFormatProp,
   })
 
   // Хук Shaka Player — инициализация и управление плеером
@@ -162,19 +159,19 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
         audioRef.current.playbackRate = speed
       }
     },
-    [setPlaybackSpeed]
+    [setPlaybackSpeed],
   )
 
   const adjustPlaybackSpeed = useCallback(
     (delta: number) => {
       const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackSpeed)
-      if (currentIndex === -1) {return}
+      if (currentIndex === -1) return
 
       const newIndex = Math.max(0, Math.min(PLAYBACK_SPEEDS.length - 1, currentIndex + Math.sign(delta)))
       const newSpeed = PLAYBACK_SPEEDS[newIndex]
       handlePlaybackSpeedChange(newSpeed)
     },
-    [playbackSpeed, handlePlaybackSpeedChange]
+    [playbackSpeed, handlePlaybackSpeedChange],
   )
 
   // Переключение оверлея информации о видео
@@ -185,7 +182,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
   // Переключение Picture-in-Picture
   const togglePiP = useCallback(async () => {
     const video = videoRef.current
-    if (!video) {return}
+    if (!video) return
 
     try {
       if (document.pictureInPictureElement) {
@@ -219,10 +216,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
   // Блокировка сна монитора при воспроизведении
   useEffect(() => {
     const video = videoRef.current
-    if (!video) {return}
+    if (!video) return
 
     const api = window.electronAPI
-    if (!api?.app?.setPowerSavePlayback) {return}
+    if (!api?.app?.setPowerSavePlayback) return
 
     const handlePlayPowerSave = () => {
       api.app.setPowerSavePlayback(true)
@@ -280,8 +277,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
     const handleVolumeChange = () => {
       setVolume(video.volume)
       // В режиме раздельных дорожек video.muted всегда true,
-      // поэтому isMuted контролируется отдельно через audio element
-      if (!usesSeparateAudioRef.current) {
+      // поэтому isMuted контролируется отдельно через audio element.
+      // Аналогично для внешнего аудио (externalAudioManaged),
+      // где video.muted = true устанавливается useExternalAudio.
+      if (!usesSeparateAudioRef.current && !externalAudioManaged) {
         setIsMuted(video.muted)
       }
     }
@@ -330,7 +329,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
   // Picture-in-Picture events
   useEffect(() => {
     const video = videoRef.current
-    if (!video) {return}
+    if (!video) return
 
     const handleEnterPiP = () => setIsPiP(true)
     const handleLeavePiP = () => setIsPiP(false)
@@ -384,6 +383,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
     }
   }, [src, videoMetadata, state.duration])
 
+  // Контекст для Portal в fullscreen режиме
+  const playerContextValue = useMemo(() => ({ containerRef }), [])
+
   return (
     <Box
       ref={containerRef}
@@ -395,89 +397,91 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(function
       onMouseMove={resetHideTimeout}
       onClick={controls.togglePlay}
     >
-      {/* Контейнер для video элемента (создаётся программно в useEffect) */}
-      <div ref={videoContainerRef} style={{ width: '100%', height: '100%' }} onClick={(e) => e.stopPropagation()} />
+      <PlayerContextProvider value={playerContextValue}>
+        {/* Контейнер для video элемента (создаётся программно в useEffect) */}
+        <div ref={videoContainerRef} style={{ width: '100%', height: '100%' }} onClick={(e) => e.stopPropagation()} />
 
-      {/* Скрытый audio элемент для раздельных дорожек */}
-      {usesSeparateAudio && currentAudioTrack?.transcodedPath && (
-        <audio
-          ref={audioRef}
-          src={toMediaUrl(currentAudioTrack.transcodedPath)}
-          style={{ display: 'none' }}
-          onLoadedData={() => {
-            // onLoadedData срабатывает ОДИН раз при загрузке нового источника
-            // (в отличие от onCanPlay, который срабатывает при каждой буферизации)
-            const video = videoRef.current
-            const audio = audioRef.current
-            if (video && audio) {
-              audio.currentTime = video.currentTime
-              audio.volume = video.volume
-              audio.playbackRate = video.playbackRate
-              // Если видео уже играет — запускаем audio
-              if (!video.paused) {
-                audio.play().catch((err) => {
-                  console.warn('[VideoPlayer] Audio play on loadeddata failed:', err)
-                })
+        {/* Скрытый audio элемент для раздельных дорожек (только IPFS) */}
+        {usesSeparateAudio && currentAudioTrack?.transcodedCid && (
+          <audio
+            ref={audioRef}
+            src={getAudioUrl(currentAudioTrack) ?? undefined}
+            style={{ display: 'none' }}
+            onLoadedData={() => {
+              // onLoadedData срабатывает ОДИН раз при загрузке нового источника
+              // (в отличие от onCanPlay, который срабатывает при каждой буферизации)
+              const video = videoRef.current
+              const audio = audioRef.current
+              if (video && audio) {
+                audio.currentTime = video.currentTime
+                audio.volume = video.volume
+                audio.playbackRate = video.playbackRate
+                // Если видео уже играет — запускаем audio
+                if (!video.paused) {
+                  audio.play().catch((err) => {
+                    console.warn('[VideoPlayer] Audio play on loadeddata failed:', err)
+                  })
+                }
               }
-            }
-          }}
-        />
-      )}
+            }}
+          />
+        )}
 
-      {/* ASS/SSA субтитры через SubtitlesOctopus — только после загрузки видео */}
-      {subtitlePath && subtitleFormat === 'ass' && isVideoReady && (
-        <SubtitleOverlay videoRef={videoRef} subtitleUrl={subtitlePath} fonts={subtitleFonts} />
-      )}
+        {/* ASS/SSA субтитры через SubtitlesOctopus — только после загрузки видео */}
+        {subtitlePath && subtitleFormat === 'ass' && isVideoReady && (
+          <SubtitleOverlay videoRef={videoRef} subtitleUrl={subtitlePath} fonts={subtitleFonts} />
+        )}
 
-      {/* Нативные субтитры (SRT/VTT) — кастомный оверлей поверх видео */}
-      {vttUrl && subtitleFormat === 'native' && <NativeSubtitleOverlay videoRef={videoRef} vttUrl={vttUrl} />}
+        {/* Нативные субтитры (SRT/VTT) — кастомный оверлей поверх видео */}
+        {vttUrl && subtitleFormat === 'native' && <NativeSubtitleOverlay videoRef={videoRef} vttUrl={vttUrl} />}
 
-      {/* Верхняя панель (header) */}
-      {showControls && (
-        <PlayerHeader
-          headerLeft={headerLeft}
-          headerCenter={headerCenter}
-          headerRight={headerRight}
-          isVisible={showControlsOverlay}
-        />
-      )}
+        {/* Верхняя панель (header) */}
+        {showControls && (
+          <PlayerHeader
+            headerLeft={headerLeft}
+            headerCenter={headerCenter}
+            headerRight={headerRight}
+            isVisible={showControlsOverlay}
+          />
+        )}
 
-      {/* Оверлей загрузки */}
-      <PlayerLoadingOverlay isLoading={isLoading} />
+        {/* Оверлей загрузки */}
+        <PlayerLoadingOverlay isLoading={isLoading} />
 
-      {/* Оверлей информации о видео (клавиша I) */}
-      <VideoInfoOverlay isVisible={showVideoInfo} info={videoInfo} />
+        {/* Оверлей информации о видео (клавиша I) */}
+        <VideoInfoOverlay isVisible={showVideoInfo} info={videoInfo} />
 
-      {/* Контролы */}
-      {showControls && (
-        <PlayerControls
-          isPlaying={state.isPlaying}
-          currentTime={state.currentTime}
-          duration={state.duration}
-          volume={state.volume}
-          isMuted={state.isMuted}
-          isFullscreen={state.isFullscreen}
-          isVisible={showControlsOverlay}
-          onTogglePlay={controls.togglePlay}
-          onSeek={controls.handleSeek}
-          onVolumeChange={controls.handleVolumeChange}
-          onToggleMute={controls.toggleMute}
-          onToggleFullscreen={controls.toggleFullscreen}
-          onSkipTime={controls.skipTime}
-          chapters={chapters}
-          onChapterSeek={onChapterSeek}
-          hasPrevEpisode={hasPrevEpisode}
-          hasNextEpisode={hasNextEpisode}
-          onPrevEpisode={onPrevEpisode}
-          onNextEpisode={onNextEpisode}
-          prevEpisodeTooltip={prevEpisodeTooltip}
-          nextEpisodeTooltip={nextEpisodeTooltip}
-          playbackSpeed={playbackSpeed}
-          onPlaybackSpeedChange={handlePlaybackSpeedChange}
-          isPiP={isPiP}
-          onTogglePiP={togglePiP}
-        />
-      )}
+        {/* Контролы */}
+        {showControls && (
+          <PlayerControls
+            isPlaying={state.isPlaying}
+            currentTime={state.currentTime}
+            duration={state.duration}
+            volume={state.volume}
+            isMuted={state.isMuted}
+            isFullscreen={state.isFullscreen}
+            isVisible={showControlsOverlay}
+            onTogglePlay={controls.togglePlay}
+            onSeek={controls.handleSeek}
+            onVolumeChange={controls.handleVolumeChange}
+            onToggleMute={controls.toggleMute}
+            onToggleFullscreen={controls.toggleFullscreen}
+            onSkipTime={controls.skipTime}
+            chapters={chapters}
+            onChapterSeek={onChapterSeek}
+            hasPrevEpisode={hasPrevEpisode}
+            hasNextEpisode={hasNextEpisode}
+            onPrevEpisode={onPrevEpisode}
+            onNextEpisode={onNextEpisode}
+            prevEpisodeTooltip={prevEpisodeTooltip}
+            nextEpisodeTooltip={nextEpisodeTooltip}
+            playbackSpeed={playbackSpeed}
+            onPlaybackSpeedChange={handlePlaybackSpeedChange}
+            isPiP={isPiP}
+            onTogglePiP={togglePiP}
+          />
+        )}
+      </PlayerContextProvider>
     </Box>
   )
 })

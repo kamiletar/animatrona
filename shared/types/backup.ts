@@ -52,6 +52,7 @@ export interface SelectedTrack {
  *
  * Содержит ТОЛЬКО данные, которые можно распространять через P2P/IPFS:
  * - shikimoriId для идентификации
+ * - manifestCid для полных метаданных из IPFS
  * - isBdRemux флаг
  * - fallbackInfo для оффлайн режима
  *
@@ -63,6 +64,9 @@ export interface AnimeMeta {
 
   /** Shikimori ID для восстановления метаданных из API */
   shikimoriId: number | null
+
+  /** CID манифеста AnimeManifest в IPFS (полные метаданные) */
+  manifestCid?: string
 
   /** BDRemux флаг */
   isBdRemux: boolean

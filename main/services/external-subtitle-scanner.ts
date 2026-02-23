@@ -11,7 +11,10 @@
 import { readdir } from 'fs/promises'
 import path from 'path'
 import { scanDirectoryRecursive } from '../utils/fs-utils'
+import { createModuleLogger } from '../utils/logger'
 import { getSubtitleInfo } from './subtitle-parser'
+
+const log = createModuleLogger('SubtitleScanner')
 
 /** Паттерны папок субтитров (case-insensitive) */
 const SUBTITLE_FOLDER_PATTERNS = [
@@ -25,6 +28,7 @@ const SUBTITLE_FOLDER_PATTERNS = [
   'english',
   'japanese',
   'субтитры',
+  'надпис',
   'рус',
 ]
 
@@ -36,6 +40,9 @@ const SUBTITLE_EXTENSIONS = new Set(['.ass', '.ssa', '.srt', '.vtt'])
 
 /** Расширения файлов шрифтов */
 const FONT_EXTENSIONS = new Set(['.ttf', '.otf', '.woff', '.woff2', '.eot'])
+
+/** Тип субтитров */
+export type SubtitleType = 'full' | 'signs' | 'songs'
 
 /** Результат матчинга субтитра */
 export interface ExternalSubtitleMatch {
@@ -56,6 +63,10 @@ export interface ExternalSubtitleMatch {
     name: string
     path: string
   }>
+  /** Название группы субтитров (из квадратных скобок в имени папки) */
+  groupName?: string
+  /** Тип субтитров (полные, надписи, песни) */
+  subtitleType: SubtitleType
 }
 
 /** Результат сканирования */
@@ -158,6 +169,15 @@ function fuzzyMatchToVideo(
 ): MatchResult | null {
   const subBaseName = path.basename(subtitleFileName, path.extname(subtitleFileName)).toLowerCase()
 
+  // 0. Если один видеофайл (фильм) — все субтитры относятся к нему
+  if (videoFiles.length === 1) {
+    const suffixMatch = subBaseName.match(/\.([a-z]{2,3})_([^.]+)$/i)
+    return {
+      episodeNumber: videoFiles[0].episodeNumber,
+      suffix: suffixMatch ? { lang: suffixMatch[1].toLowerCase(), group: suffixMatch[2] } : undefined,
+    }
+  }
+
   // 1. Точный матч по имени файла (без расширения)
   for (const video of videoFiles) {
     const videoBaseName = path.basename(video.path, path.extname(video.path)).toLowerCase()
@@ -221,7 +241,7 @@ async function findFontFolders(dir: string): Promise<string[]> {
       }
     }
   } catch (e) {
-    console.warn(`[ExternalSubScanner] Cannot read dir for fonts: ${dir}`, e)
+    log.warn(`[ExternalSubScanner] Cannot read dir for fonts: ${dir}`, e)
   }
 
   return fontDirs
@@ -250,7 +270,7 @@ async function collectFonts(fontDirs: string[]): Promise<Map<string, string>> {
         }
       }
     } catch (e) {
-      console.warn(`[ExternalSubScanner] Cannot read font dir: ${fontDir}`, e)
+      log.warn(`[ExternalSubScanner] Cannot read font dir: ${fontDir}`, e)
     }
   }
 
@@ -289,6 +309,70 @@ function matchFontsToFiles(
 }
 
 /**
+ * Извлечь имя группы из квадратных скобок в пути к папке субтитров
+ * Например: "D:/Anime/RUS Subs [Yakusub Studio]/file.ass" → "Yakusub Studio"
+ *
+ * Ищет [GroupName] в имени папки субтитров и родительских папках subsDir
+ */
+function extractGroupNameFromSubsDir(subsDir: string): string | undefined {
+  // Нормализуем путь
+  const normalized = subsDir.replace(/\\/g, '/')
+  const parts = normalized.split('/')
+
+  // Ищем квадратные скобки в частях пути (от конца к началу)
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const match = parts[i].match(/\[([^\]]+)\]/)
+    if (match) {
+      return match[1].trim()
+    }
+  }
+
+  return undefined
+}
+
+/** Паттерны для определения типа субтитров (signs/songs) */
+const SIGNS_PATTERNS = ['надписи', 'signs', 'надпис']
+const SONGS_PATTERNS = ['песни', 'songs', 'karaoke', 'караоке']
+
+/**
+ * Определить тип субтитров по имени файла и пути
+ *
+ * Проверяет:
+ * 1. Суффикс файла (.надписи.ass, .signs.ass)
+ * 2. Имя папки (надписи/, signs/)
+ */
+function detectSubtitleType(filePath: string): SubtitleType {
+  const normalized = filePath.replace(/\\/g, '/').toLowerCase()
+  const fileName = path.basename(normalized)
+  const dirParts = normalized.split('/')
+
+  // 1. Проверяем суффикс файла
+  // Убираем расширение, проверяем последнюю часть имени
+  const nameWithoutExt = fileName.replace(/\.[^.]+$/, '')
+  const nameParts = nameWithoutExt.split('.')
+  const lastPart = nameParts[nameParts.length - 1]
+
+  if (lastPart && SIGNS_PATTERNS.some((p) => lastPart.includes(p))) {
+    return 'signs'
+  }
+  if (lastPart && SONGS_PATTERNS.some((p) => lastPart.includes(p))) {
+    return 'songs'
+  }
+
+  // 2. Проверяем имя папки
+  for (const part of dirParts) {
+    if (SIGNS_PATTERNS.some((p) => part.includes(p))) {
+      return 'signs'
+    }
+    if (SONGS_PATTERNS.some((p) => part.includes(p))) {
+      return 'songs'
+    }
+  }
+
+  return 'full'
+}
+
+/**
  * Сканировать папку на внешние субтитры
  *
  * @param videoFolderPath Путь к папке с видеофайлами
@@ -298,8 +382,7 @@ export async function scanForExternalSubtitles(
   videoFolderPath: string,
   videoFiles: Array<{ path: string; episodeNumber: number }>
 ): Promise<ExternalSubtitleScanResult> {
-  console.warn(`[ExternalSubScanner] Scanning: ${videoFolderPath}`)
-  console.warn(`[ExternalSubScanner] Video files: ${videoFiles.length}`)
+  log.info('Scanning for external subtitles', { path: videoFolderPath, videoCount: videoFiles.length })
 
   const result: ExternalSubtitleScanResult = {
     subsDirs: [],
@@ -309,32 +392,54 @@ export async function scanForExternalSubtitles(
   }
 
   try {
-    // 1. Найти папки субтитров
+    // 1. Найти папки субтитров (до 2 уровней вложенности)
     const entries = await readdir(videoFolderPath, { withFileTypes: true })
 
     for (const entry of entries) {
-      if (entry.isDirectory() && isSubtitleFolder(entry.name)) {
+      if (!entry.isDirectory()) continue
+
+      if (isSubtitleFolder(entry.name)) {
         const subsDir = path.join(videoFolderPath, entry.name)
         result.subsDirs.push(subsDir)
-        console.warn(`[ExternalSubScanner] Found subs dir: ${entry.name}`)
+        log.info('Found subtitles directory', { name: entry.name })
 
         // Найти папки шрифтов внутри
         const fontDirs = await findFontFolders(subsDir)
         result.fontsDirs.push(...fontDirs)
+      } else {
+        // Проверить подпапки (для структур типа "RUS Sound/надписи/")
+        try {
+          const subEntries = await readdir(path.join(videoFolderPath, entry.name), { withFileTypes: true })
+          for (const subEntry of subEntries) {
+            if (subEntry.isDirectory() && isSubtitleFolder(subEntry.name)) {
+              const subsDir = path.join(videoFolderPath, entry.name, subEntry.name)
+              result.subsDirs.push(subsDir)
+              log.info('Found subtitles directory (nested)', { parent: entry.name, name: subEntry.name })
+
+              const fontDirs = await findFontFolders(subsDir)
+              result.fontsDirs.push(...fontDirs)
+            }
+          }
+        } catch {
+          // Ошибка чтения подпапки — пропускаем
+        }
       }
     }
 
     if (result.subsDirs.length === 0) {
-      console.warn('[ExternalSubScanner] No subtitle folders found')
+      log.info('No subtitle folders found')
       return result
     }
 
     // 2. Собрать все шрифты
     const availableFonts = await collectFonts(result.fontsDirs)
-    console.warn(`[ExternalSubScanner] Found ${availableFonts.size} font files`)
+    log.info('Fonts collected', { count: availableFonts.size })
 
     // 3. Сканировать каждую папку субтитров (рекурсивно до глубины 3)
     for (const subsDir of result.subsDirs) {
+      // Извлекаем имя группы из квадратных скобок в пути к папке
+      const groupName = extractGroupNameFromSubsDir(subsDir)
+
       try {
         // Используем рекурсивный сканер для поиска субтитров в подпапках
         for await (const subPath of scanDirectoryRecursive(subsDir, SUBTITLE_EXTENSIONS, 3)) {
@@ -345,7 +450,7 @@ export async function scanForExternalSubtitles(
 
           if (matchResult === null) {
             result.unmatchedFiles.push(subPath)
-            console.warn(`[ExternalSubScanner] Unmatched: ${subFileName}`)
+            log.debug('Unmatched subtitle file', { file: subFileName })
             continue
           }
 
@@ -358,6 +463,9 @@ export async function scanForExternalSubtitles(
             ? normalizeLanguageCode(matchResult.suffix.lang)
             : subInfo.language
           const finalTitle = matchResult.suffix?.group || subInfo.title
+
+          // Определяем тип субтитров по пути и имени файла
+          const subtitleType = detectSubtitleType(subPath)
 
           // Матчим шрифты для ASS
           const matchedFonts =
@@ -373,22 +481,31 @@ export async function scanForExternalSubtitles(
             episodeNumber: matchResult.episodeNumber,
             fontNames: subInfo.fontNames,
             matchedFonts,
+            groupName,
+            subtitleType,
           })
 
-          console.warn(
-            `[ExternalSubScanner] Matched: ${subFileName} → ep${matchResult.episodeNumber} [${finalLanguage}/${finalTitle}] (${matchedFonts.length} fonts)`
-          )
+          log.info('Subtitle matched', {
+            file: subFileName,
+            episode: matchResult.episodeNumber,
+            language: finalLanguage,
+            title: finalTitle,
+            fonts: matchedFonts.length,
+            groupName,
+            subtitleType,
+          })
         }
       } catch (e) {
-        console.warn(`[ExternalSubScanner] Cannot read subs dir: ${subsDir}`, e)
+        log.warn('Cannot read subs directory', { dir: subsDir, error: String(e) })
       }
     }
 
-    console.warn(
-      `[ExternalSubScanner] Result: ${result.subtitles.length} matched, ${result.unmatchedFiles.length} unmatched`
-    )
+    log.info('Subtitle scan complete', {
+      matched: result.subtitles.length,
+      unmatched: result.unmatchedFiles.length,
+    })
   } catch (e) {
-    console.error('[ExternalSubScanner] Error:', e)
+    log.error('Subtitle scan error', { error: String(e) })
   }
 
   return result

@@ -13,6 +13,9 @@ import * as https from 'https'
 import * as path from 'path'
 import { promisify } from 'util'
 
+import { createModuleLogger } from './logger'
+
+const log = createModuleLogger('FFmpegInstaller')
 const execAsync = promisify(exec)
 
 /** URL сборки FFmpeg с SVT-AV1 */
@@ -83,7 +86,7 @@ export function getFFmpegPath(): string {
   if (bundledDir) {
     const ffmpegPath = path.join(bundledDir, FFMPEG_BIN)
     if (!ffmpegPathLogged) {
-      console.warn('[FFmpeg] Using bundled:', ffmpegPath)
+      log.info('Using bundled FFmpeg', { path: ffmpegPath })
       ffmpegPathLogged = true
     }
     return ffmpegPath
@@ -93,7 +96,7 @@ export function getFFmpegPath(): string {
   const downloadedPath = path.join(getDownloadedFFmpegDir(), FFMPEG_BIN)
   if (fs.existsSync(downloadedPath)) {
     if (!ffmpegPathLogged) {
-      console.warn('[FFmpeg] Using downloaded:', downloadedPath)
+      log.info('Using downloaded FFmpeg', { path: downloadedPath })
       ffmpegPathLogged = true
     }
     return downloadedPath
@@ -101,7 +104,7 @@ export function getFFmpegPath(): string {
 
   // 3. Fallback на системный
   if (!ffmpegPathLogged) {
-    console.warn('[FFmpeg] Using system:', FFMPEG_BIN)
+    log.info('Using system FFmpeg', { binary: FFMPEG_BIN })
     ffmpegPathLogged = true
   }
   return FFMPEG_BIN
@@ -161,7 +164,7 @@ export async function hasSvtAv1(): Promise<boolean> {
 
 /** Скачать и установить FFmpeg */
 export async function installFFmpeg(
-  onProgress?: (progress: { stage: string; percent?: number }) => void
+  onProgress?: (progress: { stage: string; percent?: number }) => void,
 ): Promise<void> {
   const ffmpegDir = getFFmpegDir()
   const tempZip = path.join(app.getPath('temp'), 'ffmpeg-download.zip')
@@ -207,7 +210,7 @@ export async function installFFmpeg(
 
     onProgress?.({ stage: 'done', percent: 100 })
 
-    console.warn('[FFmpegInstaller] FFmpeg installed to:', ffmpegDir)
+    log.info('FFmpeg installed', { directory: ffmpegDir })
   } finally {
     // Удаляем временный файл
     if (fs.existsSync(tempZip)) {
@@ -280,6 +283,6 @@ export function uninstallFFmpeg(): void {
   const ffmpegDir = getFFmpegDir()
   if (fs.existsSync(ffmpegDir)) {
     fs.rmSync(ffmpegDir, { recursive: true })
-    console.warn('[FFmpegInstaller] FFmpeg uninstalled')
+    log.info('FFmpeg uninstalled')
   }
 }

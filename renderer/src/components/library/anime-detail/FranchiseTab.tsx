@@ -156,7 +156,7 @@ export function FranchiseTab({ animeId: _animeId, shikimoriId, franchiseId, anim
   }
 
   // Нет данных
-  if (!graph || graph.nodes.length === 0) {
+  if (!graph || !graph.nodes || graph.nodes.length === 0) {
     return (
       <VStack p={6} gap={4}>
         <Text color="fg.muted">Граф франшизы пуст</Text>

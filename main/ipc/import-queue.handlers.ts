@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * IPC handlers для Import Queue — Event-driven архитектура
  *
@@ -29,7 +28,6 @@
  * @see ImportQueueController — единственный источник правды
  */
 
-import { ipcMain } from 'electron'
 import type {
   ImportQueueAddData,
   ImportQueueDetailProgress,
@@ -38,6 +36,7 @@ import type {
   ImportQueueVmafResult,
 } from '../../shared/types/import-queue'
 import { ImportQueueController } from '../services/import-queue-controller'
+import { createHandler } from '../utils/ipc-handler-factory'
 
 /**
  * Регистрирует IPC handlers для очереди импорта
@@ -49,320 +48,93 @@ export function registerImportQueueHandlers(): void {
   // === Команды от renderer ===
   // ==========================================
 
-  /**
-   * Добавить items в очередь
-   */
-  ipcMain.handle('import-queue:add-items', async (_event, items: ImportQueueAddData[]) => {
-    try {
-      controller.addItems(items)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Добавить items в очередь
+  createHandler('import-queue:add-items', (items: ImportQueueAddData[]) => controller.addItems(items))
 
-  /**
-   * Начать обработку очереди
-   */
-  ipcMain.handle('import-queue:start', async () => {
-    try {
-      controller.startQueue()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Начать обработку очереди
+  createHandler('import-queue:start', () => controller.startQueue())
 
-  /**
-   * Приостановить очередь
-   */
-  ipcMain.handle('import-queue:pause', async () => {
-    try {
-      controller.pauseQueue()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Приостановить очередь
+  createHandler('import-queue:pause', () => controller.pauseQueue())
 
-  /**
-   * Возобновить очередь
-   */
-  ipcMain.handle('import-queue:resume', async () => {
-    try {
-      controller.resumeQueue()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Возобновить очередь
+  createHandler('import-queue:resume', () => controller.resumeQueue())
 
-  /**
-   * Отменить item
-   */
-  ipcMain.handle('import-queue:cancel-item', async (_event, itemId: string) => {
-    try {
-      controller.cancelItem(itemId)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Отменить item
+  createHandler('import-queue:cancel-item', (itemId: string) => controller.cancelItem(itemId))
 
-  /**
-   * Удалить item из очереди
-   */
-  ipcMain.handle('import-queue:remove-item', async (_event, itemId: string) => {
-    try {
-      controller.removeItem(itemId)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Удалить item из очереди
+  createHandler('import-queue:remove-item', (itemId: string) => controller.removeItem(itemId))
 
-  /**
-   * Повторить обработку item с ошибкой
-   */
-  ipcMain.handle('import-queue:retry-item', async (_event, itemId: string) => {
-    try {
-      controller.retryItem(itemId)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Повторить обработку item с ошибкой
+  createHandler('import-queue:retry-item', (itemId: string) => controller.retryItem(itemId))
 
-  /**
-   * Отменить всю очередь
-   */
-  ipcMain.handle('import-queue:cancel-all', async () => {
-    try {
-      controller.cancelAll()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Отменить всю очередь
+  createHandler('import-queue:cancel-all', () => controller.cancelAll())
 
-  /**
-   * Получить текущее состояние очереди
-   * Вызывается при mount компонента для восстановления состояния
-   */
-  ipcMain.handle('import-queue:get-state', async () => {
-    try {
-      const state = controller.getState()
-      return { success: true, data: state }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Получить текущее состояние очереди
+  createHandler('import-queue:get-state', () => controller.getState())
 
-  /**
-   * Получить item по ID
-   */
-  ipcMain.handle('import-queue:get-item', async (_event, itemId: string) => {
-    try {
-      const item = controller.getItem(itemId)
-      return { success: true, data: item }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Получить item по ID
+  createHandler('import-queue:get-item', (itemId: string) => controller.getItem(itemId))
 
-  /**
-   * Очистить завершённые items
-   */
-  ipcMain.handle('import-queue:clear-completed', async () => {
-    try {
-      controller.clearCompleted()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Очистить завершённые items
+  createHandler('import-queue:clear-completed', () => controller.clearCompleted())
 
-  /**
-   * Установить автозапуск
-   */
-  ipcMain.handle('import-queue:set-auto-start', async (_event, enabled: boolean) => {
-    try {
-      controller.setAutoStart(enabled)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Установить автозапуск
+  createHandler('import-queue:set-auto-start', (enabled: boolean) => controller.setAutoStart(enabled))
 
-  /**
-   * Изменить порядок элементов в очереди (drag & drop)
-   */
-  ipcMain.handle('import-queue:reorder-items', async (_event, activeId: string, overId: string) => {
-    try {
-      controller.reorderItems(activeId, overId)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Изменить порядок элементов в очереди (drag & drop)
+  createHandler(
+    'import-queue:reorder-items',
+    (activeId: string, overId: string) => controller.reorderItems(activeId, overId),
+  )
 
-  /**
-   * Обновить данные item (профиль, параллельность, sync offset и т.д.)
-   * Только для pending items
-   */
-  ipcMain.handle(
+  // Обновить данные item (профиль, параллельность, sync offset и т.д.)
+  createHandler(
     'import-queue:update-item',
-    async (_event, itemId: string, data: Partial<ImportQueueAddData>) => {
-      try {
-        controller.updateItem(itemId, data)
-        return { success: true }
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        }
-      }
-    }
+    (itemId: string, data: Partial<ImportQueueAddData>) => controller.updateItem(itemId, data),
   )
 
   // ==========================================
   // === Обновления от renderer (ImportProcessor) ===
   // ==========================================
 
-  /**
-   * Обновить статус item
-   * Вызывается из ImportProcessor при изменении статуса
-   */
-  ipcMain.handle(
+  // Обновить статус item
+  createHandler(
     'import-queue:update-status',
-    async (_event, itemId: string, status: ImportQueueStatus, error?: string) => {
-      try {
-        controller.updateItemStatus(itemId, status, error)
-        return { success: true }
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : String(err),
-        }
-      }
-    }
+    (itemId: string, status: ImportQueueStatus, error?: string) => controller.updateItemStatus(itemId, status, error),
   )
 
-  /**
-   * Обновить прогресс item
-   * Вызывается из ImportProcessor при изменении прогресса
-   */
-  ipcMain.handle(
+  // Обновить прогресс item
+  createHandler(
     'import-queue:update-progress',
-    async (
-      _event,
+    (
       itemId: string,
       progress: number,
       currentFileName?: string,
       currentStage?: string,
-      detailProgress?: ImportQueueDetailProgress
-    ) => {
-      try {
-        controller.updateItemProgress(itemId, progress, currentFileName, currentStage, detailProgress)
-        return { success: true }
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        }
-      }
-    }
+      detailProgress?: ImportQueueDetailProgress,
+    ) => controller.updateItemProgress(itemId, progress, currentFileName, currentStage, detailProgress),
   )
 
-  /**
-   * Обновить VMAF прогресс
-   */
-  ipcMain.handle(
+  // Обновить VMAF прогресс
+  createHandler(
     'import-queue:update-vmaf-progress',
-    async (_event, itemId: string, vmafProgress: ImportQueueVmafProgress) => {
-      try {
-        controller.updateVmafProgress(itemId, vmafProgress)
-        return { success: true }
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        }
-      }
-    }
+    (itemId: string, vmafProgress: ImportQueueVmafProgress) => controller.updateVmafProgress(itemId, vmafProgress),
   )
 
-  /**
-   * Установить результат VMAF
-   */
-  ipcMain.handle(
+  // Установить результат VMAF
+  createHandler(
     'import-queue:set-vmaf-result',
-    async (_event, itemId: string, result: ImportQueueVmafResult) => {
-      try {
-        controller.setVmafResult(itemId, result)
-        return { success: true }
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        }
-      }
-    }
+    (itemId: string, result: ImportQueueVmafResult) => controller.setVmafResult(itemId, result),
   )
 
-  /**
-   * Установить результат импорта (animeId)
-   */
-  ipcMain.handle('import-queue:set-import-result', async (_event, itemId: string, animeId: string) => {
-    try {
-      controller.setImportResult(itemId, animeId)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  // Установить результат импорта (animeId)
+  createHandler(
+    'import-queue:set-import-result',
+    (itemId: string, animeId: string) => controller.setImportResult(itemId, animeId),
+  )
 
-  console.log('[ImportQueueHandlers] Registered')
+  // Handlers registered (no logging needed)
 }

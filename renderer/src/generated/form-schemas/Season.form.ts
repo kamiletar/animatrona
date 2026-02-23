@@ -13,7 +13,7 @@ export const SeasonCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Номер сезона', fieldType: 'numberInput' }
     }),
-  name: z.string().optional()
+  name: z.string().nullable().optional()
     .meta({
       ui: { title: 'Название', placeholder: 'Например: 2nd Season' }
     }),
@@ -21,7 +21,7 @@ export const SeasonCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Тип', fieldType: 'radioCard' }
     }),
-  year: z.number().int().optional()
+  year: z.number().int().nullable().optional()
     .meta({
       ui: { title: 'Год выпуска', fieldType: 'numberInput' }
     }),
@@ -29,7 +29,7 @@ export const SeasonCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Количество эпизодов', fieldType: 'numberInput' }
     }),
-  folderPath: z.string().optional()
+  folderPath: z.string().nullable().optional()
     .meta({
       ui: { title: 'Путь к папке' }
     })

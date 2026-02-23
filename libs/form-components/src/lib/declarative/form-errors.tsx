@@ -7,6 +7,8 @@ import { useDeclarativeForm } from './form-context'
 interface FormErrorsProps {
   /** Заголовок секции ошибок */
   title?: ReactNode
+  /** Показывать ошибки до первой попытки сабмита (по умолчанию false) */
+  showBeforeSubmit?: boolean
 }
 
 interface ZodIssue {
@@ -71,19 +73,29 @@ function extractAllErrors(errors: unknown[]): string[] {
  * </Form>
  * ```
  */
-export function FormErrors({ title = 'Please fix the following errors:' }: FormErrorsProps): ReactElement | null {
+export function FormErrors({
+  title = 'Исправьте следующие ошибки:',
+  showBeforeSubmit = false,
+}: FormErrorsProps): ReactElement | null {
   const { form, apiState } = useDeclarativeForm()
 
   // Извлекаем сообщение об ошибке сервера, если есть
   const serverError = apiState?.mutationError
   // Некоторые библиотеки (например, ZenStack) добавляют info к Error
   const errorInfo = serverError && 'info' in serverError ? (serverError as { info?: { message?: string } }).info : null
-  const serverErrorMessage = serverError ? serverError.message || errorInfo?.message || 'Server error occurred' : null
+  const serverErrorMessage = serverError ? serverError.message || errorInfo?.message || 'Ошибка сервера' : null
 
   return (
-    <form.Subscribe selector={(state: { errors: unknown[] }) => state.errors}>
-      {(errors: unknown[]) => {
-        const validErrors = extractAllErrors(errors)
+    <form.Subscribe
+      selector={(state: { errors: unknown[]; submissionAttempts: number }) => ({
+        errors: state.errors,
+        submissionAttempts: state.submissionAttempts,
+      })}
+    >
+      {({ errors, submissionAttempts }: { errors: unknown[]; submissionAttempts: number }) => {
+        // Не показываем ошибки валидации до первой попытки сабмита (если не указано иное)
+        const showValidationErrors = showBeforeSubmit || submissionAttempts > 0
+        const validErrors = showValidationErrors ? extractAllErrors(errors) : []
         const hasErrors = validErrors.length > 0 || serverErrorMessage
 
         if (!hasErrors) {

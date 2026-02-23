@@ -1,8 +1,12 @@
 'use client'
 
 /**
- * Секция видео (трейлеры, опенинги, эндинги) — v0.5.3
+ * Секция видео (трейлеры, опенинги, эндинги) — v0.28.0
  * Отображает YouTube embed для просмотра видео
+ *
+ * ИЗМЕНЕНИЯ v0.28.0:
+ * - Теперь использует AnimeManifestVideo вместо Video из Prisma
+ * - Видео загружаются из AnimeManifest (IPFS)
  */
 
 import {
@@ -24,15 +28,15 @@ import {
 import { useState } from 'react'
 import { LuExternalLink, LuFilm, LuPlay, LuX } from 'react-icons/lu'
 
-import type { Video, VideoKind } from '@/generated/prisma'
+import type { AnimeManifestVideo } from '../../../../shared/types/anime-manifest'
 
 interface VideoSectionProps {
-  /** Список видео */
-  videos: Video[]
+  /** Список видео из AnimeManifest */
+  videos: AnimeManifestVideo[]
 }
 
 /** Локализация типов видео */
-const kindLabels: Record<VideoKind, { label: string; color: string }> = {
+const kindLabels: Record<string, { label: string; color: string }> = {
   OP: { label: 'Опенинг', color: 'purple' },
   ED: { label: 'Эндинг', color: 'blue' },
   PV: { label: 'Трейлер', color: 'red' },
@@ -60,8 +64,8 @@ function extractYoutubeId(url: string): string | null {
 }
 
 /** Карточка видео */
-function VideoCard({ video, onPlay }: { video: Video; onPlay: () => void }) {
-  const kindInfo = kindLabels[video.kind]
+function VideoCard({ video, onPlay }: { video: AnimeManifestVideo; onPlay: () => void }) {
+  const kindInfo = kindLabels[video.kind] || kindLabels.OTHER
   const youtubeId = extractYoutubeId(video.url)
 
   // Превью: используем imageUrl или генерируем из YouTube
@@ -82,13 +86,13 @@ function VideoCard({ video, onPlay }: { video: Video; onPlay: () => void }) {
       {/* Превью изображение */}
       <AspectRatio ratio={16 / 9}>
         <Box position="relative">
-          {thumbnailUrl ? (
-            <Image src={thumbnailUrl} alt={video.name || 'Video'} objectFit="cover" />
-          ) : (
-            <Box bg="bg.subtle" display="flex" alignItems="center" justifyContent="center">
-              <Icon as={LuFilm} boxSize={12} color="fg.subtle" />
-            </Box>
-          )}
+          {thumbnailUrl
+            ? <Image src={thumbnailUrl} alt={video.name || 'Video'} objectFit="cover" />
+            : (
+              <Box bg="bg.subtle" display="flex" alignItems="center" justifyContent="center">
+                <Icon as={LuFilm} boxSize={12} color="fg.subtle" />
+              </Box>
+            )}
 
           {/* Оверлей с кнопкой play */}
           <Box
@@ -116,27 +120,30 @@ function VideoCard({ video, onPlay }: { video: Video; onPlay: () => void }) {
         <Text fontSize="sm" fontWeight="medium" lineClamp={1} title={video.name || undefined}>
           {video.name || kindInfo.label}
         </Text>
-        {video.hosting && (
-          <Text fontSize="xs" color="fg.muted">
-            {video.hosting}
-          </Text>
-        )}
       </Card.Body>
     </Card.Root>
   )
 }
 
 /** Диалог с YouTube плеером */
-function VideoPlayerDialog({ video, open, onClose }: { video: Video | null; open: boolean; onClose: () => void }) {
+function VideoPlayerDialog({
+  video,
+  open,
+  onClose,
+}: {
+  video: AnimeManifestVideo | null
+  open: boolean
+  onClose: () => void
+}) {
   if (!video) {
     return null
   }
 
   const youtubeId = extractYoutubeId(video.url)
-  const kindInfo = kindLabels[video.kind]
+  const kindInfo = kindLabels[video.kind] || kindLabels.OTHER
 
-  // Используем playerUrl если есть, иначе генерируем embed URL
-  const embedUrl = video.playerUrl || (youtubeId ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0` : null)
+  // Генерируем embed URL для YouTube
+  const embedUrl = youtubeId ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0` : null
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()} size="xl">
@@ -168,28 +175,30 @@ function VideoPlayerDialog({ video, open, onClose }: { video: Video | null; open
             </Dialog.Header>
 
             <Dialog.Body p={0}>
-              {embedUrl ? (
-                <AspectRatio ratio={16 / 9}>
-                  <iframe
-                    src={embedUrl}
-                    title={video.name || 'Video'}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    style={{ border: 'none' }}
-                  />
-                </AspectRatio>
-              ) : (
-                <VStack py={12} gap={4}>
-                  <Icon as={LuFilm} boxSize={16} color="fg.subtle" />
-                  <Text color="fg.muted">Видео недоступно для embed</Text>
-                  <a href={video.url} target="_blank" rel="noopener noreferrer">
-                    <Button colorPalette="purple">
-                      <Icon as={LuExternalLink} mr={2} />
-                      Открыть в браузере
-                    </Button>
-                  </a>
-                </VStack>
-              )}
+              {embedUrl
+                ? (
+                  <AspectRatio ratio={16 / 9}>
+                    <iframe
+                      src={embedUrl}
+                      title={video.name || 'Video'}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      style={{ border: 'none' }}
+                    />
+                  </AspectRatio>
+                )
+                : (
+                  <VStack py={12} gap={4}>
+                    <Icon as={LuFilm} boxSize={16} color="fg.subtle" />
+                    <Text color="fg.muted">Видео недоступно для embed</Text>
+                    <a href={video.url} target="_blank" rel="noopener noreferrer">
+                      <Button colorPalette="purple">
+                        <Icon as={LuExternalLink} mr={2} />
+                        Открыть в браузере
+                      </Button>
+                    </a>
+                  </VStack>
+                )}
             </Dialog.Body>
           </Dialog.Content>
         </Dialog.Positioner>
@@ -200,9 +209,10 @@ function VideoPlayerDialog({ video, open, onClose }: { video: Video | null; open
 
 /**
  * Секция видео на странице аниме
+ * Отображает трейлеры, опенинги, эндинги из AnimeManifest
  */
 export function VideoSection({ videos }: VideoSectionProps) {
-  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
+  const [selectedVideo, setSelectedVideo] = useState<AnimeManifestVideo | null>(null)
 
   if (!videos || videos.length === 0) {
     return null
@@ -234,8 +244,8 @@ export function VideoSection({ videos }: VideoSectionProps) {
                   Трейлеры
                 </Text>
                 <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} gap={3}>
-                  {trailers.map((video) => (
-                    <Box key={video.id} role="group">
+                  {trailers.map((video, index) => (
+                    <Box key={`${video.kind}-${video.url}-${index}`} role="group">
                       <VideoCard video={video} onPlay={() => setSelectedVideo(video)} />
                     </Box>
                   ))}
@@ -250,8 +260,8 @@ export function VideoSection({ videos }: VideoSectionProps) {
                   Опенинги
                 </Text>
                 <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} gap={3}>
-                  {openings.map((video) => (
-                    <Box key={video.id} role="group">
+                  {openings.map((video, index) => (
+                    <Box key={`${video.kind}-${video.url}-${index}`} role="group">
                       <VideoCard video={video} onPlay={() => setSelectedVideo(video)} />
                     </Box>
                   ))}
@@ -266,8 +276,8 @@ export function VideoSection({ videos }: VideoSectionProps) {
                   Эндинги
                 </Text>
                 <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} gap={3}>
-                  {endings.map((video) => (
-                    <Box key={video.id} role="group">
+                  {endings.map((video, index) => (
+                    <Box key={`${video.kind}-${video.url}-${index}`} role="group">
                       <VideoCard video={video} onPlay={() => setSelectedVideo(video)} />
                     </Box>
                   ))}
@@ -282,8 +292,8 @@ export function VideoSection({ videos }: VideoSectionProps) {
                   Другое
                 </Text>
                 <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} gap={3}>
-                  {other.map((video) => (
-                    <Box key={video.id} role="group">
+                  {other.map((video, index) => (
+                    <Box key={`${video.kind}-${video.url}-${index}`} role="group">
                       <VideoCard video={video} onPlay={() => setSelectedVideo(video)} />
                     </Box>
                   ))}

@@ -7,6 +7,7 @@
 
 import type { Prisma, WatchProgress, WatchStatus } from '@/generated/prisma'
 import { prisma } from '@/lib/db'
+import { withDbRetry } from '@/lib/db-retry'
 
 // === READ ===
 
@@ -60,21 +61,24 @@ export async function upsertWatchProgress(
   episodeId: string,
   data: Prisma.WatchProgressUncheckedUpdateInput
 ): Promise<WatchProgress> {
-  return prisma.watchProgress.upsert({
-    where: {
-      animeId_episodeId: { animeId, episodeId },
-    },
-    create: {
-      animeId,
-      episodeId,
-      currentTime: (data.currentTime as number) ?? 0,
-      completed: (data.completed as boolean) ?? false,
-      selectedAudioTrackId: data.selectedAudioTrackId as string | undefined,
-      selectedSubtitleTrackId: data.selectedSubtitleTrackId as string | undefined,
-      volume: (data.volume as number) ?? 1,
-    },
-    update: data,
-  })
+  // retry при блокировке БД (конкуренция с импортом)
+  return withDbRetry(() =>
+    prisma.watchProgress.upsert({
+      where: {
+        animeId_episodeId: { animeId, episodeId },
+      },
+      create: {
+        animeId,
+        episodeId,
+        currentTime: (data.currentTime as number) ?? 0,
+        completed: (data.completed as boolean) ?? false,
+        selectedAudioTrackId: data.selectedAudioTrackId as string | undefined,
+        selectedSubtitleTrackId: data.selectedSubtitleTrackId as string | undefined,
+        volume: (data.volume as number) ?? 1,
+      },
+      update: data,
+    })
+  )
 }
 
 // === UPDATE ===
@@ -264,14 +268,16 @@ export async function updateAnimeWatchStatus(
   userRating?: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await prisma.anime.update({
-      where: { id: animeId },
-      data: {
-        watchStatus: status,
-        watchedAt: status === 'COMPLETED' ? new Date() : undefined,
-        userRating: userRating ?? undefined,
-      },
-    })
+    await withDbRetry(() =>
+      prisma.anime.update({
+        where: { id: animeId },
+        data: {
+          watchStatus: status,
+          watchedAt: status === 'COMPLETED' ? new Date() : undefined,
+          userRating: userRating ?? undefined,
+        },
+      })
+    )
     return { success: true }
   } catch (error) {
     return { success: false, error: String(error) }

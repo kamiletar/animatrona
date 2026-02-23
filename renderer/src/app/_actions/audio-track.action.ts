@@ -113,3 +113,19 @@ export async function getLocalDubGroups(animeId: string): Promise<string[]> {
 
   return tracks.map((t) => t.dubGroup).filter((g): g is string => g !== null)
 }
+
+// === BATCH UPDATE ===
+
+/**
+ * Пакетное обновление аудиодорожек
+ * Используется для массового изменения language/dubGroup
+ */
+export async function batchUpdateAudioTracks(
+  trackIds: string[],
+  data: { language?: string; dubGroup?: string | null },
+): Promise<{ count: number }> {
+  return prisma.audioTrack.updateMany({
+    where: { id: { in: trackIds } },
+    data,
+  })
+}

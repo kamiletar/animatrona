@@ -34,6 +34,9 @@ export function useEncodingSettings(options: UseEncodingSettingsOptions) {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true)
 
+  // Принудительное использование CPU
+  const [forceCpu, setForceCpu] = useState(false)
+
   // VMAF настройки для очереди (не выполняется тут, только настройка)
   const [vmafEnabled, setVmafEnabled] = useState(true) // По умолчанию включён
   const [targetVmaf, setTargetVmaf] = useState(DEFAULT_TARGET_VMAF)
@@ -69,7 +72,7 @@ export function useEncodingSettings(options: UseEncodingSettingsOptions) {
   // Получаем выбранный профиль (должен быть перед useEffect который его использует)
   const selectedProfile = useMemo(
     () => profiles.find((p) => p.id === selectedProfileId) || null,
-    [profiles, selectedProfileId]
+    [profiles, selectedProfileId],
   )
 
   // Уведомляем родителя об изменении настроек
@@ -79,11 +82,21 @@ export function useEncodingSettings(options: UseEncodingSettingsOptions) {
       selectedProfile, // Передаём полные данные профиля для main process
       audioMaxConcurrent,
       videoMaxConcurrent,
+      forceCpu,
       // VMAF настройки для очереди
       vmafEnabled,
       targetVmaf: vmafEnabled ? targetVmaf : undefined,
     })
-  }, [selectedProfileId, selectedProfile, audioMaxConcurrent, videoMaxConcurrent, vmafEnabled, targetVmaf, onSettingsChange])
+  }, [
+    selectedProfileId,
+    selectedProfile,
+    audioMaxConcurrent,
+    videoMaxConcurrent,
+    forceCpu,
+    vmafEnabled,
+    targetVmaf,
+    onSettingsChange,
+  ])
 
   return {
     // Профили
@@ -92,6 +105,10 @@ export function useEncodingSettings(options: UseEncodingSettingsOptions) {
     selectedProfile,
     isLoadingProfiles,
     setSelectedProfileId,
+
+    // CPU режим
+    forceCpu,
+    setForceCpu,
 
     // VMAF настройки (для передачи в очередь)
     vmafEnabled,

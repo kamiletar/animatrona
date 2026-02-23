@@ -1,7 +1,7 @@
 'use client'
 
 import { Button, ButtonGroup, type ButtonProps } from '@chakra-ui/react'
-import { useCallback, useState, type ReactNode } from 'react'
+import { type ReactNode, useCallback, useState } from 'react'
 import { useDeclarativeForm } from '../form-context'
 import { useFormStepsContext } from './form-steps-context'
 
@@ -78,6 +78,7 @@ export function FormStepsNavigation({
 
   const [isNavigating, setIsNavigating] = useState(false)
   const [isSkipping, setIsSkipping] = useState(false)
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false)
 
   // Handle next button click
   const handleNext = useCallback(async () => {
@@ -98,12 +99,17 @@ export function FormStepsNavigation({
     onStepChange?.(currentStep - 1)
   }, [goToPrev, currentStep, onStepChange])
 
-  // Handle submit - trigger form submission
-  const handleSubmit = useCallback(() => {
-    onSubmit?.()
-    // Trigger form submit
-    form.handleSubmit()
-  }, [form, onSubmit])
+  // Handle submit - trigger form submission с защитой от double-click
+  const handleSubmit = useCallback(async () => {
+    if (isSubmittingForm) return
+    setIsSubmittingForm(true)
+    try {
+      onSubmit?.()
+      await form.handleSubmit()
+    } finally {
+      setIsSubmittingForm(false)
+    }
+  }, [form, onSubmit, isSubmittingForm])
 
   // Handle skip button click
   const handleSkip = useCallback(async () => {
@@ -152,7 +158,15 @@ export function FormStepsNavigation({
 
       {showNext &&
         (isLastStep ? (
-          <Button type="submit" variant={nextVariant} size={size} colorPalette={colorPalette} onClick={handleSubmit}>
+          <Button
+            type="submit"
+            variant={nextVariant}
+            size={size}
+            colorPalette={colorPalette}
+            onClick={handleSubmit}
+            loading={isSubmittingForm}
+            disabled={isSubmittingForm || isNavigating || isSkipping}
+          >
             {submitLabel}
           </Button>
         ) : (

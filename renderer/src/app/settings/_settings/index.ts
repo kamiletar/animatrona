@@ -4,10 +4,13 @@
 
 // Компоненты
 export { EncodingProfilesCard } from './EncodingProfilesCard'
+export { FederationCard } from './FederationCard'
 export { LibrarySettingsCard } from './LibrarySettingsCard'
+export { MobileAccessCard } from './MobileAccessCard'
+export { P2PSharingCard } from './P2PSharingCard'
 export { PlayerSettingsCard } from './PlayerSettingsCard'
-export { RestoreLibraryCard } from './RestoreLibraryCard'
 export { ThemeSettingsCard } from './ThemeSettingsCard'
+export { TrackerPublishingCard } from './TrackerPublishingCard'
 export { TranscodingSettingsCard } from './TranscodingSettingsCard'
 export { TraySettingsCard } from './TraySettingsCard'
 export { UpdateSettingsCard } from './UpdateSettingsCard'

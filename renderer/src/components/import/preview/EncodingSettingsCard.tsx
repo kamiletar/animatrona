@@ -11,10 +11,24 @@
  * - "Сохранить как шаблон" — сохранить текущие настройки для переиспользования
  */
 
-import type { ImportTemplate } from '../../../../../shared/types/import-template'
-import { Badge, Box, Button, Card, Checkbox, HStack, Icon, NativeSelect, Slider, Spinner, Text, VStack } from '@chakra-ui/react'
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Checkbox,
+  HStack,
+  Icon,
+  NativeSelect,
+  Slider,
+  Spinner,
+  Switch,
+  Text,
+  VStack,
+} from '@chakra-ui/react'
 import { useCallback, useState } from 'react'
-import { LuBookmark, LuBookmarkPlus, LuSettings2, LuTarget } from 'react-icons/lu'
+import { LuBookmark, LuBookmarkPlus, LuCpu, LuSettings2, LuTarget } from 'react-icons/lu'
+import type { ImportTemplate } from '../../../../../shared/types/import-template'
 
 import { useTemplates } from '../../../hooks/useTemplates'
 import { SaveTemplateDialog, TemplateSelectorDialog } from '../templates'
@@ -37,6 +51,8 @@ export function EncodingSettingsCard({ settings }: EncodingSettingsCardProps) {
     targetVmaf,
     setVmafEnabled,
     setTargetVmaf,
+    forceCpu,
+    setForceCpu,
     audioMaxConcurrent,
     videoMaxConcurrent,
     setAudioMaxConcurrent,
@@ -101,98 +117,121 @@ export function EncodingSettingsCard({ settings }: EncodingSettingsCardProps) {
             </HStack>
           </HStack>
         </Card.Header>
-      <Card.Body pt={0} pb={4} px={4}>
-        <VStack gap={4} align="stretch">
-          {/* Профиль кодирования */}
-          <HStack justify="space-between" align="center">
-            <VStack align="start" gap={0}>
-              <Text fontSize="sm">Профиль видео</Text>
-              <Text fontSize="xs" color="fg.subtle">
-                Настройки качества и скорости
-              </Text>
-            </VStack>
-            <Box w="200px">
-              {isLoadingProfiles ? (
-                <Spinner size="sm" />
-              ) : (
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    value={selectedProfileId ?? ''}
-                    onChange={(e) => setSelectedProfileId(e.target.value || null)}
-                  >
-                    {profiles.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.name}
-                        {profile.isDefault ? ' ★' : ''}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              )}
-            </Box>
-          </HStack>
+        <Card.Body pt={0} pb={4} px={4}>
+          <VStack gap={4} align="stretch">
+            {/* Профиль кодирования */}
+            <HStack justify="space-between" align="center">
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm">Профиль видео</Text>
+                <Text fontSize="xs" color="fg.subtle">
+                  Настройки качества и скорости
+                </Text>
+              </VStack>
+              <Box w="200px">
+                {isLoadingProfiles ? <Spinner size="sm" /> : (
+                  <NativeSelect.Root size="sm">
+                    <NativeSelect.Field
+                      value={selectedProfileId ?? ''}
+                      onChange={(e) => setSelectedProfileId(e.target.value || null)}
+                    >
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                          {profile.isDefault ? ' ★' : ''}
+                        </option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                )}
+              </Box>
+            </HStack>
 
-          {/* VMAF подбор CQ (выполняется в очереди) */}
-          <Box p={3} bg={vmafEnabled ? 'yellow.950/50' : 'bg.muted'} borderRadius="md" borderWidth="1px" borderColor={vmafEnabled ? 'yellow.800/50' : 'border.subtle'}>
-            <VStack gap={3} align="stretch">
-              <Checkbox.Root
-                checked={vmafEnabled}
-                onCheckedChange={(e) => setVmafEnabled(!!e.checked)}
-                colorPalette="yellow"
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control />
-                <Checkbox.Label>
-                  <HStack gap={2}>
-                    <Icon as={LuTarget} color={vmafEnabled ? 'yellow.400' : 'fg.subtle'} boxSize={4} />
-                    <Text fontWeight="medium">VMAF подбор CQ</Text>
-                  </HStack>
-                </Checkbox.Label>
-              </Checkbox.Root>
-
-              <Text fontSize="xs" color="fg.muted">
-                {vmafEnabled
-                  ? 'Оптимальный CQ будет подобран перед кодированием (один раз на сериал)'
-                  : 'Будет использован CQ из профиля кодирования'}
-              </Text>
-
-              {/* Слайдер целевого VMAF */}
-              {vmafEnabled && (
-                <VStack align="stretch" gap={2}>
-                  <HStack justify="space-between">
-                    <Text fontSize="sm">Целевой VMAF</Text>
-                    <Badge colorPalette="yellow" size="lg" px={3}>
-                      {targetVmaf}
-                    </Badge>
-                  </HStack>
-                  <Slider.Root
-                    min={90}
-                    max={99}
-                    step={1}
-                    value={[targetVmaf]}
-                    onValueChange={(e) => setTargetVmaf(e.value[0])}
-                    colorPalette="yellow"
-                  >
-                    <Slider.Control>
-                      <Slider.Track>
-                        <Slider.Range />
-                      </Slider.Track>
-                      <Slider.Thumb index={0} />
-                    </Slider.Control>
-                  </Slider.Root>
-                  <Text fontSize="xs" color="fg.muted">
-                    {targetVmaf >= 97 && '⚠️ Высокий VMAF — большой размер файла'}
-                    {targetVmaf >= 94 && targetVmaf < 97 && '✓ Рекомендуемый диапазон для качества'}
-                    {targetVmaf < 94 && '💡 Меньший размер файла, чуть ниже качество'}
+            {/* Принудительное использование CPU */}
+            <HStack justify="space-between" align="center">
+              <HStack gap={2}>
+                <Icon as={LuCpu} color={forceCpu ? 'orange.400' : 'fg.subtle'} boxSize={4} />
+                <VStack align="start" gap={0}>
+                  <Text fontSize="sm">Использовать CPU</Text>
+                  <Text fontSize="xs" color="fg.subtle">
+                    Кодирование на процессоре вместо GPU
                   </Text>
                 </VStack>
-              )}
-            </VStack>
-          </Box>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+              </HStack>
+              <Switch.Root checked={forceCpu} onCheckedChange={(e) => setForceCpu(e.checked)} colorPalette="orange">
+                <Switch.HiddenInput />
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch.Root>
+            </HStack>
+
+            {/* VMAF подбор CQ (выполняется в очереди) */}
+            <Box
+              p={3}
+              bg={vmafEnabled ? 'yellow.950/50' : 'bg.muted'}
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor={vmafEnabled ? 'yellow.800/50' : 'border.subtle'}
+            >
+              <VStack gap={3} align="stretch">
+                <Checkbox.Root
+                  checked={vmafEnabled}
+                  onCheckedChange={(e) => setVmafEnabled(!!e.checked)}
+                  colorPalette="yellow"
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control />
+                  <Checkbox.Label>
+                    <HStack gap={2}>
+                      <Icon as={LuTarget} color={vmafEnabled ? 'yellow.400' : 'fg.subtle'} boxSize={4} />
+                      <Text fontWeight="medium">VMAF подбор CQ</Text>
+                    </HStack>
+                  </Checkbox.Label>
+                </Checkbox.Root>
+
+                <Text fontSize="xs" color="fg.muted">
+                  {vmafEnabled
+                    ? 'Оптимальный CQ будет подобран перед кодированием (один раз на сериал)'
+                    : 'Будет использован CQ из профиля кодирования'}
+                </Text>
+
+                {/* Слайдер целевого VMAF */}
+                {vmafEnabled && (
+                  <VStack align="stretch" gap={2}>
+                    <HStack justify="space-between">
+                      <Text fontSize="sm">Целевой VMAF</Text>
+                      <Badge colorPalette="yellow" size="lg" px={3}>
+                        {targetVmaf}
+                      </Badge>
+                    </HStack>
+                    <Slider.Root
+                      min={90}
+                      max={99}
+                      step={1}
+                      value={[targetVmaf]}
+                      onValueChange={(e) => setTargetVmaf(e.value[0])}
+                      colorPalette="yellow"
+                    >
+                      <Slider.Control>
+                        <Slider.Track>
+                          <Slider.Range />
+                        </Slider.Track>
+                        <Slider.Thumb index={0} />
+                      </Slider.Control>
+                    </Slider.Root>
+                    <Text fontSize="xs" color="fg.muted">
+                      {targetVmaf >= 97 && '⚠️ Высокий VMAF — большой размер файла'}
+                      {targetVmaf >= 94 && targetVmaf < 97 && '✓ Рекомендуемый диапазон для качества'}
+                      {targetVmaf < 94 && '💡 Меньший размер файла, чуть ниже качество'}
+                    </Text>
+                  </VStack>
+                )}
+              </VStack>
+            </Box>
+          </VStack>
+        </Card.Body>
+      </Card.Root>
 
       {/* Диалог выбора шаблона */}
       <TemplateSelectorDialog

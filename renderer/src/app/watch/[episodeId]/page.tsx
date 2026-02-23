@@ -25,11 +25,13 @@ import {
 } from '@/components/player'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useFindUniqueEpisode } from '@/lib/hooks'
+import { getSubtitleUrl, getVideoUrl } from '@/lib/media-url'
 
 import {
   useChapterAutoSkip,
   useChapterEditor,
   useEpisodeNavigation,
+  useGlobalVideo,
   usePlayerTracks,
   useUpNext,
   useWatchProgress,
@@ -91,6 +93,18 @@ export default function WatchPage({ params }: WatchPageProps) {
 
   const episode = data as EpisodeWithTracks | null | undefined
 
+  // Определяем путь к видео — только через IPFS CID (библиотека = IPFS-only)
+  // sourcePath больше не используется как fallback для воспроизведения
+  const videoSrc = episode?.transcodedCid ? getVideoUrl({ transcodedCid: episode.transcodedCid }) : null
+
+  // Хук для интеграции с глобальным видео (mini-player)
+  const globalVideo = useGlobalVideo({
+    playerRef,
+    episodeId,
+    episode: episode ?? null,
+    videoSrc,
+  })
+
   // Хук для управления дорожками
   const tracks = usePlayerTracks({
     playerRef,
@@ -151,7 +165,7 @@ export default function WatchPage({ params }: WatchPageProps) {
     duration: durationForUpNext,
   })
 
-  // Объединённый обработчик времени для прогресса, редактора глав и UpNext
+  // Объединённый обработчик времени для прогресса, редактора глав, UpNext и global video
   const handleTimeUpdate = useCallback(
     (time: number, duration: number) => {
       chapterEditor.updatePlaybackTime(time, duration)
@@ -159,17 +173,16 @@ export default function WatchPage({ params }: WatchPageProps) {
       // Обновляем состояние для UpNext оверлея
       setCurrentTimeForUpNext(time)
       setDurationForUpNext(duration)
+      // Синхронизируем с global video store для mini-player
+      globalVideo.handleGlobalTimeUpdate(time, duration)
     },
-    [chapterEditor, progress]
+    [chapterEditor, progress, globalVideo]
   )
 
   // Обработчик ошибки видео
   const handleVideoError = useCallback((err: Error) => {
     console.error('[WatchPage] Video error:', err)
   }, [])
-
-  // Определяем путь к видео
-  const videoSrc = episode?.transcodedPath || episode?.sourcePath || null
 
   // Загрузка
   if (isLoading) {
@@ -200,7 +213,7 @@ export default function WatchPage({ params }: WatchPageProps) {
     )
   }
 
-  // Нет видео
+  // Нет видео — контент недоступен
   if (!videoSrc) {
     return (
       <Box minH="100vh" bg="bg" color="fg" p={6}>
@@ -211,9 +224,9 @@ export default function WatchPage({ params }: WatchPageProps) {
               Назад к аниме
             </Button>
           </Link>
-          <Text color="yellow.400">Видео ещё не готово к воспроизведению</Text>
+          <Text color="yellow.400">Контент недоступен</Text>
           <Text color="fg.subtle" fontSize="sm">
-            Статус: {episode.transcodeStatus}
+            Видео этого эпизода не найдено в IPFS. Попробуйте переимпортировать эпизод.
           </Text>
         </VStack>
       </Box>
@@ -221,7 +234,7 @@ export default function WatchPage({ params }: WatchPageProps) {
   }
 
   return (
-    <Box h="100vh" bg="black" color="fg" display="flex" flexDirection="column" overflow="hidden">
+    <Box h="full" bg="black" color="fg" display="flex" flexDirection="column" overflow="hidden">
       {/* Видеоплеер */}
       <Box flex={1} minH={0}>
         <VideoPlayer
@@ -231,12 +244,14 @@ export default function WatchPage({ params }: WatchPageProps) {
           startTime={progress.initialTime}
           showControls
           onTimeUpdate={handleTimeUpdate}
+          onPlayStateChange={globalVideo.handleGlobalPlayStateChange}
           onEnded={navigation.handleEnded}
           onError={handleVideoError}
           audioTracks={tracks.audioTracksForPlayer}
           currentAudioTrackId={tracks.currentAudioId || undefined}
           onAudioTrackChange={tracks.handleAudioTrackChange}
-          subtitlePath={tracks.currentSubtitleTrack?.filePath}
+          subtitlePath={tracks.currentSubtitleTrack ? getSubtitleUrl(tracks.currentSubtitleTrack) : null}
+          subtitleFormat={tracks.currentSubtitleTrack?.format as 'ass' | 'ssa' | 'srt' | 'vtt' | null | undefined}
           subtitleFonts={tracks.currentSubtitleFonts}
           chapters={chapterEditor.playerChapters.map((c) => ({ id: c.id, title: c.title, startTime: c.startTime }))}
           onChapterSeek={chapterEditor.handleSeek}
@@ -347,6 +362,8 @@ export default function WatchPage({ params }: WatchPageProps) {
           allEpisodes={navigation.allEpisodes as { id: string; number: number; name?: string | null }[] | undefined}
           onCopyToEpisodes={chapterEditor.handleCopyToEpisodes}
           isCopying={chapterEditor.isCopying}
+          onGenerateRecapPreview={chapterEditor.handleGenerateRecapPreview}
+          isGenerating={chapterEditor.isGenerating}
         />
 
         {/* Оверлей "Следующий эпизод" (за 30 сек до конца) */}

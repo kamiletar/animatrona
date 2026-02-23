@@ -8,8 +8,8 @@ export const MANIFEST_VERSION = 1
 
 /** Информация о видео */
 export interface ManifestVideo {
-  /** Путь к видеофайлу */
-  path: string
+  /** CID видеофайла в IPFS */
+  cid: string
   /** Длительность в миллисекундах */
   durationMs: number
   /** Ширина кадра */
@@ -21,9 +21,6 @@ export interface ManifestVideo {
   /** Битрейт видео (bps) */
   bitrate?: number
 }
-
-/** Статус транскодирования аудиодорожки (соответствует Prisma enum TranscodeStatus) */
-export type AudioTranscodeStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'SKIPPED' | 'ERROR'
 
 /** Аудиодорожка */
 export interface ManifestAudioTrack {
@@ -43,12 +40,10 @@ export interface ManifestAudioTrack {
   bitrate?: number
   /** Дорожка по умолчанию */
   isDefault: boolean
-  /** Путь к извлечённому файлу (после demux) */
-  extractedPath?: string
-  /** Путь к готовому аудиофайлу (транскодированный или оригинал) */
-  transcodedPath?: string
-  /** Статус транскодирования */
-  transcodeStatus: AudioTranscodeStatus
+  /** CID аудиофайла в IPFS */
+  cid?: string
+  /** Группа озвучки (AniDUB, AniLibria и т.д.) */
+  dubGroup?: string
 }
 
 /** Субтитры */
@@ -63,20 +58,22 @@ export interface ManifestSubtitleTrack {
   title: string
   /** Формат (ass, srt, vtt) */
   format: string
-  /** Путь к извлечённому файлу субтитров */
-  filePath: string
+  /** CID файла субтитров в IPFS */
+  cid?: string
   /** Дорожка по умолчанию */
   isDefault: boolean
   /** Шрифты для ASS субтитров */
   fonts?: ManifestSubtitleFont[]
+  /** Группа субтитров (HorribleSubs, FanSub Team и т.д.) */
+  dubGroup?: string
 }
 
 /** Шрифт для ASS субтитров */
 export interface ManifestSubtitleFont {
   /** Имя шрифта как в ASS файле */
   name: string
-  /** Путь к файлу шрифта */
-  path: string
+  /** CID файла шрифта в IPFS */
+  cid?: string
 }
 
 /** Тип главы */
@@ -98,10 +95,10 @@ export interface ManifestChapter {
 
 /** Превью кадры (sprite sheet) */
 export interface ManifestThumbnails {
-  /** Путь к VTT файлу с метками времени */
-  vttPath: string
-  /** Путь к sprite sheet изображению */
-  spritePath: string
+  /** CID VTT файла с метками времени в IPFS */
+  vttCid: string
+  /** CID sprite sheet изображения в IPFS */
+  spriteCid: string
 }
 
 /** Навигация между эпизодами */
@@ -109,13 +106,71 @@ export interface ManifestNavigation {
   /** Следующий эпизод */
   nextEpisode?: {
     id: string
-    manifestPath: string
+    manifestCid: string
   }
   /** Предыдущий эпизод */
   prevEpisode?: {
     id: string
-    manifestPath: string
+    manifestCid: string
   }
+}
+
+/** Информация о кодировании */
+export interface ManifestEncodingInfo {
+  /** Название профиля кодирования */
+  profileName: string
+  /** Кодек (av1, hevc, h264) */
+  codec: string
+  /** Constant Quality (CQ/CRF) */
+  cq: number
+  /** Пресет энкодера */
+  preset: string
+  /** Режим контроля битрейта */
+  rateControl: string
+  /** Tune настройка */
+  tune?: string
+  /** Multipass режим */
+  multipass?: string
+  /** Spatial AQ */
+  spatialAq?: boolean
+  /** Temporal AQ */
+  temporalAq?: boolean
+  /** AQ Strength */
+  aqStrength?: number
+  /** GOP Size */
+  gopSize?: number
+  /** Lookahead */
+  lookahead?: number
+  /** B-Ref Mode */
+  bRefMode?: string
+  /** Принудительный 10-bit */
+  force10Bit?: boolean
+
+  /** VMAF score (если использовался подбор) */
+  vmafScore?: number
+  /** Тип энкодера (gpu/cpu) */
+  encoderType: 'gpu' | 'cpu'
+  /** Модель оборудования (GPU или CPU) */
+  hardwareModel?: string
+  /** Версия FFmpeg */
+  ffmpegVersion?: string
+  /** Полная команда FFmpeg */
+  ffmpegCommand?: string
+  /** Время транскодирования в мс */
+  transcodeDurationMs?: number
+  /** Количество активных GPU воркеров */
+  activeGpuWorkers?: number
+  /** Макс. параллельных видео-потоков */
+  videoMaxConcurrent?: number
+  /** Макс. параллельных аудио-потоков */
+  audioMaxConcurrent?: number
+
+  /** Размер исходного файла в байтах */
+  sourceSize?: number
+  /** Размер транскодированного файла в байтах */
+  transcodedSize?: number
+  /** Коэффициент сжатия (transcodedSize / sourceSize) */
+  compressionRatio?: number
 }
 
 /** Информация об эпизоде */
@@ -150,8 +205,20 @@ export interface EpisodeManifest {
   thumbnails?: ManifestThumbnails
   /** Навигация */
   navigation?: ManifestNavigation
+  /** Информация о кодировании */
+  encoding?: ManifestEncodingInfo
   /** Дата генерации */
   generatedAt: string
+}
+
+/** Опционально: данные дорожки из рекомендаций (для передачи dubGroup/language из UI) */
+export interface TrackOverride {
+  /** Индекс потока (или -1 для внешних) */
+  streamIndex: number
+  /** Язык (ISO 639-1) */
+  language?: string
+  /** Группа озвучки/субтитров */
+  dubGroup?: string
 }
 
 /** Опции для генерации манифеста */
@@ -166,6 +233,10 @@ export interface GenerateManifestOptions {
   animeInfo: ManifestInfo
   /** Генерировать превью (по умолчанию false) */
   generateThumbnails?: boolean
+  /** Переопределения для аудиодорожек (язык, dubGroup из UI) */
+  audioTrackOverrides?: TrackOverride[]
+  /** Переопределения для субтитров (язык, dubGroup из UI) */
+  subtitleTrackOverrides?: TrackOverride[]
 }
 
 /** Результат генерации манифеста */

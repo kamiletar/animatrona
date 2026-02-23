@@ -69,7 +69,7 @@ export function useEpisodeNavigation(options: UseEpisodeNavigationOptions) {
       ? {
         where: { animeId: episode.animeId },
         orderBy: { number: 'asc' },
-        select: { id: true, number: true, name: true, thumbnailPaths: true },
+        select: { id: true, number: true, name: true, thumbnailCids: true },
       }
       : undefined,
   )

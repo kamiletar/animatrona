@@ -4,9 +4,8 @@
  * Синхронизирует настройки трея между renderer (БД) и main process
  */
 
-import { ipcMain } from 'electron'
-
 import { getTraySettings, updateTraySettings } from '../tray'
+import { createHandler } from '../utils/ipc-handler-factory'
 
 /** Настройки трея */
 export interface TraySettings {
@@ -19,13 +18,11 @@ export interface TraySettings {
  * Регистрирует IPC handlers для настроек трея
  */
 export function registerTrayHandlers(): void {
-  // Получить текущие настройки трея из main process
-  ipcMain.handle('tray:getSettings', (): TraySettings => {
-    return getTraySettings()
-  })
+  // Получить текущие настройки трея
+  createHandler('tray:getSettings', () => getTraySettings())
 
-  // Обновить настройки трея (вызывается из renderer при изменении в UI)
-  ipcMain.handle('tray:updateSettings', (_event, settings: Partial<TraySettings>): void => {
+  // Обновить настройки трея
+  createHandler('tray:updateSettings', (settings: Partial<TraySettings>) => {
     updateTraySettings(settings)
   })
 }

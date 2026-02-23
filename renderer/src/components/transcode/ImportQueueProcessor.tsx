@@ -113,6 +113,7 @@ function queueEntryToImportOptions(entry: ImportQueueEntry): ImportOptions {
         externalPath: r.externalPath,
         groupName: r.groupName,
         language: r.language,
+        dubGroup: r.dubGroup,
       })),
       subtitleRecommendations: [],
     })),
@@ -126,8 +127,20 @@ function queueEntryToImportOptions(entry: ImportQueueEntry): ImportOptions {
     donorPath: entry.donorPath,
     donorFiles,
     syncOffset: entry.syncOffset ?? 0,
-    useCpuFallback: entry.vmafResult?.useCpuFallback,
+    // CPU fallback активируется если:
+    // 1. VMAF определил что нужен CPU (useCpuFallback)
+    // 2. ИЛИ профиль явно указывает preferCpu
+    // 3. ИЛИ GPU отключен в профиле (useGpu: false)
+    // 4. ИЛИ GPU отключен глобально в Settings (globalUseGpu: false)
+    // 5. ИЛИ пользователь включил forceCpu для конкретного элемента
+    useCpuFallback:
+      entry.vmafResult?.useCpuFallback ||
+      entry.encodingProfile?.preferCpu ||
+      entry.encodingProfile?.useGpu === false ||
+      entry.globalUseGpu === false ||
+      entry.forceCpu === true,
     vmafScore: entry.vmafResult?.vmafScore,
+    isFileMode: entry.isFileMode,
   }
 }
 
@@ -139,10 +152,7 @@ export function ImportQueueProcessor() {
 
   // Refs для отслеживания состояния и предотвращения дублирования
   const processingIdRef = useRef<string | null>(null)
-  const lastProgressRef = useRef<number | null>(null)
   const lastStageRef = useRef<string | null>(null)
-  // Ref для throttling обновлений прогресса воркеров
-  const lastWorkersProgressRef = useRef<string | null>(null)
   // Время начала обработки для истории
   const importStartedAtRef = useRef<string | null>(null)
 
@@ -162,7 +172,7 @@ export function ImportQueueProcessor() {
 
     const syncWithMain = async () => {
       const api = window.electronAPI
-      if (!api) {return}
+      if (!api) return
 
       // Если есть текущий обрабатываемый item — проверяем в main и синхронизируем refs
       if (currentItem) {
@@ -173,7 +183,7 @@ export function ImportQueueProcessor() {
             // Обработка действительно идёт в main — синхронизируем ref
             if (processingIdRef.current !== currentItem.id) {
               console.log(
-                `[ImportQueueProcessor] Syncing ref with main processing item ${currentItem.id} (${currentItem.status})`,
+                `[ImportQueueProcessor] Syncing ref with main processing item ${currentItem.id} (${currentItem.status})`
               )
               processingIdRef.current = currentItem.id
             }
@@ -193,10 +203,10 @@ export function ImportQueueProcessor() {
     entry: ImportQueueEntry,
     status: 'completed' | 'error' | 'cancelled',
     errorMessage?: string,
-    animeId?: string,
+    animeId?: string
   ) => {
     const api = window.electronAPI
-    if (!api) {return}
+    if (!api) return
 
     const completedAt = new Date().toISOString()
     const startedAt = importStartedAtRef.current ?? completedAt
@@ -207,9 +217,10 @@ export function ImportQueueProcessor() {
       animeName: entry.selectedAnime.name,
       animeNameRu: entry.selectedAnime.russian ?? undefined,
       animeId: animeId ?? entry.selectedAnime.id,
-      shikimoriId: typeof entry.selectedAnime.id === 'string' && entry.selectedAnime.id.match(/^\d+$/)
-        ? parseInt(entry.selectedAnime.id)
-        : undefined,
+      shikimoriId:
+        typeof entry.selectedAnime.id === 'string' && entry.selectedAnime.id.match(/^\d+$/)
+          ? parseInt(entry.selectedAnime.id)
+          : undefined,
       posterUrl: entry.selectedAnime.posterUrl ?? undefined,
       episodesCount: entry.files.filter((f) => f.selected).length,
       seasonNumber: entry.parsedInfo.seasonNumber ?? undefined,
@@ -348,6 +359,7 @@ export function ImportQueueProcessor() {
   }, [isLoading, currentItem, importFlow, updateStatus, setImportResult])
 
   // === Обновление прогресса на основе parallelProgress ===
+  // Throttling НЕ нужен здесь — useImportQueue уже батчит обновления каждые 250мс
   useEffect(() => {
     if (!currentItem || processingIdRef.current !== currentItem.id) {
       return
@@ -358,8 +370,8 @@ export function ImportQueueProcessor() {
       return
     }
 
-    // Общий прогресс (completedTasks / totalTasks * 100)
-    const newProgress = Math.round(parallelProgress.totalPercent)
+    // Общий прогресс с полной точностью (без округления до целых)
+    const newProgress = parallelProgress.totalPercent
 
     // Получаем VMAF результат
     const vmafResult = currentItem.vmafResult
@@ -393,31 +405,6 @@ export function ImportQueueProcessor() {
         status: t.status as 'pending' | 'running' | 'completed' | 'error',
       }))
 
-    // Вычисляем "суммарный прогресс воркеров" для throttling
-    // Используем 1 знак после запятой для более плавных обновлений
-    const videoWorkersProgressSum = videoWorkers.reduce((sum, w) => sum + w.progress, 0)
-    const audioWorkersProgressSum = audioWorkers.reduce((sum, w) => sum + w.progress, 0)
-    // Ключ с точностью 0.5% для более плавного обновления GPU воркеров
-    const videoKey = Math.floor(videoWorkersProgressSum * 2)
-    const audioKey = Math.floor(audioWorkersProgressSum * 2)
-    const workersProgressKey = `${videoKey}-${audioKey}`
-
-    // Обновляем UI если:
-    // 1. Общий прогресс изменился на >= 1%
-    // 2. ИЛИ сумма прогресса воркеров изменилась на >= 0.5%
-    const progressChanged = lastProgressRef.current === null || Math.abs(newProgress - lastProgressRef.current) >= 1
-    const workersChanged = lastWorkersProgressRef.current !== workersProgressKey
-
-    if (!progressChanged && !workersChanged) {
-      return
-    }
-
-    // Обновляем refs
-    if (progressChanged) {
-      lastProgressRef.current = newProgress
-    }
-    lastWorkersProgressRef.current = workersProgressKey
-
     // Детальный прогресс для UI
     const detailProgress = {
       fps: importFlow.transcodeProgress?.fps,
@@ -443,7 +430,7 @@ export function ImportQueueProcessor() {
       newProgress,
       importFlow.currentFileName ?? undefined,
       importFlow.stage,
-      detailProgress,
+      detailProgress
     )
   }, [
     currentItem,
@@ -475,8 +462,10 @@ export function ImportQueueProcessor() {
       if (currentItem.status !== 'postprocess') {
         updateStatus(currentItem.id, 'postprocess')
       }
+      // Обновляем currentStage в item чтобы UI показывал правильную стадию
+      updateProgress(currentItem.id, currentItem.progress ?? 100, importFlow.currentFileName ?? undefined, stage)
     }
-  }, [currentItem, importFlow.stage, updateStatus])
+  }, [currentItem, importFlow.stage, importFlow.currentFileName, updateStatus, updateProgress])
 
   // Компонент не рендерит UI
   return null

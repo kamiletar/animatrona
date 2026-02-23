@@ -40,7 +40,7 @@ async function updateUserWatchStatus(anime: EpisodeWithTracks['anime'], newStatu
       libraryPath,
       anime.folderPath,
       newStatus as 'NOT_STARTED' | 'WATCHING' | 'COMPLETED' | 'ON_HOLD' | 'DROPPED' | 'PLANNED',
-      newStatus === 'COMPLETED' ? new Date().toISOString() : undefined,
+      newStatus === 'COMPLETED' ? new Date().toISOString() : undefined
     )
   } catch (err) {
     console.warn('[updateUserWatchStatus] Failed to update user data:', err)
@@ -67,7 +67,7 @@ interface UseWatchProgressOptions {
     progress: {
       selectedAudioTrackId: string | null
       selectedSubtitleTrackId: string | null
-    } | null,
+    } | null
   ) => void
 }
 
@@ -98,6 +98,8 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
   const lastSavedTimeRef = useRef<number>(0)
   // Ref для отслеживания времени последнего сохранения (throttle)
   const lastSaveTimestampRef = useRef<number>(0)
+  // Ref для предотвращения повторной отметки completed при авто-детекте конца
+  const completedMarkedRef = useRef(false)
 
   // Загружаем сохранённый прогресс
   const { data: watchProgressData, isLoading: progressQueryLoading } = useFindUniqueWatchProgress(
@@ -109,7 +111,7 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
         },
       },
     },
-    { enabled: !!episode?.animeId },
+    { enabled: !!episode?.animeId }
   )
 
   // Мутация для сохранения прогресса
@@ -179,7 +181,7 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
 
     if (!subtitleTrackSelected && episode.anime.lastSelectedSubtitleDubGroup) {
       const trackByDubGroup = episode.subtitleTracks.find(
-        (t) => t.dubGroup === episode.anime.lastSelectedSubtitleDubGroup,
+        (t) => t.dubGroup === episode.anime.lastSelectedSubtitleDubGroup
       )
       if (trackByDubGroup) {
         onSetSelectedSubtitleTrackId(trackByDubGroup.id)
@@ -190,7 +192,7 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
     // Fallback по языку если dubGroup не найден
     if (!subtitleTrackSelected && episode.anime.lastSelectedSubtitleLanguage) {
       const trackByLanguage = episode.subtitleTracks.find(
-        (t) => t.language === episode.anime.lastSelectedSubtitleLanguage,
+        (t) => t.language === episode.anime.lastSelectedSubtitleLanguage
       )
       if (trackByLanguage) {
         onSetSelectedSubtitleTrackId(trackByLanguage.id)
@@ -202,10 +204,10 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
     onProgressReady?.(
       watchProgressData
         ? {
-          selectedAudioTrackId: audioTrackSelected ? watchProgressData.selectedAudioTrackId : null,
-          selectedSubtitleTrackId: subtitleTrackSelected ? watchProgressData.selectedSubtitleTrackId : null,
-        }
-        : null,
+            selectedAudioTrackId: audioTrackSelected ? watchProgressData.selectedAudioTrackId : null,
+            selectedSubtitleTrackId: subtitleTrackSelected ? watchProgressData.selectedSubtitleTrackId : null,
+          }
+        : null
     )
 
     setProgressLoaded(true)
@@ -221,7 +223,7 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
 
   // Автоустановка статуса WATCHING при начале просмотра
   useEffect(() => {
-    if (!episode || !progressLoaded) {return}
+    if (!episode || !progressLoaded) return
 
     // Если это первый просмотр эпизода этого аниме — устанавливаем статус WATCHING
     // Проверяем: нет сохранённого прогресса или прогресс < 30 сек
@@ -233,6 +235,11 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
         .catch((err) => console.error('[WatchPage] Ошибка установки статуса WATCHING:', err))
     }
   }, [episode?.animeId, progressLoaded, watchProgressData])
+
+  // Сброс флага автоотметки при смене эпизода
+  useEffect(() => {
+    completedMarkedRef.current = false
+  }, [episodeId])
 
   // Обработчик "Продолжить" из ResumeOverlay
   const handleResumeFromSaved = useCallback(() => {
@@ -304,10 +311,10 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
       })
 
       // Записываем прогресс в _user/ для возможности восстановления библиотеки
-      if (episode.manifestPath && episode.anime.folderPath && window.electronAPI?.userData) {
+      if (episode.folderPath && episode.anime.folderPath && window.electronAPI?.userData) {
         // Извлекаем пути
         const libraryPath = extractLibraryPath(episode.anime.folderPath)
-        const episodeFolder = episode.manifestPath.replace(/[/\\][^/\\]+$/, '')
+        const episodeFolder = episode.folderPath
 
         // Находим информацию о выбранных дорожках (dubGroup/language)
         const selectedAudioInfo = selectedAudioTrackId
@@ -330,9 +337,9 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
               : null,
             selectedSubtitle: selectedSubtitleInfo
               ? {
-                dubGroup: selectedSubtitleInfo.dubGroup ?? undefined,
-                language: selectedSubtitleInfo.language ?? undefined,
-              }
+                  dubGroup: selectedSubtitleInfo.dubGroup ?? undefined,
+                  language: selectedSubtitleInfo.language ?? undefined,
+                }
               : null,
           })
           .catch((err) => {
@@ -340,13 +347,20 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
           })
       }
     },
-    [episode, selectedAudioTrackId, selectedSubtitleTrackId, upsertProgress, playerRef],
+    [episode, selectedAudioTrackId, selectedSubtitleTrackId, upsertProgress, playerRef]
   )
 
   // Обработчик обновления времени видео (throttle вместо debounce!)
   const handleTimeUpdate = useCallback(
-    (time: number, _duration: number) => {
+    (time: number, duration: number) => {
       const now = Date.now()
+
+      // Автоотметка: если до конца ≤ 120 сек — помечаем серию просмотренной
+      if (duration > 0 && duration - time <= 120 && !completedMarkedRef.current) {
+        completedMarkedRef.current = true
+        saveProgress(time, true)
+        return
+      }
 
       // Throttle: сохраняем не чаще чем раз в SAVE_INTERVAL
       if (now - lastSaveTimestampRef.current >= SAVE_INTERVAL) {
@@ -354,7 +368,7 @@ export function useWatchProgress(options: UseWatchProgressOptions) {
         saveProgress(time)
       }
     },
-    [saveProgress],
+    [saveProgress]
   )
 
   // Сохранение при размонтировании (переход на другую страницу/эпизод)

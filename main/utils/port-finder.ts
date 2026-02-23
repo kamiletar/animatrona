@@ -4,6 +4,10 @@
  */
 import { createServer, type Server } from 'net'
 
+import { createModuleLogger } from './logger'
+
+const log = createModuleLogger('PortFinder')
+
 /**
  * Проверить, свободен ли порт
  */
@@ -34,7 +38,7 @@ export async function getAvailablePort(preferredPort = 3007, maxAttempts = 200):
     const port = preferredPort + i
     const isFree = await isPortFree(port)
     if (isFree) {
-      console.warn(`[Port] Found free port: ${port}${i > 0 ? ` (after ${i} attempts)` : ''}`)
+      log.info(`Found free port: ${port}`, { attempts: i })
       return port
     }
   }

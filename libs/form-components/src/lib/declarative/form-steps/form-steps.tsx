@@ -1,11 +1,11 @@
 'use client'
 
 import { Steps } from '@chakra-ui/react'
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 import { useDeclarativeForm } from '../form-context'
 import { FormStepsContext, type FormStepsContextValue } from './form-steps-context'
 import { useStepNavigation } from './use-step-navigation'
-import { useStepPersistence, type StepPersistenceConfig } from './use-step-persistence'
+import { type StepPersistenceConfig, useStepPersistence } from './use-step-persistence'
 import { useStepState } from './use-step-state'
 
 export type { StepPersistenceConfig }
@@ -140,12 +140,27 @@ export function FormSteps({
     setInternalStep,
   })
 
-  // Context value
+  // Refs для нестабильных значений — предотвращает пересоздание contextValue
+  // при каждой регистрации шага (sortedSteps и hiddenFields меняются при регистрации)
+  const sortedStepsRef = useRef(sortedSteps)
+  sortedStepsRef.current = sortedSteps
+
+  const hiddenFieldsRef = useRef(hiddenFields)
+  hiddenFieldsRef.current = hiddenFields
+
+  const onStepCompleteRef = useRef(onStepComplete)
+  onStepCompleteRef.current = onStepComplete
+
+  // Context value — зависит только от стабильных значений
+  // sortedSteps, hiddenFields и onStepComplete через refs
   const contextValue: FormStepsContextValue = useMemo(
     () => ({
       currentStep,
       stepCount,
-      steps: sortedSteps,
+      // Геттер для steps — возвращает актуальное значение через ref
+      get steps() {
+        return sortedStepsRef.current
+      },
       goToNext,
       goToPrev,
       goToStep,
@@ -167,16 +182,22 @@ export function FormSteps({
       animated,
       animationDuration,
       direction,
-      hiddenFields,
+      get hiddenFields() {
+        return hiddenFieldsRef.current
+      },
       hideFieldsFromValidation,
       showFieldsForValidation,
-      onStepComplete,
+      get onStepComplete() {
+        return onStepCompleteRef.current
+      },
       clearStepPersistence: clearPersistence,
     }),
+    // ВАЖНО: sortedSteps, hiddenFields, onStepComplete НЕ в deps —
+    // доступны через refs/getters, предотвращает бесконечный цикл
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       currentStep,
       stepCount,
-      sortedSteps,
       goToNext,
       goToPrev,
       goToStep,
@@ -194,11 +215,9 @@ export function FormSteps({
       animated,
       animationDuration,
       direction,
-      hiddenFields,
       hideFieldsFromValidation,
       showFieldsForValidation,
-      onStepComplete,
-    ]
+    ],
   )
 
   // Handle step change from Chakra Steps
@@ -211,7 +230,7 @@ export function FormSteps({
       }
       goToStep(details.step)
     },
-    [linear, currentStep, goToStep]
+    [linear, currentStep, goToStep],
   )
 
   return (

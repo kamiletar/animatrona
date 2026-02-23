@@ -8,7 +8,14 @@ import { useCallback, useEffect, useState } from 'react'
 
 import type { ParsedFile } from '../FileScanStep'
 
-import type { AudioRecommendation, FileAnalysis, SubtitleRecommendation } from './types'
+import {
+  createTrackGroupId,
+  extractGroupFromPath,
+  normalizeLanguageCode,
+  POPULAR_DUB_GROUPS,
+} from '@/constants/dub-groups'
+
+import type { AudioRecommendation, FileAnalysis, SubtitleRecommendation, TrackGroupEdit } from './types'
 import { formatChannels, getAudioRecommendation } from './utils'
 
 interface UsePreviewAnalysisOptions {
@@ -68,23 +75,101 @@ export function usePreviewAnalysis(options: UsePreviewAnalysisOptions) {
       // Используем индекс массива, а не stream index из контейнера
       const audioRecommendations: AudioRecommendation[] = mediaInfo.audioTracks.map((track, arrayIndex) => {
         const rec = getAudioRecommendation(track)
+        const normalizedLang = normalizeLanguageCode(track.language)
+        
+        // Пытаемся извлечь группу озвучки из тегов или названия
+        let dubGroup: string | undefined
+        
+        // 1. Из тегов (если есть)
+        if (track.tags) {
+          // Часто используется PERFORMER или SUMMARY в MKV
+          const rawGroup = track.tags.PERFORMER || track.tags.performer || track.tags.SUMMARY || track.tags.summary || track.tags.comment
+          if (rawGroup) {
+             // Ищем точное совпадение с известными группами
+             dubGroup = POPULAR_DUB_GROUPS.find(g => rawGroup.toLowerCase().includes(g.toLowerCase())) ?? rawGroup
+          }
+        }
+        
+        // 2. Из названия дорожки (Title)
+        if (!dubGroup && track.title) {
+          // Паттерн "Russian (AniDUB)"
+          const parenMatch = track.title.match(/\(([^)]+)\)$/)
+          if (parenMatch) {
+            dubGroup = parenMatch[1]
+          } else {
+             // Ищем вхождение известной группы
+             dubGroup = POPULAR_DUB_GROUPS.find(g => track.title.toLowerCase().includes(g.toLowerCase()))
+          }
+        }
+
+        // Автоматически устанавливаем dubGroup "Оригинал" для японских дорожек, если не найдено иное
+        if (!dubGroup && normalizedLang === 'ja') {
+          dubGroup = 'Оригинал'
+        }
+
         return {
           trackIndex: arrayIndex,
           action: rec.action,
           reason: rec.reason,
           enabled: true, // По умолчанию все включены
+          language: track.language,
+          dubGroup,
         }
       })
 
       // Формируем рекомендации для встроенных субтитров
-      const subtitleRecommendations: SubtitleRecommendation[] = (mediaInfo.subtitleTracks || []).map((sub, idx) => ({
-        streamIndex: idx,
-        language: sub.language,
-        title: sub.title || 'Субтитры',
-        format: 'embedded',
-        isExternal: false,
-        enabled: true, // По умолчанию все включены
-      }))
+      const subtitleRecommendations: SubtitleRecommendation[] = (mediaInfo.subtitleTracks || []).map((sub, idx) => {
+        // Определяем тип субтитров
+        let subtitleType: 'full' | 'signs' | 'songs' | undefined
+        const titleLower = (sub.title || '').toLowerCase()
+        
+        if (titleLower.includes('sign') || titleLower.includes('надписи') || titleLower.includes('forced')) {
+          subtitleType = 'signs'
+        } else if (titleLower.includes('song') || titleLower.includes('op/ed') || titleLower.includes('lyrics') || titleLower.includes('песни')) {
+          subtitleType = 'songs'
+        } else {
+          subtitleType = 'full'
+        }
+
+        // Пытаемся извлечь группу перевода из тегов или названия
+        let dubGroup: string | undefined
+        
+        // 1. Из тегов
+        if (sub.tags) {
+           const rawGroup = sub.tags.PERFORMER || sub.tags.performer || sub.tags.SUMMARY || sub.tags.summary || sub.tags.comment || sub.tags.title
+           if (rawGroup) {
+              dubGroup = POPULAR_DUB_GROUPS.find(g => rawGroup.toLowerCase().includes(g.toLowerCase()))
+           }
+        }
+
+        // 2. Из названия (Title)
+        if (!dubGroup && sub.title) {
+           // Паттерн "Russian (FanSubGroup)" или просто наличие названия группы
+           const parenMatch = sub.title.match(/\(([^)]+)\)$/)
+           if (parenMatch) {
+             const content = parenMatch[1]
+             // Проверяем, не является ли содержимое скобок просто "Full" или "Sign"
+             if (!['full', 'sign', 'signs', 'forced', 'song', 'songs', 'lyrics'].includes(content.toLowerCase())) {
+               dubGroup = content
+             }
+           }
+           
+           if (!dubGroup) {
+              dubGroup = POPULAR_DUB_GROUPS.find(g => sub.title.toLowerCase().includes(g.toLowerCase()))
+           }
+        }
+
+        return {
+          streamIndex: idx,
+          language: sub.language,
+          title: sub.title || 'Субтитры',
+          format: 'embedded',
+          isExternal: false,
+          enabled: true, // По умолчанию все включены
+          subtitleType,
+          dubGroup,
+        }
+      })
 
       return {
         file,
@@ -146,7 +231,24 @@ export function usePreviewAnalysis(options: UsePreviewAnalysisOptions) {
           }))
 
         // Сканируем внешние субтитры
-        const externalSubs = await api.fs.scanExternalSubtitles(folderPath, videoFiles)
+        // createHandler возвращает { success, data: { subtitles, ... } }
+        const externalSubsResult = (await api.fs.scanExternalSubtitles(folderPath, videoFiles)) as unknown as {
+          success: boolean
+          data?: {
+            subtitles: Array<{
+              episodeNumber: number | null
+              filePath: string
+              language: string
+              title: string
+              format: string
+              matchedFonts: Array<{ name: string; path: string }>
+              groupName?: string
+              subtitleType?: 'full' | 'signs' | 'songs'
+            }>
+            unmatchedFiles: string[]
+          }
+        }
+        const externalSubs = externalSubsResult.data || { subtitles: [], unmatchedFiles: [] }
 
         if (externalSubs.subtitles.length > 0) {
           // Группируем внешние субтитры по эпизодам
@@ -173,6 +275,8 @@ export function usePreviewAnalysis(options: UsePreviewAnalysisOptions) {
                 externalPath: sub.filePath,
                 matchedFonts: sub.matchedFonts,
                 enabled: true,
+                dubGroup: sub.groupName,
+                subtitleType: sub.subtitleType || 'full',
               }))
 
               results[i] = {
@@ -192,7 +296,23 @@ export function usePreviewAnalysis(options: UsePreviewAnalysisOptions) {
         }
 
         // Сканируем внешние аудио (Rus Sound/, Audio/ и т.д.)
-        const externalAudio = await api.fs.scanExternalAudio(folderPath, videoFiles)
+        // createHandler возвращает { success, data: { audioTracks, ... } }
+        const externalAudioResult = (await api.fs.scanExternalAudio(folderPath, videoFiles)) as unknown as {
+          success: boolean
+          data?: {
+            audioTracks: Array<{
+              episodeNumber: number | null
+              filePath: string
+              codec: string
+              channels: number
+              groupName: string
+              language: string
+            }>
+            audioDirs: string[]
+            unmatchedFiles: string[]
+          }
+        }
+        const externalAudio = externalAudioResult.data || { audioTracks: [], audioDirs: [], unmatchedFiles: [] }
 
         if (externalAudio.audioTracks.length > 0) {
           // Группируем внешние аудио по эпизодам
@@ -288,6 +408,99 @@ export function usePreviewAnalysis(options: UsePreviewAnalysisOptions) {
     )
   }, [])
 
+  /**
+   * Редактирование группы дорожек (язык/dubGroup)
+   * Применяется только к ТЕКУЩЕМУ эпизоду
+   */
+  const handleTrackGroupEdit = useCallback(
+    (episodeNumber: number, type: 'audio' | 'subtitle', groupId: string, edit: TrackGroupEdit) => {
+      setAnalyses((prev) =>
+        prev.map((analysis) => {
+          // Применяем только к текущему эпизоду
+          if (analysis.file.episodeNumber !== episodeNumber) {
+            return analysis
+          }
+
+          if (type === 'audio') {
+            return {
+              ...analysis,
+              audioRecommendations: analysis.audioRecommendations.map((rec) => {
+                const recGroupId = rec.groupId || createAudioGroupId(rec)
+                if (recGroupId !== groupId) { return rec }
+
+                return {
+                  ...rec,
+                  language: edit.language ?? rec.language,
+                  dubGroup: edit.dubGroup !== undefined ? (edit.dubGroup ?? undefined) : rec.dubGroup,
+                  groupId: recGroupId,
+                }
+              }),
+            }
+          } else {
+            return {
+              ...analysis,
+              subtitleRecommendations: analysis.subtitleRecommendations.map((rec) => {
+                const recGroupId = rec.groupId || createSubtitleGroupId(rec)
+                if (recGroupId !== groupId) { return rec }
+
+                return {
+                  ...rec,
+                  language: edit.language ?? rec.language,
+                  dubGroup: edit.dubGroup !== undefined ? (edit.dubGroup ?? undefined) : rec.dubGroup,
+                  subtitleType: edit.subtitleType ?? rec.subtitleType,
+                  groupId: recGroupId,
+                }
+              }),
+            }
+          }
+        })
+      )
+    },
+    []
+  )
+
+  /**
+   * Применить настройки группы ко ВСЕМ эпизодам
+   */
+  const applyTrackGroupToAll = useCallback((type: 'audio' | 'subtitle', groupId: string, edit: TrackGroupEdit) => {
+    setAnalyses((prev) =>
+      prev.map((analysis) => {
+        if (type === 'audio') {
+          return {
+            ...analysis,
+            audioRecommendations: analysis.audioRecommendations.map((rec) => {
+              const recGroupId = rec.groupId || createAudioGroupId(rec)
+              if (recGroupId !== groupId) { return rec }
+
+              return {
+                ...rec,
+                language: edit.language ?? rec.language,
+                dubGroup: edit.dubGroup !== undefined ? (edit.dubGroup ?? undefined) : rec.dubGroup,
+                groupId: recGroupId,
+              }
+            }),
+          }
+        } else {
+          return {
+            ...analysis,
+            subtitleRecommendations: analysis.subtitleRecommendations.map((rec) => {
+              const recGroupId = rec.groupId || createSubtitleGroupId(rec)
+              if (recGroupId !== groupId) { return rec }
+
+              return {
+                ...rec,
+                language: edit.language ?? rec.language,
+                dubGroup: edit.dubGroup !== undefined ? (edit.dubGroup ?? undefined) : rec.dubGroup,
+                subtitleType: edit.subtitleType ?? rec.subtitleType,
+                groupId: recGroupId,
+              }
+            }),
+          }
+        }
+      })
+    )
+  }, [])
+
   // Запускаем анализ при монтировании
   useEffect(() => {
     if (selectedFiles.length > 0 && analyses.length === 0) {
@@ -318,7 +531,31 @@ export function usePreviewAnalysis(options: UsePreviewAnalysisOptions) {
     startAnalysis,
     handleToggleTrack,
     handleToggleSubtitle,
+    handleTrackGroupEdit,
+    applyTrackGroupToAll,
   }
+}
+
+/**
+ * Создать groupId для аудиодорожки
+ */
+function createAudioGroupId(rec: AudioRecommendation): string {
+  if (rec.isExternal && rec.externalPath) {
+    const folderName = extractGroupFromPath(rec.externalPath)
+    return createTrackGroupId(true, folderName || 'external')
+  }
+  return createTrackGroupId(false, rec.trackIndex)
+}
+
+/**
+ * Создать groupId для субтитров
+ */
+function createSubtitleGroupId(rec: SubtitleRecommendation): string {
+  if (rec.isExternal && rec.externalPath) {
+    const folderName = extractGroupFromPath(rec.externalPath)
+    return createTrackGroupId(true, folderName || 'external')
+  }
+  return createTrackGroupId(false, rec.streamIndex)
 }
 
 export type UsePreviewAnalysisReturn = ReturnType<typeof usePreviewAnalysis>

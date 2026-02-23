@@ -1,12 +1,22 @@
 'use client'
 
 import { Box, HStack, Icon, Text, VStack } from '@chakra-ui/react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
-import { LuCoffee, LuFlaskConical, LuFolder, LuHistory, LuListVideo, LuPlay, LuSettings, LuTv } from 'react-icons/lu'
 
-import { useFindUniqueSettings } from '@/lib/hooks'
+import { navigateTo } from '@/lib/navigation'
+import {
+  LuAward,
+  LuCoffee,
+  LuDatabase,
+  LuDownload,
+  LuFlaskConical,
+  LuHistory,
+  LuListVideo,
+  LuPlay,
+  LuSettings,
+  LuTv,
+} from 'react-icons/lu'
 
 import { ContinueWatchingCard } from './ContinueWatchingCard'
 import { EncodingStatusCard } from './EncodingStatusCard'
@@ -20,9 +30,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/library', label: 'Библиотека', icon: LuTv },
+  { href: '/import-cid', label: 'Импорт CID', icon: LuDownload },
   { href: '/history', label: 'История', icon: LuHistory },
   { href: '/transcode', label: 'Очередь', icon: LuListVideo },
   { href: '/player', label: 'Плеер', icon: LuPlay },
+  { href: '/reputation', label: 'Репутация', icon: LuAward },
   { href: '/test-encoding', label: 'Тест профилей', icon: LuFlaskConical },
   { href: '/settings', label: 'Настройки', icon: LuSettings },
 ]
@@ -44,8 +56,8 @@ interface PowerSaveState {
 
 /** Форматирует размер в человекочитаемый формат */
 function formatBytes(bytes: number): string {
-  if (bytes === 0) {
-    return '0 B'
+  if (!bytes || bytes <= 0 || !Number.isFinite(bytes)) {
+    return '—'
   }
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -62,11 +74,6 @@ export function Sidebar() {
   const [powerSave, setPowerSave] = useState<PowerSaveState | null>(null)
   const [librarySize, setLibrarySize] = useState<number | null>(null)
 
-  // Настройки из БД (для получения пути к библиотеке)
-  const { data: settings } = useFindUniqueSettings({
-    where: { id: 'default' },
-  })
-
   // Загружаем информацию о диске
   useEffect(() => {
     const loadDiskInfo = async () => {
@@ -76,9 +83,10 @@ export function Sidebar() {
       }
 
       // Получаем путь к библиотеке из настроек (или userData по умолчанию)
-      const info = await api.app.getDiskInfo()
-      if (info) {
-        setDiskInfo(info)
+      // preload.ts уже разворачивает IpcResult и возвращает data или null
+      const diskData = await api.app.getDiskInfo()
+      if (diskData) {
+        setDiskInfo(diskData)
       }
     }
 
@@ -88,38 +96,40 @@ export function Sidebar() {
     return () => clearInterval(interval)
   }, [])
 
-  // Загружаем размер библиотеки (с кешированием на backend)
+  // Загружаем размер хранилища IPFS (blockstoreSize)
   useEffect(() => {
-    const loadLibrarySize = async () => {
-      const api = window.electronAPI
+    const loadIpfsSize = async () => {
+      const api = window.electronAPI?.ipfs
       if (!api) {
         return
       }
 
-      // Получаем путь к библиотеке
-      let libraryPath = settings?.libraryPath
-      if (!libraryPath) {
-        // Дефолтный путь
-        const videos = await api.app.getPath('videos')
-        libraryPath = `${videos.replace(/\//g, '\\')}\\Animatrona`
+      // Получаем статус IPFS с blockstoreSize
+      const result = await api.status()
+      if (result?.success && result.data?.blockstoreSize) {
+        setLibrarySize(result.data.blockstoreSize)
       }
-
-      // Получаем размер (кешируется на backend 5 минут)
-      const size = await api.app.getLibrarySize(libraryPath)
-      setLibrarySize(size)
     }
 
-    loadLibrarySize()
-    // Обновляем каждые 60 секунд (backend вернёт кеш если не инвалидирован)
-    const interval = setInterval(loadLibrarySize, 60000)
-    return () => clearInterval(interval)
-  }, [settings?.libraryPath])
+    loadIpfsSize()
+
+    // Подписка на изменения статуса IPFS
+    const api = window.electronAPI?.ipfs
+    if (!api) return
+
+    const unsubscribe = api.onStatusChanged((status) => {
+      if (status?.blockstoreSize) {
+        setLibrarySize(status.blockstoreSize)
+      }
+    })
+    return () => unsubscribe()
+  }, [])
 
   // Загружаем состояние блокировки сна
   useEffect(() => {
     const loadPowerSave = async () => {
       const api = window.electronAPI
-      if (!api?.app?.getPowerSaveState) {return}
+      if (!api?.app?.getPowerSaveState) return
 
       const state = await api.app.getPowerSaveState()
       setPowerSave(state)
@@ -134,7 +144,7 @@ export function Sidebar() {
   // Переключение ручной блокировки
   const togglePowerSave = useCallback(async () => {
     const api = window.electronAPI
-    if (!api?.app?.togglePowerSaveManual) {return}
+    if (!api?.app?.togglePowerSaveManual) return
 
     const result = await api.app.togglePowerSaveManual()
     setPowerSave((prev) => prev ? { ...prev, ...result } : null)
@@ -167,26 +177,29 @@ export function Sidebar() {
           const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
 
           return (
-            <Link key={item.href} href={item.href}>
-              <Box
-                display="flex"
-                alignItems="center"
-                gap={3}
-                px={3}
-                py={2}
-                borderRadius="md"
-                bg={isActive ? 'state.selected.bg' : 'transparent'}
-                color={isActive ? 'state.selected.fg' : 'fg.muted'}
-                _hover={{ bg: 'state.hover', color: 'fg' }}
-                _active={{ transform: 'scale(0.98)', bg: 'state.active' }}
-                transition="all 0.1s ease-out"
-              >
-                <Icon as={item.icon} boxSize={5} />
-                <Text fontSize="sm" fontWeight="medium">
-                  {item.label}
-                </Text>
-              </Box>
-            </Link>
+            <Box
+              key={item.href}
+              as="button"
+              onClick={() => navigateTo(item.href)}
+              display="flex"
+              alignItems="center"
+              gap={3}
+              px={3}
+              py={2}
+              w="full"
+              borderRadius="md"
+              bg={isActive ? 'state.selected.bg' : 'transparent'}
+              color={isActive ? 'state.selected.fg' : 'fg.muted'}
+              _hover={{ bg: 'state.hover', color: 'fg' }}
+              _active={{ transform: 'scale(0.98)', bg: 'state.active' }}
+              transition="all 0.1s ease-out"
+              textAlign="left"
+            >
+              <Icon as={item.icon} boxSize={5} />
+              <Text fontSize="sm" fontWeight="medium">
+                {item.label}
+              </Text>
+            </Box>
           )
         })}
       </VStack>
@@ -230,12 +243,12 @@ export function Sidebar() {
           </HStack>
         </Box>
 
-        {/* Размер библиотеки и место на диске */}
+        {/* Размер IPFS хранилища и место на диске */}
         <Box p={3} mx={2} borderRadius="md" bg="bg.muted" border="1px" borderColor="border">
-          {/* Размер библиотеки */}
+          {/* Размер IPFS хранилища */}
           <HStack gap={2} mb={2}>
-            <Icon as={LuFolder} boxSize={3.5} color="fg.subtle" />
-            <Text fontSize="xs" color="fg.subtle">Библиотека:</Text>
+            <Icon as={LuDatabase} boxSize={3.5} color="fg.subtle" />
+            <Text fontSize="xs" color="fg.subtle">IPFS:</Text>
             <Text fontSize="xs" color="fg" fontWeight="medium">
               {librarySize !== null ? formatBytes(librarySize) : '—'}
             </Text>

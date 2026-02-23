@@ -6,6 +6,7 @@
  * - Прогресс и события для UI
  * - Отмена экспорта
  * - Главы, постер, шрифты
+ * - IPFS интеграция: video/audio напрямую через gateway, fonts/poster через temp files
  */
 
 import { EventEmitter } from 'events'
@@ -20,6 +21,20 @@ import type {
 } from '../../shared/types/export'
 import { mergeMKV } from '../ffmpeg/merge'
 import type { MergeChapter, MergeConfig, SubtitleTrack } from '../ffmpeg/types'
+import { TempFileManager } from './temp-file-manager'
+
+/** Порт IPFS Gateway */
+const IPFS_GATEWAY_PORT = 8765
+
+/**
+ * Получить URL для IPFS контента — IPFS-only подход
+ * Возвращает HTTP URL для gateway или null если CID не указан
+ * @deprecated path параметр больше не используется
+ */
+function toSourceUrl(cid: string | null | undefined): string | null {
+  if (!cid) return null
+  return `http://localhost:${IPFS_GATEWAY_PORT}/ipfs/${cid}`
+}
 
 /** Данные эпизода для экспорта (передаются из renderer) */
 export interface EpisodeExportData {
@@ -31,22 +46,34 @@ export interface EpisodeExportData {
   seasonNumber: number
   /** Название эпизода */
   name?: string | null
-  /** Путь к транскодированному видео (или source) */
-  videoPath: string
+  /** @deprecated Не используется — видео берётся из videoCid */
+  videoPath?: string
+  /** CID транскодированного видео в IPFS (обязательно для экспорта) */
+  videoCid: string
   /** Аудиодорожки */
   audioTracks: Array<{
     language: string
     title: string | null
-    transcodedPath: string | null
+    /** @deprecated Не используется — аудио берётся из transcodedCid */
+    transcodedPath?: string | null
+    /** CID транскодированной аудиодорожки в IPFS */
+    transcodedCid: string
     streamIndex: number
-    inputPath: string
+    /** @deprecated Не используется */
+    inputPath?: string
   }>
   /** Субтитры */
   subtitleTracks: Array<{
     language: string
     title: string | null
-    filePath: string | null
-    fonts: string[]
+    /** @deprecated Не используется — субтитры берутся из fileCid */
+    filePath?: string | null
+    /** CID файла субтитров в IPFS */
+    fileCid: string
+    /** @deprecated Не используется — шрифты берутся из fontCids */
+    fonts?: string[]
+    /** CID шрифтов в IPFS */
+    fontCids: string[]
   }>
   /** Главы */
   chapters: Array<{
@@ -69,6 +96,8 @@ export interface ExportConfig {
   namingPattern: NamingPattern
   /** Путь к постеру (опционально) */
   posterPath?: string
+  /** CID постера в IPFS */
+  posterCid?: string | null
   /** Данные эпизодов */
   episodes: EpisodeExportData[]
   /** Выбранные ключи аудиодорожек (language + title) в порядке, указанном пользователем */
@@ -274,20 +303,27 @@ export class ExportManager extends EventEmitter {
 
   /**
    * Экспортировать один эпизод
+   *
+   * Гибридный подход для IPFS:
+   * - Video/Audio: напрямую через IPFS Gateway (HTTP URLs)
+   * - Fonts/Poster: скачиваются во временные файлы (FFmpeg -attach требует локальные)
    */
   private async exportEpisode(
     config: ExportConfig,
     episode: EpisodeExportData,
     index: number,
-    outputDir: string,
+    outputDir: string
   ): Promise<string> {
     // Генерируем имя файла
     const outputFileName = this.generateFileName(config, episode)
     const outputPath = path.join(outputDir, outputFileName)
 
-    // Проверяем наличие видео
-    if (!episode.videoPath || !fs.existsSync(episode.videoPath)) {
-      throw new Error('Видеофайл не найден')
+    // Получаем URL к видео из IPFS (IPFS-only подход)
+    const videoSource = toSourceUrl(episode.videoCid)
+
+    // Проверяем наличие видео в IPFS
+    if (!videoSource) {
+      throw new Error('Видео не мигрировано в IPFS')
     }
 
     // Фильтруем и сортируем дорожки в порядке, указанном пользователем
@@ -304,45 +340,82 @@ export class ExportManager extends EventEmitter {
       throw new Error('Нет выбранных аудиодорожек для этого эпизода')
     }
 
-    // Формируем конфигурацию мержа
-    const mergeConfig: MergeConfig = {
-      videoPath: episode.videoPath,
-      originalAudio: [],
-      externalAudio: selectedAudio.map((track) => ({
-        path: track.transcodedPath || track.inputPath,
-        language: track.language,
-        title: track.title || '',
-      })),
-      subtitles: selectedSubs
-        .filter((s): s is typeof s & { filePath: string } => !!s.filePath)
-        .map(
-          (track): SubtitleTrack => ({
-            path: track.filePath,
+    // TempFileManager для скачивания fonts/poster из IPFS
+    const tempManager = new TempFileManager()
+
+    try {
+      // Подготавливаем poster (FFmpeg -attach требует локальный файл)
+      let posterPath = config.posterPath
+      if (config.posterCid && !posterPath) {
+        posterPath = await tempManager.downloadFromIpfs(config.posterCid, 'poster.jpg')
+      }
+
+      // Подготавливаем субтитры с шрифтами (IPFS-only)
+      const preparedSubtitles: SubtitleTrack[] = []
+      for (const sub of selectedSubs) {
+        // Путь к субтитрам из IPFS
+        const subtitlePath = toSourceUrl(sub.fileCid)
+        if (!subtitlePath) continue
+
+        // Шрифты — FFmpeg -attach требует локальные файлы
+        // Скачиваем из IPFS (CID обязателен)
+        const preparedFonts: string[] = []
+        const fontCids = sub.fontCids || []
+        for (let i = 0; i < fontCids.length; i++) {
+          const fontCid = fontCids[i]
+          if (!fontCid) continue
+
+          // Скачиваем из IPFS
+          const fontFilename = `font-${i}.ttf`
+          const localFontPath = await tempManager.downloadFromIpfs(fontCid, fontFilename)
+          preparedFonts.push(localFontPath)
+        }
+
+        preparedSubtitles.push({
+          path: subtitlePath,
+          language: sub.language,
+          title: sub.title || '',
+          fonts: preparedFonts,
+        })
+      }
+
+      // Формируем конфигурацию мержа (IPFS-only)
+      const mergeConfig: MergeConfig = {
+        videoPath: videoSource,
+        originalAudio: [],
+        externalAudio: selectedAudio
+          .filter((track) => track.transcodedCid) // Только с CID
+          .map((track) => ({
+            // Аудио из IPFS (FFmpeg поддерживает HTTP URLs для -i)
+            path: toSourceUrl(track.transcodedCid)!,
             language: track.language,
             title: track.title || '',
-            fonts: track.fonts,
-          }),
+          })),
+        subtitles: preparedSubtitles,
+        outputPath,
+        chapters: episode.chapters.map(
+          (ch): MergeChapter => ({
+            startMs: ch.startMs,
+            endMs: ch.endMs,
+            title: ch.title || this.getChapterTitle(ch.type),
+          })
         ),
-      outputPath,
-      chapters: episode.chapters.map(
-        (ch): MergeChapter => ({
-          startMs: ch.startMs,
-          endMs: ch.endMs,
-          title: ch.title || this.getChapterTitle(ch.type),
-        }),
-      ),
-      posterPath: config.posterPath,
-      // Default tracks — индексы соответствуют порядку в selectedAudio/selectedSubs
-      defaultAudioIndex: config.defaultAudioIndex ?? 0,
-      defaultSubtitleIndex: config.defaultSubtitleIndex,
+        posterPath,
+        // Default tracks — индексы соответствуют порядку в selectedAudio/selectedSubs
+        defaultAudioIndex: config.defaultAudioIndex ?? 0,
+        defaultSubtitleIndex: config.defaultSubtitleIndex,
+      }
+
+      // Запускаем мерж
+      await mergeMKV(mergeConfig, (progress) => {
+        this.updateEpisodeStatus(index, 'processing', progress.percent)
+      })
+
+      return outputPath
+    } finally {
+      // Очищаем временные файлы (fonts, poster)
+      await tempManager.cleanup()
     }
-
-    // Запускаем мерж
-    await mergeMKV(mergeConfig, (progress) => {
-      this.updateEpisodeStatus(index, 'processing', progress.percent)
-    })
-
-    return outputPath
   }
 
   /**
@@ -421,10 +494,14 @@ export class ExportManager extends EventEmitter {
   }
 
   /**
-   * Проверить, можно ли пропустить ошибку
+   * Проверить, можно ли пропустить ошибку (эпизод не готов к экспорту)
    */
   private isSkippableError(error: string): boolean {
-    return error.includes('Видеофайл не найден') || error.includes('Нет выбранных аудиодорожек')
+    return (
+      error.includes('Видеофайл не найден') ||
+      error.includes('Видео не мигрировано в IPFS') ||
+      error.includes('Нет выбранных аудиодорожек')
+    )
   }
 
   /**
@@ -435,7 +512,7 @@ export class ExportManager extends EventEmitter {
     status: EpisodeExportProgress['status'],
     percent: number,
     error?: string,
-    outputPath?: string,
+    outputPath?: string
   ): void {
     if (this.progress.episodes[index]) {
       this.progress.episodes[index] = {

@@ -10,12 +10,12 @@ import { RelationKindFormSchema } from './enums/RelationKind.form'
 export const AnimeRelationCreateFormSchema = z.object({
   sourceAnimeId: z.string(),
   targetShikimoriId: z.number().int(),
-  targetAnimeId: z.string().optional(),
+  targetAnimeId: z.string().nullable().optional(),
   relationKind: RelationKindFormSchema,
-  targetName: z.string().optional(),
-  targetPosterUrl: z.string().optional(),
-  targetYear: z.number().int().optional(),
-  targetKind: z.string().optional()
+  targetName: z.string().nullable().optional(),
+  targetPosterUrl: z.string().nullable().optional(),
+  targetYear: z.number().int().nullable().optional(),
+  targetKind: z.string().nullable().optional()
 })
 
 /**

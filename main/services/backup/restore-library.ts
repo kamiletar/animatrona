@@ -15,11 +15,14 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import type { AnimeMeta } from '../../../shared/types/backup'
-import type { UserAnimeData, UserEpisodeData } from '../../../shared/types/user-data'
 import type { EpisodeManifest } from '../../../shared/types/manifest'
+import type { UserAnimeData, UserEpisodeData } from '../../../shared/types/user-data'
+import { getEpisodeRelativePath } from '../../../shared/utils/folder-hash'
+import { createModuleLogger } from '../../utils/logger'
 import { getAnimeExtended } from '../shikimori'
 import { readUserAnimeData } from './user-data-service'
-import { getEpisodeRelativePath } from '../../../shared/utils/folder-hash'
+
+const log = createModuleLogger('RestoreLibrary')
 
 /** Информация об аудиодорожке из манифеста */
 export interface ManifestAudioTrackData {
@@ -143,7 +146,7 @@ async function readAnimeMeta(animeFolder: string): Promise<AnimeMeta | null> {
     const content = fs.readFileSync(metaPath, 'utf-8')
     return JSON.parse(content) as AnimeMeta
   } catch (err) {
-    console.warn('[RestoreLibrary] Failed to read anime.meta.json:', metaPath, err)
+    log.warn('Failed to read anime.meta.json', { metaPath, error: err })
     return null
   }
 }
@@ -160,7 +163,7 @@ async function readEpisodeManifest(manifestPath: string): Promise<EpisodeManifes
     const content = fs.readFileSync(manifestPath, 'utf-8')
     return JSON.parse(content) as EpisodeManifest
   } catch (err) {
-    console.warn('[RestoreLibrary] Failed to read manifest:', manifestPath, err)
+    log.warn('Failed to read manifest', { manifestPath, error: err })
     return null
   }
 }
@@ -246,7 +249,7 @@ async function fetchShikimoriData(shikimoriId: number): Promise<AnimeRestoreData
       synonyms: data.synonyms ?? [],
     }
   } catch (err) {
-    console.warn('[RestoreLibrary] Failed to fetch Shikimori data:', shikimoriId, err)
+    log.warn('Failed to fetch Shikimori data', { shikimoriId, error: err })
     return null
   }
 }
@@ -257,7 +260,7 @@ async function fetchShikimoriData(shikimoriId: number): Promise<AnimeRestoreData
 async function scanAnimeFolder(
   libraryPath: string,
   animeFolder: string,
-  loadShikimori: boolean
+  loadShikimori: boolean,
 ): Promise<{ data: AnimeRestoreData | null; warnings: string[] }> {
   const warnings: string[] = []
 
@@ -427,7 +430,7 @@ export async function scanLibraryForRestore(libraryPath: string, loadShikimori =
  * Быстрое сканирование — только статистика без загрузки Shikimori
  */
 export async function quickScanLibrary(
-  libraryPath: string
+  libraryPath: string,
 ): Promise<{ success: boolean; stats: LibraryScanResult['stats']; error?: string }> {
   const result = await scanLibraryForRestore(libraryPath, false)
 

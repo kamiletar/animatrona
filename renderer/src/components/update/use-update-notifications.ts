@@ -31,6 +31,27 @@ export function useUpdateNotifications() {
   // Отслеживаем уже показанные версии, чтобы не показывать дважды
   const shownVersions = useRef<Set<string>>(new Set())
 
+  // Флаг что автопроверка уже запущена в этой сессии
+  const autoCheckTriggered = useRef(false)
+
+  // Автоматическая проверка обновлений при запуске (если включена в настройках)
+  useEffect(() => {
+    if (!preferences.autoCheck || autoCheckTriggered.current) {
+      return
+    }
+
+    autoCheckTriggered.current = true
+
+    // Задержка 5 секунд после старта приложения
+    const timer = setTimeout(async () => {
+      if (window.electronAPI?.updater) {
+        await window.electronAPI.updater.check()
+      }
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [preferences.autoCheck])
+
   useEffect(() => {
     // Если уведомления отключены, ничего не делаем
     if (!preferences.showNotifications) {

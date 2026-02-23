@@ -249,9 +249,9 @@ function generateZodType(field: ModelFieldInfo, _enumNames: Set<string>): string
     zodType = `z.array(${zodType})`
   }
 
-  // Опциональные поля
+  // Опциональные поля (Prisma ? означает nullable, не undefined)
   if (!field.isRequired) {
-    zodType = `${zodType}.optional()`
+    zodType = `${zodType}.nullable().optional()`
   }
 
   // Значение по умолчанию
@@ -259,8 +259,15 @@ function generateZodType(field: ModelFieldInfo, _enumNames: Set<string>): string
     let defaultStr: string
     if (typeof field.defaultValue === 'string') {
       defaultStr = `'${field.defaultValue}'`
-    } else if (typeof field.defaultValue === 'boolean' || typeof field.defaultValue === 'number') {
+    } else if (typeof field.defaultValue === 'boolean') {
       defaultStr = String(field.defaultValue)
+    } else if (typeof field.defaultValue === 'number') {
+      // Для BigInt типов нужно использовать BigInt()
+      if (field.type === 'BigInt') {
+        defaultStr = `BigInt(${field.defaultValue})`
+      } else {
+        defaultStr = String(field.defaultValue)
+      }
     } else {
       defaultStr = JSON.stringify(field.defaultValue)
     }

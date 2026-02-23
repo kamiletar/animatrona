@@ -2,10 +2,10 @@
 
 import { Steps } from '@chakra-ui/react'
 import { AnimatePresence, motion, type Variants } from 'framer-motion'
-import { Children, isValidElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Children, isValidElement, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useDeclarativeForm } from '../form-context'
 import { FormGroupDeclarative } from '../form-group/form-group-declarative'
-import { useFormStepsContext, type StepInfo } from './form-steps-context'
+import { type StepInfo, useFormStepsContext } from './form-steps-context'
 
 /**
  * Условие отображения шага
@@ -84,8 +84,7 @@ function extractFieldNames(children: ReactNode, parentPath = ''): string[] {
       if (props.children) {
         names.push(...extractFieldNames(props.children as ReactNode, groupPath))
       }
-    }
-    // Recurse into children (but not into Form.Group.List - arrays are handled differently)
+    } // Recurse into children (but not into Form.Group.List - arrays are handled differently)
     else if (props.children && displayName !== 'FormGroupListDeclarative') {
       names.push(...extractFieldNames(props.children as ReactNode, parentPath))
     }
@@ -268,9 +267,10 @@ export function FormStepsStep({
         unregisterStep(indexRef.current)
       }
     }
-    // ВАЖНО: steps и children намеренно НЕ включены — вызывают бесконечный цикл
+    // ВАЖНО: steps, children и icon намеренно НЕ включены — вызывают бесконечный цикл
+    // icon — JSX элемент, создаётся заново каждый рендер
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [description, icon, registerStep, title, unregisterStep, onEnter, onLeave, isVisible, fieldExtractionPath])
+  }, [description, registerStep, title, unregisterStep, onEnter, onLeave, isVisible, fieldExtractionPath])
 
   // Извлекаем fieldNames и мемоизируем их строковое представление
   // для использования в dependency array вместо children
@@ -280,26 +280,29 @@ export function FormStepsStep({
     // Используем segment path как proxy для определения когда структура может измениться
     // children НЕ включаем — они меняются на каждый рендер
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fieldExtractionPath]
+    [fieldExtractionPath],
   )
 
   // Обновляем ref только если fieldNames реально изменились
-  const fieldNamesChanged =
-    currentFieldNames.length !== fieldNamesRef.current.length ||
-    currentFieldNames.some((name, i) => name !== fieldNamesRef.current[i])
+  const fieldNamesChanged = currentFieldNames.length !== fieldNamesRef.current.length
+    || currentFieldNames.some((name, i) => name !== fieldNamesRef.current[i])
   if (fieldNamesChanged) {
     fieldNamesRef.current = currentFieldNames
   }
 
   // Update step info if props change (but keep same index)
-  // ВАЖНО: children НЕ включён в deps — он меняется каждый рендер и вызовет бесконечный цикл
+  // ВАЖНО: children и icon НЕ включены в deps — они меняются каждый рендер и вызовут бесконечный цикл
+  // icon — JSX элемент, который создаётся заново при каждом рендере
+  const iconRef = useRef(icon)
+  iconRef.current = icon
+
   useEffect(() => {
     if (indexRef.current >= 0 && isVisible) {
       const stepInfo: StepInfo = {
         index: indexRef.current,
         title,
         description,
-        icon,
+        icon: iconRef.current,
         fieldNames: fieldNamesRef.current,
         onEnter,
         onLeave,
@@ -307,7 +310,7 @@ export function FormStepsStep({
       registerStep(stepInfo)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, icon, registerStep, onEnter, onLeave, isVisible, fieldExtractionPath])
+  }, [title, description, registerStep, onEnter, onLeave, isVisible, fieldExtractionPath])
 
   const index = indexRef.current
 
@@ -330,7 +333,7 @@ export function FormStepsStep({
         x: direction === 'forward' ? -SLIDE_OFFSET : SLIDE_OFFSET,
       },
     }),
-    [direction]
+    [direction],
   )
 
   // Шаг скрыт через when условие — не рендерим

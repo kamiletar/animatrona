@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LuCheck, LuClock, LuExpand, LuInfo, LuPlay } from 'react-icons/lu'
 
-import { toMediaUrl } from '@/lib/media-url'
+import { toPlayableUrl } from '@/lib/media-url'
 
 import { EncodingInfoDialog } from './EncodingInfoDialog'
 
@@ -20,10 +20,10 @@ interface EpisodeCardProps {
   number: number
   name?: string | null
   durationMs?: number | null
-  /** JSON массив путей к thumbnail-ам (320px) */
-  thumbnailPaths?: string | null
-  /** JSON массив путей к полноразмерным скриншотам (1280px) */
-  screenshotPaths?: string | null
+  /** JSON массив CID thumbnail'ов в IPFS (320px) */
+  thumbnailCids?: string | null
+  /** JSON массив CID скриншотов в IPFS (1280px) */
+  screenshotCids?: string | null
   /** Статус просмотра */
   watchStatus: 'unwatched' | 'in_progress' | 'completed'
   /** Прогресс просмотра (0-100) */
@@ -39,18 +39,25 @@ interface EpisodeCardProps {
 }
 
 /**
- * Парсит JSON строку путей в массив
+ * Парсит JSON строку CID в массив
  */
-function parsePathsJson(json: string | null | undefined): string[] {
+function parseCidsJson(json: string | null | undefined): string[] {
   if (!json) {
     return []
   }
   try {
-    const paths = JSON.parse(json)
-    return Array.isArray(paths) ? paths : []
+    const cids = JSON.parse(json)
+    return Array.isArray(cids) ? cids : []
   } catch {
     return []
   }
+}
+
+/**
+ * Преобразует CID в URL IPFS gateway
+ */
+function cidToUrl(cid: string): string | null {
+  return toPlayableUrl({ cid })
 }
 
 /**
@@ -79,8 +86,8 @@ export const EpisodeCard = memo(function EpisodeCard({
   number,
   name,
   durationMs,
-  thumbnailPaths,
-  screenshotPaths,
+  thumbnailCids,
+  screenshotCids,
   watchStatus,
   watchProgress = 0,
   encodingSettingsJson,
@@ -90,9 +97,9 @@ export const EpisodeCard = memo(function EpisodeCard({
 }: EpisodeCardProps) {
   const router = useRouter()
 
-  // Мемоизация парсинга JSON путей — избегаем повторного парсинга при каждом рендере
-  const thumbnails = useMemo(() => parsePathsJson(thumbnailPaths), [thumbnailPaths])
-  const fullScreenshots = useMemo(() => parsePathsJson(screenshotPaths), [screenshotPaths])
+  // Мемоизация парсинга JSON CID — избегаем повторного парсинга при каждом рендере
+  const thumbnails = useMemo(() => parseCidsJson(thumbnailCids), [thumbnailCids])
+  const fullScreenshots = useMemo(() => parseCidsJson(screenshotCids), [screenshotCids])
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
@@ -130,7 +137,7 @@ export const EpisodeCard = memo(function EpisodeCard({
       e.stopPropagation()
       router.push(`/watch/${id}`)
     },
-    [router, id]
+    [router, id],
   )
 
   // Открыть лайтбокс
@@ -143,7 +150,7 @@ export const EpisodeCard = memo(function EpisodeCard({
         setLightboxOpen(true)
       }
     },
-    [currentIndex, fullScreenshots.length]
+    [currentIndex, fullScreenshots.length],
   )
 
   // Открыть диалог информации о кодировании
@@ -159,11 +166,11 @@ export const EpisodeCard = memo(function EpisodeCard({
   // Мемоизация слайдов для лайтбокса — пересчитываем только при изменении скриншотов
   const lightboxSlides = useMemo(
     () =>
-      fullScreenshots.map((path, i) => ({
-        src: toMediaUrl(path) || '',
+      fullScreenshots.map((cid, i) => ({
+        src: cidToUrl(cid) || '',
         alt: `Эпизод ${number} — кадр ${i + 1}`,
       })),
-    [fullScreenshots, number]
+    [fullScreenshots, number],
   )
 
   // Бейдж статуса — используем константу вместо создания объекта
@@ -190,19 +197,21 @@ export const EpisodeCard = memo(function EpisodeCard({
       >
         {/* Thumbnail (16:9) */}
         <Box position="relative" aspectRatio={16 / 9} cursor="pointer" onClick={handlePlayClick}>
-          {currentThumbnail ? (
-            <Image
-              src={toMediaUrl(currentThumbnail) || undefined}
-              alt={`Эпизод ${number}`}
-              objectFit="cover"
-              w="full"
-              h="full"
-            />
-          ) : (
-            <Box w="full" h="full" bg="bg.subtle" display="flex" alignItems="center" justifyContent="center">
-              <Icon as={LuPlay} boxSize={10} color="fg.subtle" />
-            </Box>
-          )}
+          {currentThumbnail
+            ? (
+              <Image
+                src={cidToUrl(currentThumbnail) || undefined}
+                alt={`Эпизод ${number}`}
+                objectFit="cover"
+                w="full"
+                h="full"
+              />
+            )
+            : (
+              <Box w="full" h="full" bg="bg.subtle" display="flex" alignItems="center" justifyContent="center">
+                <Icon as={LuPlay} boxSize={10} color="fg.subtle" />
+              </Box>
+            )}
 
           {/* Overlay с кнопками при hover */}
           {isHovering && (

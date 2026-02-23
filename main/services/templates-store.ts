@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Сервис хранения шаблонов импорта
  *
@@ -16,6 +15,9 @@ import type {
   ImportTemplateCreateData,
   ImportTemplateUpdateData,
 } from '../../shared/types/import-template'
+import { createModuleLogger } from '../utils/logger'
+
+const log = createModuleLogger('TemplatesStore')
 
 const TEMPLATES_FILE = 'import-templates.json'
 
@@ -39,7 +41,7 @@ function loadTemplates(): ImportTemplate[] {
     const data = fs.readFileSync(filePath, 'utf-8')
     return JSON.parse(data)
   } catch (error) {
-    console.error('[TemplatesStore] Ошибка загрузки шаблонов:', error)
+    log.error('Ошибка загрузки шаблонов', { error })
     return []
   }
 }
@@ -52,7 +54,7 @@ function saveTemplates(templates: ImportTemplate[]): void {
     const filePath = getTemplatesPath()
     fs.writeFileSync(filePath, JSON.stringify(templates, null, 2), 'utf-8')
   } catch (error) {
-    console.error('[TemplatesStore] Ошибка сохранения шаблонов:', error)
+    log.error('Ошибка сохранения шаблонов', { error })
     throw error
   }
 }
@@ -87,7 +89,7 @@ export function createTemplate(data: ImportTemplateCreateData): ImportTemplate {
   templates.push(newTemplate)
   saveTemplates(templates)
 
-  console.log(`[TemplatesStore] Создан шаблон: ${newTemplate.name}`)
+  log.info('Создан шаблон', { name: newTemplate.name })
   return newTemplate
 }
 
@@ -108,7 +110,7 @@ export function updateTemplate(id: string, data: ImportTemplateUpdateData): Impo
   }
 
   saveTemplates(templates)
-  console.log(`[TemplatesStore] Обновлён шаблон: ${templates[index].name}`)
+  log.info('Обновлён шаблон', { name: templates[index].name })
   return templates[index]
 }
 
@@ -125,7 +127,7 @@ export function deleteTemplate(id: string): boolean {
 
   const deleted = templates.splice(index, 1)[0]
   saveTemplates(templates)
-  console.log(`[TemplatesStore] Удалён шаблон: ${deleted.name}`)
+  log.info('Удалён шаблон', { name: deleted.name })
   return true
 }
 

@@ -56,12 +56,21 @@ export function useStepState(): UseStepStateResult {
 
   const stepCount = sortedSteps.length
 
-  // Регистрация шага
+  // Регистрация шага (с проверкой изменений — предотвращает лишние ре-рендеры)
   const registerStep = useCallback((step: StepInfo) => {
     setSteps((prev) => {
-      // Заменяем если уже существует с таким индексом
       const existing = prev.findIndex((s) => s.index === step.index)
       if (existing >= 0) {
+        const old = prev[existing]
+        // Сравниваем значимые поля — если не изменились, не обновляем state
+        if (
+          old.title === step.title
+          && old.description === step.description
+          && old.fieldNames.length === step.fieldNames.length
+          && old.fieldNames.every((f, i) => f === step.fieldNames[i])
+        ) {
+          return prev // Без изменений — возвращаем тот же объект
+        }
         const next = [...prev]
         next[existing] = step
         return next

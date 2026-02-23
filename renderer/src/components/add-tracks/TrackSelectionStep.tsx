@@ -26,7 +26,7 @@ interface TrackSelectionStepProps {
     episodeId: string,
     episodeDir: string,
     type: 'audio' | 'subtitle',
-    track: TrackInfo
+    track: TrackInfo,
   ) => void
   /** Выбрать все дорожки типа */
   onSelectAllOfType: (type: 'audio' | 'subtitle') => void
@@ -337,7 +337,12 @@ export function TrackSelectionStep({
             </Button>
           )}
           {onDeselectByLanguage && (
-            <Button size="sm" variant="ghost" colorPalette="red" onClick={() => onDeselectByLanguage(['jpn', 'ja'])}>
+            <Button
+              size="sm"
+              variant="ghost"
+              colorPalette="red"
+              onClick={() => onDeselectByLanguage(['jpn', 'ja'])}
+            >
               −jpn
             </Button>
           )}
@@ -358,7 +363,8 @@ export function TrackSelectionStep({
           }
 
           const episode = libraryEpisodes.find((ep) => ep.id === targetEp.id)
-          const episodeDir = episode?.transcodedPath ? episode.transcodedPath.replace(/[/\\][^/\\]+$/, '') : ''
+          // Используем folderPath эпизода или пустую строку (дорожки сохраняются в IPFS)
+          const episodeDir = episode?.folderPath ?? ''
 
           // Встроенные аудио (из MKV)
           const embeddedAudio = probe.audioTracks.filter((t) => !t.isExternal)

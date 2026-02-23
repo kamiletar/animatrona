@@ -92,7 +92,7 @@ export function CommandPalette({ open, onOpenChange, onShowShortcuts, onImport }
           import('@/components/ui/toaster').then(({ toaster }) => {
             toaster.info({
               title: 'Экспорт аниме',
-              description: 'Откройте страницу аниме → меню ⋮ → «Экспорт в MKV»',
+              description: 'Откройте страницу аниме → меню ⋮ → «Экспорт»',
             })
           })
           break

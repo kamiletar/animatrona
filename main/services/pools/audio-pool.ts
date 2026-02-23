@@ -23,7 +23,7 @@ import { BasePool } from './base-pool'
 function parseFFmpegProgress(
   str: string,
   duration: number,
-  startTime: number
+  startTime: number,
 ): Partial<TranscodeProgressExtended> | null {
   const time = parseTimeToSeconds(str)
   if (time === null) {
@@ -95,6 +95,14 @@ export class AudioPool extends BasePool<AudioPoolTask> {
     this.emit('taskStarted', task)
 
     try {
+      // Passthrough с input=output: файл уже готов после demux, FFmpeg не нужен
+      // Просто завершаем задачу — событие taskCompleted загрузит файл в IPFS
+      if (task.passthrough && task.inputPath === task.outputPath) {
+        const duration = await getVideoDuration(task.inputPath)
+        this.completeTask(task, duration)
+        return
+      }
+
       const duration = await getVideoDuration(task.inputPath)
 
       // Проверяем флаг отмены ПОСЛЕ async операции
@@ -162,7 +170,7 @@ export class AudioPool extends BasePool<AudioPoolTask> {
 
   /** Построить аргументы FFmpeg */
   private buildFFmpegArgs(task: AudioPoolTask): string[] {
-    const { options, inputPath, outputPath, useStreamMapping, trackIndex, syncOffset } = task
+    const { options, inputPath, outputPath, useStreamMapping, trackIndex, syncOffset, passthrough } = task
 
     const args: string[] = ['-y', '-hide_banner', '-threads', '0']
 
@@ -179,28 +187,42 @@ export class AudioPool extends BasePool<AudioPoolTask> {
       args.push('-map', `0:a:${trackIndex}`)
     }
 
-    // Отрицательное смещение: донор отстаёт → добавить тишину через adelay
-    if (syncOffset && syncOffset < 0) {
-      const delayMs = Math.abs(syncOffset)
-      // adelay формат: delay_left|delay_right (для стерео)
-      // Для многоканального аудио (5.1, 7.1) — все каналы получат одинаковую задержку
-      args.push('-af', `adelay=${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}`)
-    }
+    // Passthrough режим — копируем аудио без транскодирования
+    // Используется для AAC ≤256kbps и MP3, которые не нуждаются в перекодировании
+    if (passthrough) {
+      args.push(
+        '-c:a',
+        'copy',
+        '-vn', // Без видео
+      )
+    } else {
+      // Отрицательное смещение: донор отстаёт → добавить тишину через adelay
+      // Применяется только при транскодировании (copy не поддерживает фильтры)
+      if (syncOffset && syncOffset < 0) {
+        const delayMs = Math.abs(syncOffset)
+        // adelay формат: delay_left|delay_right (для стерео)
+        // Для многоканального аудио (5.1, 7.1) — все каналы получат одинаковую задержку
+        args.push(
+          '-af',
+          `adelay=${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}|${delayMs}`,
+        )
+      }
 
-    args.push(
-      '-c:a',
-      'aac',
-      '-b:a',
-      `${options.targetBitrate}k`,
-      '-vn' // Без видео
-    )
+      args.push(
+        '-c:a',
+        'aac',
+        '-b:a',
+        `${options.targetBitrate}k`,
+        '-vn', // Без видео
+      )
 
-    // Опциональные параметры
-    if (options.sampleRate) {
-      args.push('-ar', options.sampleRate.toString())
-    }
-    if (options.channels) {
-      args.push('-ac', options.channels.toString())
+      // Опциональные параметры (только при транскодировании)
+      if (options.sampleRate) {
+        args.push('-ar', options.sampleRate.toString())
+      }
+      if (options.channels) {
+        args.push('-ac', options.channels.toString())
+      }
     }
 
     args.push(outputPath)

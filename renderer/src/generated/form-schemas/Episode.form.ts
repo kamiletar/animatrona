@@ -2,37 +2,24 @@
 // DO NOT EDIT MANUALLY
 
 import { z } from 'zod/v4'
-import { TranscodeStatusFormSchema } from './enums/TranscodeStatus.form'
 
 /**
  * Схема создания Episode с UI метаданными
  */
 export const EpisodeCreateFormSchema = z.object({
   animeId: z.string(),
-  seasonId: z.string().optional(),
+  seasonId: z.string().nullable().optional(),
   number: z.number().int().min(0)
     .meta({
       ui: { title: 'Номер серии', fieldType: 'numberInput' }
     }),
-  name: z.string().optional()
+  name: z.string().nullable().optional()
     .meta({
       ui: { title: 'Название' }
     }),
-  durationMs: z.number().int().optional()
+  durationMs: z.number().int().nullable().optional()
     .meta({
       ui: { title: 'Длительность (мс)', fieldType: 'numberInput' }
-    }),
-  sourcePath: z.string().optional()
-    .meta({
-      ui: { title: 'Путь к исходному файлу' }
-    }),
-  transcodedPath: z.string().optional()
-    .meta({
-      ui: { title: 'Путь к транскодированному файлу' }
-    }),
-  transcodeStatus: TranscodeStatusFormSchema
-    .meta({
-      ui: { title: 'Статус транскодирования' }
     })
 })
 
@@ -44,7 +31,7 @@ export const EpisodeUpdateFormSchema = EpisodeCreateFormSchema.partial()
 /**
  * Поля, исключённые из форм
  */
-export const EpisodeExcludedFields = ['id', 'anime', 'season', 'manifestPath', 'extractedVideoPath', 'transcodeError', 'videoCodec', 'videoWidth', 'videoHeight', 'videoBitrate', 'videoBitDepth', 'thumbnailPaths', 'screenshotPaths', 'audioTracks', 'subtitleTracks', 'chapters', 'watchProgress', 'encodingSettingsJson', 'encodingProfileId', 'encodingProfile', 'sourceSize', 'transcodedSize', 'createdAt', 'updatedAt'] as const
+export const EpisodeExcludedFields = ['id', 'anime', 'season', 'folderPath', 'videoCodec', 'videoWidth', 'videoHeight', 'videoBitrate', 'videoBitDepth', 'audioTracks', 'subtitleTracks', 'chapters', 'watchProgress', 'encodingSettingsJson', 'encodingProfileId', 'encodingProfile', 'sourceSize', 'transcodedSize', 'transcodedCid', 'manifestCid', 'thumbnailCids', 'screenshotCids', 'createdAt', 'updatedAt'] as const
 
 /**
  * Типы

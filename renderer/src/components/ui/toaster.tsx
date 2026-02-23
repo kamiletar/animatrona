@@ -1,11 +1,11 @@
 'use client'
 
-import { Toaster as ChakraToaster, Portal, Spinner, Stack, Toast, createToaster } from '@chakra-ui/react'
+import { createToaster, Portal, Spinner, Stack, Toast, Toaster as ChakraToaster } from '@chakra-ui/react'
 
 /**
  * Toaster singleton для показа уведомлений
  */
-export const toaster = createToaster({
+export const toaster: ReturnType<typeof createToaster> = createToaster({
   placement: 'bottom-end',
   pauseOnPageIdle: true,
 })

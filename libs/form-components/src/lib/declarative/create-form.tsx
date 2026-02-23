@@ -32,6 +32,7 @@ import type {
   FormStepsStepProps,
 } from './form-steps'
 import { Form } from './index'
+import { createLazyComponents, type LazyComponentImport } from './lazy-component'
 import type {
   AddressFieldProps,
   CheckboxFieldProps,
@@ -64,12 +65,49 @@ interface CreateFormOptions {
   extraFields?: Record<string, AnyComponent>
   /** Extra button components to add to Form.Button */
   extraButtons?: Record<string, AnyComponent>
-  /** Extra select components to add to Form.Select */
+  /** Extra select components to add to Form.Select (синхронные) */
   extraSelects?: Record<string, AnyComponent>
-  /** Extra combobox components to add to Form.Combobox */
+  /** Extra combobox components to add to Form.Combobox (синхронные) */
   extraComboboxes?: Record<string, AnyComponent>
-  /** Extra listbox components to add to Form.Listbox */
+  /** Extra listbox components to add to Form.Listbox (синхронные) */
   extraListboxes?: Record<string, AnyComponent>
+
+  /**
+   * Ленивые Select компоненты — загружаются только при рендере
+   *
+   * @example
+   * ```tsx
+   * lazySelects: {
+   *   Type: () => import('./selects/select-type').then(m => m.SelectType),
+   *   Status: () => import('./selects/select-status').then(m => m.SelectStatus),
+   * }
+   * ```
+   */
+  lazySelects?: Record<string, LazyComponentImport>
+
+  /**
+   * Ленивые Combobox компоненты — загружаются только при рендере
+   *
+   * @example
+   * ```tsx
+   * lazyComboboxes: {
+   *   User: () => import('./comboboxes/combobox-user').then(m => m.ComboboxUser),
+   * }
+   * ```
+   */
+  lazyComboboxes?: Record<string, LazyComponentImport>
+
+  /**
+   * Ленивые Listbox компоненты — загружаются только при рендере
+   *
+   * @example
+   * ```tsx
+   * lazyListboxes: {
+   *   Tags: () => import('./listboxes/listbox-tags').then(m => m.ListboxTags),
+   * }
+   * ```
+   */
+  lazyListboxes?: Record<string, LazyComponentImport>
 }
 
 interface ListButton {
@@ -216,7 +254,21 @@ export interface ExtendedForm {
  * ```
  */
 export function createForm(options: CreateFormOptions = {}): ExtendedForm {
-  const { extraFields = {}, extraButtons = {}, extraSelects = {}, extraComboboxes = {}, extraListboxes = {} } = options
+  const {
+    extraFields = {},
+    extraButtons = {},
+    extraSelects = {},
+    extraComboboxes = {},
+    extraListboxes = {},
+    lazySelects = {},
+    lazyComboboxes = {},
+    lazyListboxes = {},
+  } = options
+
+  // Создаём lazy-обёртки для компонентов
+  const lazySelectComponents = createLazyComponents(lazySelects)
+  const lazyComboboxComponents = createLazyComponents(lazyComboboxes)
+  const lazyListboxComponents = createLazyComponents(lazyListboxes)
 
   const ExtendedField = {
     ...Form.Field,
@@ -228,16 +280,20 @@ export function createForm(options: CreateFormOptions = {}): ExtendedForm {
     ...extraButtons,
   }
 
+  // Объединяем синхронные и lazy компоненты
   const ExtendedSelect = {
     ...extraSelects,
+    ...lazySelectComponents,
   }
 
   const ExtendedCombobox = {
     ...extraComboboxes,
+    ...lazyComboboxComponents,
   }
 
   const ExtendedListbox = {
     ...extraListboxes,
+    ...lazyListboxComponents,
   }
 
   const ExtendedForm = Object.assign(

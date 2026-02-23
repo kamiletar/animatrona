@@ -13,13 +13,14 @@ export const SubtitleTrackCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Язык' }
     }),
-  title: z.string().optional()
+  title: z.string().nullable().optional()
     .meta({
       ui: { title: 'Название' }
     }),
-  dubGroup: z.string().optional(),
+  dubGroup: z.string().nullable().optional(),
+  subtitleType: z.string().default('full'),
   format: z.string(),
-  filePath: z.string().optional(),
+  fileCid: z.string().nullable().optional(),
   isDefault: z.boolean().default(false)
 })
 

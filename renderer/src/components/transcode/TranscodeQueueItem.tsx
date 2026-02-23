@@ -16,7 +16,7 @@ import {
 } from 'react-icons/lu'
 
 import { Tooltip } from '@/components/ui/tooltip'
-import { formatBytes, formatSpeed } from '@/utils/format'
+import { formatBytes, formatSpeed } from '@/lib/format-utils'
 import type { QueueItem, QueueItemStatus } from '../../../../shared/types'
 
 interface TranscodeQueueItemProps {

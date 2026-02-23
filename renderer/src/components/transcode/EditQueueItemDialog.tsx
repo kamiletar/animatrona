@@ -10,20 +10,9 @@
  * Доступно только для элементов со статусом 'pending'
  */
 
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  HStack,
-  Icon,
-  Portal,
-  Slider,
-  Switch,
-  Text,
-  VStack,
-} from '@chakra-ui/react'
+import { Button, Checkbox, Dialog, HStack, Icon, Portal, Slider, Switch, Text, VStack } from '@chakra-ui/react'
 import { memo, useCallback, useState } from 'react'
-import { LuPencil, LuTarget } from 'react-icons/lu'
+import { LuCpu, LuPencil, LuTarget } from 'react-icons/lu'
 
 import type { ImportQueueAddData, ImportQueueEntry } from '../../../../shared/types/import-queue'
 
@@ -62,6 +51,7 @@ export const EditQueueItemDialog = memo(function EditQueueItemDialog({
   // Локальное состояние для редактирования
   const [vmafEnabled, setVmafEnabled] = useState(item.vmafSettings?.enabled ?? false)
   const [targetVmaf, setTargetVmaf] = useState(item.vmafSettings?.targetVmaf ?? 94)
+  const [forceCpu, setForceCpu] = useState(item.forceCpu ?? false)
   const [selectedFiles, setSelectedFiles] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(item.files.map((f) => [f.path, f.selected]))
   )
@@ -72,6 +62,7 @@ export const EditQueueItemDialog = memo(function EditQueueItemDialog({
       if (e.open) {
         setVmafEnabled(item.vmafSettings?.enabled ?? false)
         setTargetVmaf(item.vmafSettings?.targetVmaf ?? 94)
+        setForceCpu(item.forceCpu ?? false)
         setSelectedFiles(Object.fromEntries(item.files.map((f) => [f.path, f.selected])))
       }
 
@@ -101,6 +92,7 @@ export const EditQueueItemDialog = memo(function EditQueueItemDialog({
           targetVmaf,
         },
         files: updatedFiles,
+        forceCpu,
       })
 
       if (isControlled) {
@@ -111,7 +103,7 @@ export const EditQueueItemDialog = memo(function EditQueueItemDialog({
     } finally {
       setIsLoading(false)
     }
-  }, [item, vmafEnabled, targetVmaf, selectedFiles, onUpdate, isControlled, onClose])
+  }, [item, vmafEnabled, targetVmaf, forceCpu, selectedFiles, onUpdate, isControlled, onClose])
 
   // Количество выбранных файлов
   const selectedCount = Object.values(selectedFiles).filter(Boolean).length
@@ -191,10 +183,31 @@ export const EditQueueItemDialog = memo(function EditQueueItemDialog({
                   )}
                 </VStack>
 
+                {/* Принудительный CPU */}
+                <HStack justify="space-between">
+                  <HStack gap={2}>
+                    <Icon as={LuCpu} boxSize={4} color="blue.400" />
+                    <VStack gap={0} align="start">
+                      <Text fontWeight="medium">Использовать CPU</Text>
+                      <Text fontSize="xs" color="fg.muted">
+                        libsvtav1 вместо NVENC (1 поток)
+                      </Text>
+                    </VStack>
+                  </HStack>
+                  <Switch.Root checked={forceCpu} onCheckedChange={(e) => setForceCpu(e.checked)}>
+                    <Switch.HiddenInput />
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch.Root>
+                </HStack>
+
                 {/* Выбор файлов */}
                 <VStack gap={2} align="stretch">
                   <HStack justify="space-between">
-                    <Text fontWeight="medium">Файлы ({selectedCount}/{item.files.length})</Text>
+                    <Text fontWeight="medium">
+                      Файлы ({selectedCount}/{item.files.length})
+                    </Text>
                     <HStack gap={2}>
                       <Button
                         size="xs"
@@ -218,9 +231,7 @@ export const EditQueueItemDialog = memo(function EditQueueItemDialog({
                       <Checkbox.Root
                         key={file.path}
                         checked={selectedFiles[file.path]}
-                        onCheckedChange={(e) =>
-                          setSelectedFiles((prev) => ({ ...prev, [file.path]: !!e.checked }))
-                        }
+                        onCheckedChange={(e) => setSelectedFiles((prev) => ({ ...prev, [file.path]: !!e.checked }))}
                       >
                         <Checkbox.HiddenInput />
                         <Checkbox.Control>

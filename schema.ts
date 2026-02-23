@@ -63,6 +63,11 @@ export class SchemaType implements SchemaDef {
                     type: "String",
                     optional: true
                 },
+                cid: {
+                    name: "cid",
+                    type: "String",
+                    optional: true
+                },
                 uploadedAt: {
                     name: "uploadedAt",
                     type: "DateTime",
@@ -78,8 +83,8 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("category")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("uploadedAt")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("FileCategory", [ExpressionUtils.field("category")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("uploadedAt")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -146,7 +151,7 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("rootShikimoriId")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("rootShikimoriId")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -218,8 +223,13 @@ export class SchemaType implements SchemaDef {
                     name: "poster",
                     type: "File",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("posterId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("posterId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
                     relation: { opposite: "animePoster", fields: ["posterId"], references: ["id"], onDelete: "SetNull" }
+                },
+                posterCid: {
+                    name: "posterCid",
+                    type: "String",
+                    optional: true
                 },
                 rating: {
                     name: "rating",
@@ -257,6 +267,11 @@ export class SchemaType implements SchemaDef {
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
                     default: false
                 },
+                manifestCid: {
+                    name: "manifestCid",
+                    type: "String",
+                    optional: true
+                },
                 shikimoriId: {
                     name: "shikimoriId",
                     type: "Int",
@@ -276,7 +291,7 @@ export class SchemaType implements SchemaDef {
                     name: "franchise",
                     type: "Franchise",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("franchiseId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("franchiseId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
                     relation: { opposite: "animes", fields: ["franchiseId"], references: ["id"], onDelete: "SetNull" }
                 },
                 seasons: {
@@ -323,45 +338,9 @@ export class SchemaType implements SchemaDef {
                     attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("TargetRelations") }] }],
                     relation: { opposite: "targetAnime", name: "TargetRelations" }
                 },
-                studios: {
-                    name: "studios",
-                    type: "StudioOnAnime",
-                    array: true,
-                    relation: { opposite: "anime" }
-                },
-                staff: {
-                    name: "staff",
-                    type: "PersonOnAnime",
-                    array: true,
-                    relation: { opposite: "anime" }
-                },
-                characters: {
-                    name: "characters",
-                    type: "CharacterOnAnime",
-                    array: true,
-                    relation: { opposite: "anime" }
-                },
-                externalLinks: {
-                    name: "externalLinks",
-                    type: "ExternalLink",
-                    array: true,
-                    relation: { opposite: "anime" }
-                },
-                fandubbers: {
-                    name: "fandubbers",
-                    type: "FandubberOnAnime",
-                    array: true,
-                    relation: { opposite: "anime" }
-                },
-                fansubbers: {
-                    name: "fansubbers",
-                    type: "FansubberOnAnime",
-                    array: true,
-                    relation: { opposite: "anime" }
-                },
-                videos: {
-                    name: "videos",
-                    type: "Video",
+                federatedContent: {
+                    name: "federatedContent",
+                    type: "FederatedContent",
                     array: true,
                     relation: { opposite: "anime" }
                 },
@@ -426,12 +405,12 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("name")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("year")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("status")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("shikimoriId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("franchiseId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("watchStatus")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("name")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("year")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("AnimeStatus", [ExpressionUtils.field("status")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("shikimoriId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("franchiseId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("WatchStatus", [ExpressionUtils.field("watchStatus")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -486,673 +465,13 @@ export class SchemaType implements SchemaDef {
                 shikimoriId: { type: "Int" }
             }
         },
-        Studio: {
-            name: "Studio",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                name: {
-                    name: "name",
-                    type: "String",
-                    unique: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                shikimoriId: {
-                    name: "shikimoriId",
-                    type: "Int",
-                    unique: true,
-                    optional: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                imageUrl: {
-                    name: "imageUrl",
-                    type: "String",
-                    optional: true
-                },
-                animes: {
-                    name: "animes",
-                    type: "StudioOnAnime",
-                    array: true,
-                    relation: { opposite: "studio" }
-                },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("name")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                name: { type: "String" },
-                shikimoriId: { type: "Int" }
-            }
-        },
-        StudioOnAnime: {
-            name: "StudioOnAnime",
-            fields: {
-                anime: {
-                    name: "anime",
-                    type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "studios", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    id: true,
-                    foreignKeyFor: [
-                        "anime"
-                    ]
-                },
-                studio: {
-                    name: "studio",
-                    type: "Studio",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("studioId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "animes", fields: ["studioId"], references: ["id"], onDelete: "Cascade" }
-                },
-                studioId: {
-                    name: "studioId",
-                    type: "String",
-                    id: true,
-                    foreignKeyFor: [
-                        "studio"
-                    ]
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("studioId")]) }] }
-            ],
-            idFields: ["animeId", "studioId"],
-            uniqueFields: {
-                animeId_studioId: { animeId: { type: "String" }, studioId: { type: "String" } }
-            }
-        },
-        Person: {
-            name: "Person",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                name: {
-                    name: "name",
-                    type: "String"
-                },
-                nameRu: {
-                    name: "nameRu",
-                    type: "String",
-                    optional: true
-                },
-                shikimoriId: {
-                    name: "shikimoriId",
-                    type: "Int",
-                    unique: true,
-                    optional: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                imageUrl: {
-                    name: "imageUrl",
-                    type: "String",
-                    optional: true
-                },
-                animeRoles: {
-                    name: "animeRoles",
-                    type: "PersonOnAnime",
-                    array: true,
-                    relation: { opposite: "person" }
-                },
-                voicedCharacters: {
-                    name: "voicedCharacters",
-                    type: "CharacterVoice",
-                    array: true,
-                    relation: { opposite: "person" }
-                },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("name")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("nameRu")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                shikimoriId: { type: "Int" }
-            }
-        },
-        PersonOnAnime: {
-            name: "PersonOnAnime",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                anime: {
-                    name: "anime",
-                    type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "staff", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "anime"
-                    ]
-                },
-                person: {
-                    name: "person",
-                    type: "Person",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("personId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "animeRoles", fields: ["personId"], references: ["id"], onDelete: "Cascade" }
-                },
-                personId: {
-                    name: "personId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "person"
-                    ]
-                },
-                role: {
-                    name: "role",
-                    type: "PersonRole"
-                },
-                roleText: {
-                    name: "roleText",
-                    type: "String",
-                    optional: true
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("personId"), ExpressionUtils.field("role")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("personId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("role")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                animeId_personId_role: { animeId: { type: "String" }, personId: { type: "String" }, role: { type: "PersonRole" } }
-            }
-        },
-        Character: {
-            name: "Character",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                name: {
-                    name: "name",
-                    type: "String"
-                },
-                nameRu: {
-                    name: "nameRu",
-                    type: "String",
-                    optional: true
-                },
-                shikimoriId: {
-                    name: "shikimoriId",
-                    type: "Int",
-                    unique: true,
-                    optional: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                imageUrl: {
-                    name: "imageUrl",
-                    type: "String",
-                    optional: true
-                },
-                animeAppearances: {
-                    name: "animeAppearances",
-                    type: "CharacterOnAnime",
-                    array: true,
-                    relation: { opposite: "character" }
-                },
-                voices: {
-                    name: "voices",
-                    type: "CharacterVoice",
-                    array: true,
-                    relation: { opposite: "character" }
-                },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("name")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("nameRu")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                shikimoriId: { type: "Int" }
-            }
-        },
-        CharacterOnAnime: {
-            name: "CharacterOnAnime",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                anime: {
-                    name: "anime",
-                    type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "characters", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "anime"
-                    ]
-                },
-                character: {
-                    name: "character",
-                    type: "Character",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("characterId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "animeAppearances", fields: ["characterId"], references: ["id"], onDelete: "Cascade" }
-                },
-                characterId: {
-                    name: "characterId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "character"
-                    ]
-                },
-                roleText: {
-                    name: "roleText",
-                    type: "String",
-                    optional: true
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("characterId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("characterId")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                animeId_characterId: { animeId: { type: "String" }, characterId: { type: "String" } }
-            }
-        },
-        CharacterVoice: {
-            name: "CharacterVoice",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                character: {
-                    name: "character",
-                    type: "Character",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("characterId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "voices", fields: ["characterId"], references: ["id"], onDelete: "Cascade" }
-                },
-                characterId: {
-                    name: "characterId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "character"
-                    ]
-                },
-                person: {
-                    name: "person",
-                    type: "Person",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("personId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "voicedCharacters", fields: ["personId"], references: ["id"], onDelete: "Cascade" }
-                },
-                personId: {
-                    name: "personId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "person"
-                    ]
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    optional: true
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("characterId"), ExpressionUtils.field("personId"), ExpressionUtils.field("animeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("characterId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("personId")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                characterId_personId_animeId: { characterId: { type: "String" }, personId: { type: "String" }, animeId: { type: "String" } }
-            }
-        },
-        ExternalLink: {
-            name: "ExternalLink",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                anime: {
-                    name: "anime",
-                    type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "externalLinks", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "anime"
-                    ]
-                },
-                kind: {
-                    name: "kind",
-                    type: "ExternalLinkKind"
-                },
-                url: {
-                    name: "url",
-                    type: "String"
-                },
-                shikimoriId: {
-                    name: "shikimoriId",
-                    type: "Int",
-                    optional: true
-                },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("kind")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                animeId_kind: { animeId: { type: "String" }, kind: { type: "ExternalLinkKind" } }
-            }
-        },
-        Video: {
-            name: "Video",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                anime: {
-                    name: "anime",
-                    type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "videos", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "anime"
-                    ]
-                },
-                shikimoriId: {
-                    name: "shikimoriId",
-                    type: "Int",
-                    unique: true,
-                    optional: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                name: {
-                    name: "name",
-                    type: "String",
-                    optional: true
-                },
-                kind: {
-                    name: "kind",
-                    type: "VideoKind",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("OTHER") }] }],
-                    default: "OTHER"
-                },
-                url: {
-                    name: "url",
-                    type: "String"
-                },
-                playerUrl: {
-                    name: "playerUrl",
-                    type: "String",
-                    optional: true
-                },
-                imageUrl: {
-                    name: "imageUrl",
-                    type: "String",
-                    optional: true
-                },
-                hosting: {
-                    name: "hosting",
-                    type: "String",
-                    optional: true
-                },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("kind")]) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                shikimoriId: { type: "Int" }
-            }
-        },
-        Fandubber: {
-            name: "Fandubber",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                name: {
-                    name: "name",
-                    type: "String",
-                    unique: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                animes: {
-                    name: "animes",
-                    type: "FandubberOnAnime",
-                    array: true,
-                    relation: { opposite: "fandubber" }
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                name: { type: "String" }
-            }
-        },
-        FandubberOnAnime: {
-            name: "FandubberOnAnime",
-            fields: {
-                anime: {
-                    name: "anime",
-                    type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "fandubbers", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    id: true,
-                    foreignKeyFor: [
-                        "anime"
-                    ]
-                },
-                fandubber: {
-                    name: "fandubber",
-                    type: "Fandubber",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("fandubberId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "animes", fields: ["fandubberId"], references: ["id"], onDelete: "Cascade" }
-                },
-                fandubberId: {
-                    name: "fandubberId",
-                    type: "String",
-                    id: true,
-                    foreignKeyFor: [
-                        "fandubber"
-                    ]
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("fandubberId")]) }] }
-            ],
-            idFields: ["animeId", "fandubberId"],
-            uniqueFields: {
-                animeId_fandubberId: { animeId: { type: "String" }, fandubberId: { type: "String" } }
-            }
-        },
-        Fansubber: {
-            name: "Fansubber",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                name: {
-                    name: "name",
-                    type: "String",
-                    unique: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                animes: {
-                    name: "animes",
-                    type: "FansubberOnAnime",
-                    array: true,
-                    relation: { opposite: "fansubber" }
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
-            ],
-            idFields: ["id"],
-            uniqueFields: {
-                id: { type: "String" },
-                name: { type: "String" }
-            }
-        },
-        FansubberOnAnime: {
-            name: "FansubberOnAnime",
-            fields: {
-                anime: {
-                    name: "anime",
-                    type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "fansubbers", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
-                },
-                animeId: {
-                    name: "animeId",
-                    type: "String",
-                    id: true,
-                    foreignKeyFor: [
-                        "anime"
-                    ]
-                },
-                fansubber: {
-                    name: "fansubber",
-                    type: "Fansubber",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("fansubberId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "animes", fields: ["fansubberId"], references: ["id"], onDelete: "Cascade" }
-                },
-                fansubberId: {
-                    name: "fansubberId",
-                    type: "String",
-                    id: true,
-                    foreignKeyFor: [
-                        "fansubber"
-                    ]
-                }
-            },
-            attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("fansubberId")]) }] }
-            ],
-            idFields: ["animeId", "fansubberId"],
-            uniqueFields: {
-                animeId_fansubberId: { animeId: { type: "String" }, fansubberId: { type: "String" } }
-            }
-        },
         GenreOnAnime: {
             name: "GenreOnAnime",
             fields: {
                 anime: {
                     name: "anime",
                     type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "genres", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 animeId: {
@@ -1166,7 +485,7 @@ export class SchemaType implements SchemaDef {
                 genre: {
                     name: "genre",
                     type: "Genre",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("genreId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("genreId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "animes", fields: ["genreId"], references: ["id"], onDelete: "Cascade" }
                 },
                 genreId: {
@@ -1180,7 +499,7 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("genreId")]) }] }
+                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId"), ExpressionUtils.field("genreId")]) }] }
             ],
             idFields: ["animeId", "genreId"],
             uniqueFields: {
@@ -1224,7 +543,7 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("name")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("name")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1239,7 +558,7 @@ export class SchemaType implements SchemaDef {
                 anime: {
                     name: "anime",
                     type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "themes", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 animeId: {
@@ -1253,7 +572,7 @@ export class SchemaType implements SchemaDef {
                 theme: {
                     name: "theme",
                     type: "Theme",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("themeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("themeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "animes", fields: ["themeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 themeId: {
@@ -1267,7 +586,7 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("themeId")]) }] }
+                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId"), ExpressionUtils.field("themeId")]) }] }
             ],
             idFields: ["animeId", "themeId"],
             uniqueFields: {
@@ -1294,7 +613,7 @@ export class SchemaType implements SchemaDef {
                 sourceAnime: {
                     name: "sourceAnime",
                     type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("SourceRelations") }, { name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("sourceAnimeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("SourceRelations") }, { name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("sourceAnimeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "sourceRelations", name: "SourceRelations", fields: ["sourceAnimeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 targetShikimoriId: {
@@ -1313,7 +632,7 @@ export class SchemaType implements SchemaDef {
                     name: "targetAnime",
                     type: "Anime",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("TargetRelations") }, { name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("targetAnimeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("TargetRelations") }, { name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("targetAnimeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
                     relation: { opposite: "targetRelations", name: "TargetRelations", fields: ["targetAnimeId"], references: ["id"], onDelete: "SetNull" }
                 },
                 relationKind: {
@@ -1349,10 +668,10 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("sourceAnimeId"), ExpressionUtils.field("targetShikimoriId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("sourceAnimeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("targetAnimeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("targetShikimoriId")]) }] }
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("sourceAnimeId"), ExpressionUtils.field("targetShikimoriId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("sourceAnimeId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("targetAnimeId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("targetShikimoriId")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1373,7 +692,7 @@ export class SchemaType implements SchemaDef {
                 anime: {
                     name: "anime",
                     type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "seasons", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 animeId: {
@@ -1437,8 +756,8 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("number")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }] }
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId"), ExpressionUtils.field("number")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1459,7 +778,7 @@ export class SchemaType implements SchemaDef {
                 episode: {
                     name: "episode",
                     type: "Episode",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "audioTracks", fields: ["episodeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 episodeId: {
@@ -1508,24 +827,8 @@ export class SchemaType implements SchemaDef {
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
                     default: false
                 },
-                extractedPath: {
-                    name: "extractedPath",
-                    type: "String",
-                    optional: true
-                },
-                transcodedPath: {
-                    name: "transcodedPath",
-                    type: "String",
-                    optional: true
-                },
-                transcodeStatus: {
-                    name: "transcodeStatus",
-                    type: "TranscodeStatus",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("QUEUED") }] }],
-                    default: "QUEUED"
-                },
-                transcodeError: {
-                    name: "transcodeError",
+                transcodedCid: {
+                    name: "transcodedCid",
                     type: "String",
                     optional: true
                 },
@@ -1544,7 +847,7 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("episodeId")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("episodeId")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1564,7 +867,7 @@ export class SchemaType implements SchemaDef {
                 episode: {
                     name: "episode",
                     type: "Episode",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "subtitleTracks", fields: ["episodeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 episodeId: {
@@ -1596,12 +899,18 @@ export class SchemaType implements SchemaDef {
                     type: "String",
                     optional: true
                 },
+                subtitleType: {
+                    name: "subtitleType",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("full") }] }],
+                    default: "full"
+                },
                 format: {
                     name: "format",
                     type: "String"
                 },
-                filePath: {
-                    name: "filePath",
+                fileCid: {
+                    name: "fileCid",
                     type: "String",
                     optional: true
                 },
@@ -1626,7 +935,7 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("episodeId")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("episodeId")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1646,7 +955,7 @@ export class SchemaType implements SchemaDef {
                 subtitleTrack: {
                     name: "subtitleTrack",
                     type: "SubtitleTrack",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("subtitleTrackId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("subtitleTrackId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "fonts", fields: ["subtitleTrackId"], references: ["id"], onDelete: "Cascade" }
                 },
                 subtitleTrackId: {
@@ -1660,9 +969,10 @@ export class SchemaType implements SchemaDef {
                     name: "fontName",
                     type: "String"
                 },
-                filePath: {
-                    name: "filePath",
-                    type: "String"
+                fileCid: {
+                    name: "fileCid",
+                    type: "String",
+                    optional: true
                 },
                 createdAt: {
                     name: "createdAt",
@@ -1673,7 +983,7 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("subtitleTrackId")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("subtitleTrackId")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1693,7 +1003,7 @@ export class SchemaType implements SchemaDef {
                 episode: {
                     name: "episode",
                     type: "Episode",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "chapters", fields: ["episodeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 episodeId: {
@@ -1737,8 +1047,8 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("episodeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("type")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("episodeId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("ChapterType", [ExpressionUtils.field("type")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1758,7 +1068,7 @@ export class SchemaType implements SchemaDef {
                 anime: {
                     name: "anime",
                     type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "episodes", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 animeId: {
@@ -1772,7 +1082,7 @@ export class SchemaType implements SchemaDef {
                     name: "season",
                     type: "Season",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("seasonId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("seasonId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
                     relation: { opposite: "episodes", fields: ["seasonId"], references: ["id"], onDelete: "SetNull" }
                 },
                 seasonId: {
@@ -1797,34 +1107,8 @@ export class SchemaType implements SchemaDef {
                     type: "Int",
                     optional: true
                 },
-                sourcePath: {
-                    name: "sourcePath",
-                    type: "String",
-                    optional: true
-                },
-                transcodedPath: {
-                    name: "transcodedPath",
-                    type: "String",
-                    optional: true
-                },
-                manifestPath: {
-                    name: "manifestPath",
-                    type: "String",
-                    optional: true
-                },
-                extractedVideoPath: {
-                    name: "extractedVideoPath",
-                    type: "String",
-                    optional: true
-                },
-                transcodeStatus: {
-                    name: "transcodeStatus",
-                    type: "TranscodeStatus",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("QUEUED") }] }],
-                    default: "QUEUED"
-                },
-                transcodeError: {
-                    name: "transcodeError",
+                folderPath: {
+                    name: "folderPath",
                     type: "String",
                     optional: true
                 },
@@ -1851,16 +1135,6 @@ export class SchemaType implements SchemaDef {
                 videoBitDepth: {
                     name: "videoBitDepth",
                     type: "Int",
-                    optional: true
-                },
-                thumbnailPaths: {
-                    name: "thumbnailPaths",
-                    type: "String",
-                    optional: true
-                },
-                screenshotPaths: {
-                    name: "screenshotPaths",
-                    type: "String",
                     optional: true
                 },
                 audioTracks: {
@@ -1904,7 +1178,7 @@ export class SchemaType implements SchemaDef {
                     name: "encodingProfile",
                     type: "EncodingProfile",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("encodingProfileId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("encodingProfileId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
                     relation: { opposite: "episodes", fields: ["encodingProfileId"], references: ["id"], onDelete: "SetNull" }
                 },
                 sourceSize: {
@@ -1915,6 +1189,26 @@ export class SchemaType implements SchemaDef {
                 transcodedSize: {
                     name: "transcodedSize",
                     type: "BigInt",
+                    optional: true
+                },
+                transcodedCid: {
+                    name: "transcodedCid",
+                    type: "String",
+                    optional: true
+                },
+                manifestCid: {
+                    name: "manifestCid",
+                    type: "String",
+                    optional: true
+                },
+                thumbnailCids: {
+                    name: "thumbnailCids",
+                    type: "String",
+                    optional: true
+                },
+                screenshotCids: {
+                    name: "screenshotCids",
+                    type: "String",
                     optional: true
                 },
                 createdAt: {
@@ -1932,10 +1226,9 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("number")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("seasonId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("transcodeStatus")]) }] }
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId"), ExpressionUtils.field("number")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("seasonId")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -1956,7 +1249,7 @@ export class SchemaType implements SchemaDef {
                 anime: {
                     name: "anime",
                     type: "Anime",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "watchProgress", fields: ["animeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 animeId: {
@@ -1969,7 +1262,7 @@ export class SchemaType implements SchemaDef {
                 episode: {
                     name: "episode",
                     type: "Episode",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("episodeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "watchProgress", fields: ["episodeId"], references: ["id"], onDelete: "Cascade" }
                 },
                 episodeId: {
@@ -2016,9 +1309,9 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId"), ExpressionUtils.field("episodeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("animeId")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("lastWatchedAt")]) }] }
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId"), ExpressionUtils.field("episodeId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("lastWatchedAt")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -2147,8 +1440,20 @@ export class SchemaType implements SchemaDef {
                     name: "defaultProfile",
                     type: "EncodingProfile",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("defaultProfileId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("defaultProfileId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
                     relation: { opposite: "settings", fields: ["defaultProfileId"], references: ["id"], onDelete: "SetNull" }
+                },
+                mobileAccessEnabled: {
+                    name: "mobileAccessEnabled",
+                    type: "Boolean",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
+                    default: false
+                },
+                mobileServerPort: {
+                    name: "mobileServerPort",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(4000) }] }],
+                    default: 4000
                 },
                 updatedAt: {
                     name: "updatedAt",
@@ -2329,8 +1634,8 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("isBuiltIn")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("isDefault")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Boolean", [ExpressionUtils.field("isBuiltIn")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Boolean", [ExpressionUtils.field("isDefault")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -2408,9 +1713,979 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("status")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("priority")]) }] },
-                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("addedAt")]) }] }
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("ImportQueueItemStatus", [ExpressionUtils.field("status")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("priority")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("addedAt")]) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
+        },
+        Subscription: {
+            name: "Subscription",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                ipnsName: {
+                    name: "ipnsName",
+                    type: "String",
+                    unique: true,
+                    attributes: [{ name: "@unique" }]
+                },
+                displayName: {
+                    name: "displayName",
+                    type: "String"
+                },
+                lastKnownCid: {
+                    name: "lastKnownCid",
+                    type: "String",
+                    optional: true
+                },
+                lastCheckedAt: {
+                    name: "lastCheckedAt",
+                    type: "DateTime",
+                    optional: true
+                },
+                autoPin: {
+                    name: "autoPin",
+                    type: "Boolean",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
+                    default: false
+                },
+                autoPinLimit: {
+                    name: "autoPinLimit",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("ipnsName")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("lastCheckedAt")]) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                ipnsName: { type: "String" }
+            }
+        },
+        Tracker: {
+            name: "Tracker",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                url: {
+                    name: "url",
+                    type: "String",
+                    unique: true,
+                    attributes: [{ name: "@unique" }]
+                },
+                name: {
+                    name: "name",
+                    type: "String"
+                },
+                description: {
+                    name: "description",
+                    type: "String",
+                    optional: true
+                },
+                theme: {
+                    name: "theme",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("anime") }] }],
+                    default: "anime"
+                },
+                language: {
+                    name: "language",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("ru") }] }],
+                    default: "ru"
+                },
+                publicKeyPem: {
+                    name: "publicKeyPem",
+                    type: "String",
+                    optional: true
+                },
+                trustLevel: {
+                    name: "trustLevel",
+                    type: "TrustLevel",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("UNTRUSTED") }] }],
+                    default: "UNTRUSTED"
+                },
+                uptimePercent: {
+                    name: "uptimePercent",
+                    type: "Float",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                avgResponseTimeMs: {
+                    name: "avgResponseTimeMs",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                contentQuality: {
+                    name: "contentQuality",
+                    type: "Float",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                successfulSyncs: {
+                    name: "successfulSyncs",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                failedSyncs: {
+                    name: "failedSyncs",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                contentSynced: {
+                    name: "contentSynced",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                lastSyncAt: {
+                    name: "lastSyncAt",
+                    type: "DateTime",
+                    optional: true
+                },
+                lastCheckedAt: {
+                    name: "lastCheckedAt",
+                    type: "DateTime",
+                    optional: true
+                },
+                importedContent: {
+                    name: "importedContent",
+                    type: "FederatedContent",
+                    array: true,
+                    relation: { opposite: "tracker" }
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("TrustLevel", [ExpressionUtils.field("trustLevel")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("lastSyncAt")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("lastCheckedAt")]) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                url: { type: "String" }
+            }
+        },
+        FederatedContent: {
+            name: "FederatedContent",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                trackerId: {
+                    name: "trackerId",
+                    type: "String",
+                    foreignKeyFor: [
+                        "tracker"
+                    ]
+                },
+                tracker: {
+                    name: "tracker",
+                    type: "Tracker",
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("trackerId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    relation: { opposite: "importedContent", fields: ["trackerId"], references: ["id"], onDelete: "Cascade" }
+                },
+                remoteId: {
+                    name: "remoteId",
+                    type: "String"
+                },
+                animeId: {
+                    name: "animeId",
+                    type: "String",
+                    optional: true,
+                    foreignKeyFor: [
+                        "anime"
+                    ]
+                },
+                anime: {
+                    name: "anime",
+                    type: "Anime",
+                    optional: true,
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("SetNull") }] }],
+                    relation: { opposite: "federatedContent", fields: ["animeId"], references: ["id"], onDelete: "SetNull" }
+                },
+                contentJson: {
+                    name: "contentJson",
+                    type: "String"
+                },
+                malId: {
+                    name: "malId",
+                    type: "Int",
+                    optional: true
+                },
+                anilistId: {
+                    name: "anilistId",
+                    type: "Int",
+                    optional: true
+                },
+                shikimoriId: {
+                    name: "shikimoriId",
+                    type: "Int",
+                    optional: true
+                },
+                anidbId: {
+                    name: "anidbId",
+                    type: "Int",
+                    optional: true
+                },
+                receivedAt: {
+                    name: "receivedAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("trackerId"), ExpressionUtils.field("remoteId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("trackerId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("animeId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("malId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("anilistId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("shikimoriId")]) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                trackerId_remoteId: { trackerId: { type: "String" }, remoteId: { type: "String" } }
+            }
+        },
+        FederationSettings: {
+            name: "FederationSettings",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("default") }] }],
+                    default: "default"
+                },
+                enabled: {
+                    name: "enabled",
+                    type: "Boolean",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
+                    default: false
+                },
+                trackerName: {
+                    name: "trackerName",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("My Animatrona") }] }],
+                    default: "My Animatrona"
+                },
+                trackerDescription: {
+                    name: "trackerDescription",
+                    type: "String",
+                    optional: true
+                },
+                theme: {
+                    name: "theme",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("anime") }] }],
+                    default: "anime"
+                },
+                language: {
+                    name: "language",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("ru") }] }],
+                    default: "ru"
+                },
+                autoSync: {
+                    name: "autoSync",
+                    type: "Boolean",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(true) }] }],
+                    default: true
+                },
+                syncIntervalMinutes: {
+                    name: "syncIntervalMinutes",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(60) }] }],
+                    default: 60
+                },
+                minTrustForAutoImport: {
+                    name: "minTrustForAutoImport",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(3) }] }],
+                    default: 3
+                },
+                privateKeyPem: {
+                    name: "privateKeyPem",
+                    type: "String",
+                    optional: true
+                },
+                publicKeyPem: {
+                    name: "publicKeyPem",
+                    type: "String",
+                    optional: true
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
+        },
+        UserStats: {
+            name: "UserStats",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("default") }] }],
+                    default: "default"
+                },
+                bytesUploaded: {
+                    name: "bytesUploaded",
+                    type: "BigInt",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                bytesDownloaded: {
+                    name: "bytesDownloaded",
+                    type: "BigInt",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                totalSeedingTimeMs: {
+                    name: "totalSeedingTimeMs",
+                    type: "BigInt",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                currentSessionMs: {
+                    name: "currentSessionMs",
+                    type: "BigInt",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                uniqueContentSeeded: {
+                    name: "uniqueContentSeeded",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                peersHelped: {
+                    name: "peersHelped",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                firstSeedAt: {
+                    name: "firstSeedAt",
+                    type: "DateTime",
+                    optional: true
+                },
+                lastActiveAt: {
+                    name: "lastActiveAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                dailyStats: {
+                    name: "dailyStats",
+                    type: "DailyStats",
+                    array: true,
+                    relation: { opposite: "userStats" }
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
+        },
+        DailyStats: {
+            name: "DailyStats",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                userStatsId: {
+                    name: "userStatsId",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("default") }] }],
+                    default: "default",
+                    foreignKeyFor: [
+                        "userStats"
+                    ]
+                },
+                userStats: {
+                    name: "userStats",
+                    type: "UserStats",
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("userStatsId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    relation: { opposite: "dailyStats", fields: ["userStatsId"], references: ["id"], onDelete: "Cascade", hasDefault: true }
+                },
+                date: {
+                    name: "date",
+                    type: "String"
+                },
+                bytesUploaded: {
+                    name: "bytesUploaded",
+                    type: "BigInt",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                bytesDownloaded: {
+                    name: "bytesDownloaded",
+                    type: "BigInt",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                seedingTimeMs: {
+                    name: "seedingTimeMs",
+                    type: "BigInt",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                peersHelped: {
+                    name: "peersHelped",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("userStatsId"), ExpressionUtils.field("date")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("date")]) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                userStatsId_date: { userStatsId: { type: "String" }, date: { type: "String" } }
+            }
+        },
+        UserReputation: {
+            name: "UserReputation",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("default") }] }],
+                    default: "default"
+                },
+                score: {
+                    name: "score",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                rank: {
+                    name: "rank",
+                    type: "UserRank",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("NEWCOMER") }] }],
+                    default: "NEWCOMER"
+                },
+                ratioScore: {
+                    name: "ratioScore",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                seedingTimeScore: {
+                    name: "seedingTimeScore",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                uniqueContentScore: {
+                    name: "uniqueContentScore",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                helpedPeersScore: {
+                    name: "helpedPeersScore",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                longevityScore: {
+                    name: "longevityScore",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
+        },
+        UserAchievement: {
+            name: "UserAchievement",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                achievementId: {
+                    name: "achievementId",
+                    type: "String"
+                },
+                unlockedAt: {
+                    name: "unlockedAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                notified: {
+                    name: "notified",
+                    type: "Boolean",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
+                    default: false
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("achievementId")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("unlockedAt")]) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                achievementId: { type: "String" }
+            }
+        },
+        AchievementProgress: {
+            name: "AchievementProgress",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                achievementId: {
+                    name: "achievementId",
+                    type: "String",
+                    unique: true,
+                    attributes: [{ name: "@unique" }]
+                },
+                progress: {
+                    name: "progress",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                achievementId: { type: "String" }
+            }
+        },
+        UserBonusPoints: {
+            name: "UserBonusPoints",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("default") }] }],
+                    default: "default"
+                },
+                balance: {
+                    name: "balance",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                totalEarned: {
+                    name: "totalEarned",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                totalSpent: {
+                    name: "totalSpent",
+                    type: "Int",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
+                    default: 0
+                },
+                transactions: {
+                    name: "transactions",
+                    type: "BonusTransaction",
+                    array: true,
+                    relation: { opposite: "bonusPoints" }
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
+        },
+        BonusTransaction: {
+            name: "BonusTransaction",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                bonusPointsId: {
+                    name: "bonusPointsId",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("default") }] }],
+                    default: "default",
+                    foreignKeyFor: [
+                        "bonusPoints"
+                    ]
+                },
+                bonusPoints: {
+                    name: "bonusPoints",
+                    type: "UserBonusPoints",
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("bonusPointsId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    relation: { opposite: "transactions", fields: ["bonusPointsId"], references: ["id"], onDelete: "Cascade", hasDefault: true }
+                },
+                type: {
+                    name: "type",
+                    type: "BonusTransactionType"
+                },
+                amount: {
+                    name: "amount",
+                    type: "Int"
+                },
+                balanceAfter: {
+                    name: "balanceAfter",
+                    type: "Int"
+                },
+                description: {
+                    name: "description",
+                    type: "String"
+                },
+                metadataJson: {
+                    name: "metadataJson",
+                    type: "String",
+                    optional: true
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("BonusTransactionType", [ExpressionUtils.field("type")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("DateTime", [ExpressionUtils.field("createdAt")]) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
+        },
+        LocalUserProfile: {
+            name: "LocalUserProfile",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("default") }] }],
+                    default: "default"
+                },
+                peerId: {
+                    name: "peerId",
+                    type: "String"
+                },
+                friendCode: {
+                    name: "friendCode",
+                    type: "String",
+                    unique: true,
+                    attributes: [{ name: "@unique" }]
+                },
+                displayName: {
+                    name: "displayName",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("\u0410\u043D\u043E\u043D\u0438\u043C\u0443\u0441") }] }],
+                    default: "\u0410\u043D\u043E\u043D\u0438\u043C\u0443\u0441"
+                },
+                avatarUrl: {
+                    name: "avatarUrl",
+                    type: "String",
+                    optional: true
+                },
+                avatarColor: {
+                    name: "avatarColor",
+                    type: "String",
+                    optional: true
+                },
+                status: {
+                    name: "status",
+                    type: "String",
+                    optional: true
+                },
+                ipnsPublishedCid: {
+                    name: "ipnsPublishedCid",
+                    type: "String",
+                    optional: true
+                },
+                ipnsPublishedAt: {
+                    name: "ipnsPublishedAt",
+                    type: "DateTime",
+                    optional: true
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] }
+            ],
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                friendCode: { type: "String" }
+            }
+        },
+        Friend: {
+            name: "Friend",
+            fields: {
+                peerId: {
+                    name: "peerId",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }]
+                },
+                friendCode: {
+                    name: "friendCode",
+                    type: "String"
+                },
+                displayName: {
+                    name: "displayName",
+                    type: "String"
+                },
+                avatarUrl: {
+                    name: "avatarUrl",
+                    type: "String",
+                    optional: true
+                },
+                isOnline: {
+                    name: "isOnline",
+                    type: "Boolean",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
+                    default: false
+                },
+                watchingJson: {
+                    name: "watchingJson",
+                    type: "String",
+                    optional: true
+                },
+                lastSeenAt: {
+                    name: "lastSeenAt",
+                    type: "DateTime",
+                    optional: true
+                },
+                friendsSince: {
+                    name: "friendsSince",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("Boolean", [ExpressionUtils.field("isOnline")]) }] }
+            ],
+            idFields: ["peerId"],
+            uniqueFields: {
+                peerId: { type: "String" }
+            }
+        },
+        FriendRequest: {
+            name: "FriendRequest",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                fromPeerId: {
+                    name: "fromPeerId",
+                    type: "String"
+                },
+                fromFriendCode: {
+                    name: "fromFriendCode",
+                    type: "String"
+                },
+                fromDisplayName: {
+                    name: "fromDisplayName",
+                    type: "String"
+                },
+                toPeerId: {
+                    name: "toPeerId",
+                    type: "String"
+                },
+                status: {
+                    name: "status",
+                    type: "String",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("pending") }] }],
+                    default: "pending"
+                },
+                sentAt: {
+                    name: "sentAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                respondedAt: {
+                    name: "respondedAt",
+                    type: "DateTime",
+                    optional: true
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
+            },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("fromPeerId"), ExpressionUtils.field("toPeerId"), ExpressionUtils.field("status")]) }] },
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("toPeerId"), ExpressionUtils.field("status")]) }] }
             ],
             idFields: ["id"],
             uniqueFields: {
@@ -2420,6 +2695,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         AnimeStatus: {
+            name: "AnimeStatus",
             values: {
                 ONGOING: "ONGOING",
                 COMPLETED: "COMPLETED",
@@ -2427,6 +2703,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         AnimeSource: {
+            name: "AnimeSource",
             values: {
                 MANGA: "MANGA",
                 LIGHT_NOVEL: "LIGHT_NOVEL",
@@ -2438,6 +2715,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         AgeRating: {
+            name: "AgeRating",
             values: {
                 G: "G",
                 PG: "PG",
@@ -2447,16 +2725,8 @@ export class SchemaType implements SchemaDef {
                 RX: "RX"
             }
         },
-        TranscodeStatus: {
-            values: {
-                QUEUED: "QUEUED",
-                PROCESSING: "PROCESSING",
-                COMPLETED: "COMPLETED",
-                SKIPPED: "SKIPPED",
-                ERROR: "ERROR"
-            }
-        },
         VideoCodec: {
+            name: "VideoCodec",
             values: {
                 AV1: "AV1",
                 HEVC: "HEVC",
@@ -2465,6 +2735,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         TrackPreference: {
+            name: "TrackPreference",
             values: {
                 RUSSIAN_DUB: "RUSSIAN_DUB",
                 ORIGINAL_SUB: "ORIGINAL_SUB",
@@ -2472,6 +2743,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         SeasonType: {
+            name: "SeasonType",
             values: {
                 TV: "TV",
                 OVA: "OVA",
@@ -2481,6 +2753,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         ChapterType: {
+            name: "ChapterType",
             values: {
                 CHAPTER: "CHAPTER",
                 OP: "OP",
@@ -2490,6 +2763,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         FileCategory: {
+            name: "FileCategory",
             values: {
                 POSTER: "POSTER",
                 SCREENSHOT: "SCREENSHOT",
@@ -2498,6 +2772,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         RateControl: {
+            name: "RateControl",
             values: {
                 VBR: "VBR",
                 CONSTQP: "CONSTQP",
@@ -2505,6 +2780,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         Tune: {
+            name: "Tune",
             values: {
                 NONE: "NONE",
                 HQ: "HQ",
@@ -2514,6 +2790,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         Multipass: {
+            name: "Multipass",
             values: {
                 DISABLED: "DISABLED",
                 QRES: "QRES",
@@ -2521,6 +2798,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         BRefMode: {
+            name: "BRefMode",
             values: {
                 DISABLED: "DISABLED",
                 EACH: "EACH",
@@ -2528,6 +2806,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         RelationKind: {
+            name: "RelationKind",
             values: {
                 SEQUEL: "SEQUEL",
                 PREQUEL: "PREQUEL",
@@ -2543,47 +2822,8 @@ export class SchemaType implements SchemaDef {
                 OTHER: "OTHER"
             }
         },
-        PersonRole: {
-            values: {
-                DIRECTOR: "DIRECTOR",
-                WRITER: "WRITER",
-                ORIGINAL_CREATOR: "ORIGINAL_CREATOR",
-                CHARACTER_DESIGN: "CHARACTER_DESIGN",
-                MUSIC: "MUSIC",
-                PRODUCER: "PRODUCER",
-                ANIMATION_DIRECTOR: "ANIMATION_DIRECTOR",
-                KEY_ANIMATOR: "KEY_ANIMATOR",
-                ART_DIRECTOR: "ART_DIRECTOR",
-                SOUND_DIRECTOR: "SOUND_DIRECTOR",
-                OTHER: "OTHER"
-            }
-        },
-        ExternalLinkKind: {
-            values: {
-                MYANIMELIST: "MYANIMELIST",
-                ANIDB: "ANIDB",
-                ANILIST: "ANILIST",
-                WIKIPEDIA: "WIKIPEDIA",
-                OFFICIAL_SITE: "OFFICIAL_SITE",
-                TWITTER: "TWITTER",
-                WORLDART: "WORLDART",
-                KINOPOISK: "KINOPOISK",
-                ANIME_NEWS_NETWORK: "ANIME_NEWS_NETWORK",
-                OTHER: "OTHER"
-            }
-        },
-        VideoKind: {
-            values: {
-                OP: "OP",
-                ED: "ED",
-                PV: "PV",
-                CM: "CM",
-                CLIP: "CLIP",
-                EPISODE_PREVIEW: "EPISODE_PREVIEW",
-                OTHER: "OTHER"
-            }
-        },
         WatchStatus: {
+            name: "WatchStatus",
             values: {
                 NOT_STARTED: "NOT_STARTED",
                 WATCHING: "WATCHING",
@@ -2594,6 +2834,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         ImportQueueItemStatus: {
+            name: "ImportQueueItemStatus",
             values: {
                 PENDING: "PENDING",
                 VMAF: "VMAF",
@@ -2603,6 +2844,45 @@ export class SchemaType implements SchemaDef {
                 COMPLETED: "COMPLETED",
                 ERROR: "ERROR",
                 CANCELLED: "CANCELLED"
+            }
+        },
+        TrustLevel: {
+            name: "TrustLevel",
+            values: {
+                BLOCKED: "BLOCKED",
+                UNTRUSTED: "UNTRUSTED",
+                KNOWN: "KNOWN",
+                TRUSTED: "TRUSTED",
+                VERIFIED: "VERIFIED"
+            }
+        },
+        UserRank: {
+            name: "UserRank",
+            values: {
+                NEWCOMER: "NEWCOMER",
+                CONTRIBUTOR: "CONTRIBUTOR",
+                REGULAR: "REGULAR",
+                VETERAN: "VETERAN",
+                LEGEND: "LEGEND"
+            }
+        },
+        BonusTransactionType: {
+            name: "BonusTransactionType",
+            values: {
+                EARNING: "EARNING",
+                ACHIEVEMENT: "ACHIEVEMENT",
+                SPENDING: "SPENDING",
+                BONUS: "BONUS",
+                ADJUSTMENT: "ADJUSTMENT"
+            }
+        },
+        AchievementTier: {
+            name: "AchievementTier",
+            values: {
+                BRONZE: "BRONZE",
+                SILVER: "SILVER",
+                GOLD: "GOLD",
+                PLATINUM: "PLATINUM"
             }
         }
     } as const;

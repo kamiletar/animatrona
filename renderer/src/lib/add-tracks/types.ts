@@ -159,8 +159,8 @@ export interface LibraryEpisode {
   number: number
   /** Путь к папке эпизода (Season X/Episode Y) */
   folderPath?: string | null
-  /** Путь к транскодированному видео */
-  transcodedPath?: string | null
+  /** CID транскодированного видео в IPFS */
+  transcodedCid?: string | null
 }
 
 /** Опции хука */

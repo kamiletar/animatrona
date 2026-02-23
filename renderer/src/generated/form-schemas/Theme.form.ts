@@ -11,8 +11,8 @@ export const ThemeCreateFormSchema = z.object({
     .meta({
       ui: { title: 'Название' }
     }),
-  nameRu: z.string().optional(),
-  shikimoriId: z.number().int().optional()
+  nameRu: z.string().nullable().optional(),
+  shikimoriId: z.number().int().nullable().optional()
 })
 
 /**

@@ -15,6 +15,7 @@ import {
   useDeleteSubtitleTrack,
 } from '@/lib/hooks'
 
+import { uploadToIpfs } from '../ipfs-upload'
 import type { AudioTask, FileProgress, SubtitleTask } from './types'
 import type { UseAddTracksStateReturn } from './use-add-tracks-state'
 import { formatChannels, needsAudioTranscode, runWithConcurrency } from './utils'
@@ -129,19 +130,17 @@ export function useTrackProcessing(options: UseTrackProcessingOptions) {
       const allProgress: FileProgress[] = [
         ...allAudioTasks.map((t) => ({
           id: t.id,
-          fileName:
-            t.type === 'embedded'
-              ? `[MKV] ${t.trackInfo.title || t.trackInfo.language || 'audio'}`
-              : t.trackInfo.title || t.trackInfo.filePath?.split(/[/\\]/).pop() || 'audio',
+          fileName: t.type === 'embedded'
+            ? `[MKV] ${t.trackInfo.title || t.trackInfo.language || 'audio'}`
+            : t.trackInfo.title || t.trackInfo.filePath?.split(/[/\\]/).pop() || 'audio',
           phase: 'waiting' as const,
           percent: 0,
         })),
         ...allSubtitleTasks.map((t) => ({
           id: t.id,
-          fileName:
-            t.type === 'embedded'
-              ? `[SUB] ${t.trackInfo.title || t.trackInfo.language || 'subtitle'}`
-              : t.trackInfo.title || t.trackInfo.filePath?.split(/[/\\]/).pop() || 'subtitle',
+          fileName: t.type === 'embedded'
+            ? `[SUB] ${t.trackInfo.title || t.trackInfo.language || 'subtitle'}`
+            : t.trackInfo.title || t.trackInfo.filePath?.split(/[/\\]/).pop() || 'subtitle',
           phase: 'waiting' as const,
           percent: 0,
         })),
@@ -164,7 +163,7 @@ export function useTrackProcessing(options: UseTrackProcessingOptions) {
           updateFileProgress,
           incrementAddedTracks,
           addRecord,
-          createAudioTrack
+          createAudioTrack,
         )
       }
 
@@ -183,7 +182,7 @@ export function useTrackProcessing(options: UseTrackProcessingOptions) {
           incrementAddedTracks,
           addRecord,
           createSubtitleTrack,
-          createSubtitleFont
+          createSubtitleFont,
         )
       }
 
@@ -295,7 +294,7 @@ async function processAudio(
   updateFileProgress: (id: string, update: Partial<FileProgress>) => void,
   incrementAddedTracks: (type: 'audio' | 'subtitle') => void,
   addRecord: (record: { type: 'audio' | 'subtitle'; id: string; filePath: string }) => void,
-  createAudioTrack: ReturnType<typeof useCreateAudioTrack>
+  createAudioTrack: ReturnType<typeof useCreateAudioTrack>,
 ): Promise<void> {
   const { id, type, donorPath, episodeId, episodeDir, trackInfo } = task
 
@@ -345,6 +344,9 @@ async function processAudio(
 
     updateFileProgress(id, { percent: 80 })
 
+    // Загружаем аудио в IPFS
+    const transcodedCid = await uploadToIpfs(destPath)
+
     const audioRecord = await createAudioTrack.mutateAsync({
       data: {
         episodeId,
@@ -355,8 +357,7 @@ async function processAudio(
         channels: type === 'embedded' ? formatChannels(trackInfo.channels) : '2.0',
         bitrate: 256000,
         isDefault: false,
-        transcodedPath: destPath,
-        transcodeStatus: 'COMPLETED',
+        transcodedCid: transcodedCid ?? undefined,
         dubGroup: trackInfo.dubGroup || undefined,
       },
     })
@@ -385,7 +386,7 @@ async function processSubtitle(
   incrementAddedTracks: (type: 'audio' | 'subtitle') => void,
   addRecord: (record: { type: 'audio' | 'subtitle'; id: string; filePath: string }) => void,
   createSubtitleTrack: ReturnType<typeof useCreateSubtitleTrack>,
-  createSubtitleFont: ReturnType<typeof useCreateSubtitleFont>
+  createSubtitleFont: ReturnType<typeof useCreateSubtitleFont>,
 ): Promise<void> {
   const { id, type, donorPath, episodeId, episodeDir, trackInfo } = task
 
@@ -427,6 +428,9 @@ async function processSubtitle(
 
       updateFileProgress(id, { percent: 80 })
 
+      // Загружаем субтитры в IPFS
+      const fileCid = await uploadToIpfs(destPath)
+
       const subtitleRecord = await createSubtitleTrack.mutateAsync({
         data: {
           episodeId,
@@ -434,7 +438,7 @@ async function processSubtitle(
           language: lang,
           title: trackInfo.title || undefined,
           format,
-          filePath: destPath,
+          fileCid: fileCid ?? undefined,
           isDefault: false,
           dubGroup: trackInfo.dubGroup || undefined,
         },
@@ -446,7 +450,7 @@ async function processSubtitle(
       })
       addRecord({ type: 'subtitle', id: subtitleRecord.id, filePath: destPath })
 
-      // Копируем шрифты для ASS
+      // Копируем и загружаем шрифты для ASS
       if (trackInfo.matchedFonts && trackInfo.matchedFonts.length > 0) {
         const fontsDir = `${episodeDir}/fonts`
         for (const font of trackInfo.matchedFonts) {
@@ -454,8 +458,16 @@ async function processSubtitle(
             const fontFileName = font.path.split(/[/\\]/).pop() || `${font.name}.ttf`
             const destFontPath = `${fontsDir}/${fontFileName}`
             await api.fs.copyFile(font.path, destFontPath)
+
+            // Загружаем шрифт в IPFS
+            const fontCid = await uploadToIpfs(destFontPath)
+
             await createSubtitleFont.mutateAsync({
-              data: { subtitleTrackId: subtitleRecord.id, fontName: font.name, filePath: destFontPath },
+              data: {
+                subtitleTrackId: subtitleRecord.id,
+                fontName: font.name,
+                fileCid: fontCid ?? undefined,
+              },
             })
           } catch (fontError) {
             console.warn(`[AddTracks] Failed to copy font ${font.name}:`, fontError)
@@ -513,6 +525,9 @@ async function processSubtitle(
 
           updateFileProgress(id, { percent: 80 })
 
+          // Загружаем субтитры в IPFS
+          const embeddedFileCid = await uploadToIpfs(destPath)
+
           const embeddedSubRecord = await createSubtitleTrack.mutateAsync({
             data: {
               episodeId,
@@ -520,7 +535,7 @@ async function processSubtitle(
               language: lang,
               title: trackInfo.title || undefined,
               format: demuxedSub.format || format,
-              filePath: destPath,
+              fileCid: embeddedFileCid ?? undefined,
               isDefault: false,
               dubGroup: trackInfo.dubGroup || undefined,
             },

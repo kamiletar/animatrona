@@ -23,8 +23,8 @@ export {
 // Подкомпоненты (для кастомизации)
 export { PlayerControls, PlayerHeader, PlayerLoadingOverlay } from './_components'
 
-export { SubtitleOverlay } from './SubtitleOverlay'
-export type { SubtitleOverlayProps } from './SubtitleOverlay'
+// SubtitleOverlay теперь экспортируется из @lena/video-player-react
+export { SubtitleOverlay, type SubtitleOverlayProps } from '@lena/video-player-react'
 
 export { TrackSelector } from './TrackSelector'
 export type { TrackInfo, TrackSelectorProps } from './TrackSelector'

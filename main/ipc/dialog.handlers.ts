@@ -2,109 +2,77 @@
  * IPC handlers для диалогов файловой системы
  */
 
-import { dialog, ipcMain } from 'electron'
+import { dialog } from 'electron'
 
 import type { FileFilter } from '../../shared/types'
+import { MKV_EXPORT_FILTERS, VIDEO_FILTERS } from '../constants/file-filters'
 import { allowFilePath, allowPath } from '../protocols/allowed-paths'
+import { createHandler } from '../utils/ipc-handler-factory'
 
 /**
  * Регистрирует IPC handlers для диалогов
  */
 export function registerDialogHandlers(): void {
   // Выбор файла
-  ipcMain.handle('dialog:selectFile', async (_event, filters?: FileFilter[]) => {
-    try {
-      const result = await dialog.showOpenDialog({
-        properties: ['openFile'],
-        filters: filters || [
-          { name: 'Видео', extensions: ['mkv', 'mp4', 'avi', 'webm'] },
-          { name: 'Все файлы', extensions: ['*'] },
-        ],
-      })
+  createHandler('dialog:selectFile', async (filters?: FileFilter[]) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: filters || VIDEO_FILTERS,
+    })
 
-      if (result.canceled || result.filePaths.length === 0) {
-        return null
-      }
-
-      const filePath = result.filePaths[0]
-      // Добавляем директорию файла в whitelist для media:// протокола
-      allowFilePath(filePath)
-
-      return filePath
-    } catch (error) {
-      console.error('[IPC] dialog:selectFile error:', error)
+    if (result.canceled || result.filePaths.length === 0) {
       return null
     }
+
+    const filePath = result.filePaths[0]
+    allowFilePath(filePath)
+    return filePath
   })
 
   // Выбор нескольких файлов
-  ipcMain.handle('dialog:selectFiles', async (_event, filters?: FileFilter[]) => {
-    try {
-      const result = await dialog.showOpenDialog({
-        properties: ['openFile', 'multiSelections'],
-        filters: filters || [
-          { name: 'Видео', extensions: ['mkv', 'mp4', 'avi', 'webm'] },
-          { name: 'Все файлы', extensions: ['*'] },
-        ],
-      })
+  createHandler('dialog:selectFiles', async (filters?: FileFilter[]) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+      filters: filters || VIDEO_FILTERS,
+    })
 
-      if (result.canceled) {
-        return []
-      }
-
-      // Добавляем директории выбранных файлов в whitelist
-      for (const filePath of result.filePaths) {
-        allowFilePath(filePath)
-      }
-
-      return result.filePaths
-    } catch (error) {
-      console.error('[IPC] dialog:selectFiles error:', error)
+    if (result.canceled) {
       return []
     }
+
+    for (const filePath of result.filePaths) {
+      allowFilePath(filePath)
+    }
+
+    return result.filePaths
   })
 
   // Выбор папки
-  ipcMain.handle('dialog:selectFolder', async () => {
-    try {
-      const result = await dialog.showOpenDialog({
-        properties: ['openDirectory'],
-      })
+  createHandler('dialog:selectFolder', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+    })
 
-      if (result.canceled || result.filePaths.length === 0) {
-        return null
-      }
-
-      const folderPath = result.filePaths[0]
-      // Добавляем папку в whitelist для media:// протокола
-      allowPath(folderPath)
-
-      return folderPath
-    } catch (error) {
-      console.error('[IPC] dialog:selectFolder error:', error)
+    if (result.canceled || result.filePaths.length === 0) {
       return null
     }
+
+    const folderPath = result.filePaths[0]
+    allowPath(folderPath)
+    return folderPath
   })
 
   // Сохранение файла
-  ipcMain.handle('dialog:saveFile', async (_event, defaultName?: string, filters?: FileFilter[]) => {
-    try {
-      const result = await dialog.showSaveDialog({
-        defaultPath: defaultName,
-        filters: filters || [
-          { name: 'Видео MKV', extensions: ['mkv'] },
-          { name: 'Все файлы', extensions: ['*'] },
-        ],
-      })
+  createHandler('dialog:saveFile', async (defaultName?: string, filters?: FileFilter[]) => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: defaultName,
+      filters: filters || MKV_EXPORT_FILTERS,
+    })
 
-      if (result.canceled || !result.filePath) {
-        return null
-      }
-
-      return result.filePath
-    } catch (error) {
-      console.error('[IPC] dialog:saveFile error:', error)
+    if (result.canceled || !result.filePath) {
       return null
     }
+
+    return result.filePath
   })
 }

@@ -5,6 +5,10 @@
 import { readdir } from 'fs/promises'
 import path from 'path'
 
+import { createModuleLogger } from './logger'
+
+const log = createModuleLogger('FsUtils')
+
 /**
  * Рекурсивный генератор файлов в директории
  *
@@ -25,7 +29,7 @@ export async function* scanDirectoryRecursive(
   dir: string,
   extensions: Set<string>,
   maxDepth = 3,
-  currentDepth = 0
+  currentDepth = 0,
 ): AsyncGenerator<string> {
   if (currentDepth > maxDepth) {
     return
@@ -48,7 +52,7 @@ export async function* scanDirectoryRecursive(
       }
     }
   } catch (e) {
-    console.warn(`[scanDirectoryRecursive] Cannot read dir: ${dir}`, e)
+    log.warn(`Cannot read directory: ${dir}`, { error: e })
   }
 }
 

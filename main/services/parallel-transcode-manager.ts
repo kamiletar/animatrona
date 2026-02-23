@@ -17,8 +17,11 @@ import type {
   VideoPoolTask,
 } from '../../shared/types/parallel-transcode'
 import type { CqSearchProgress } from '../../shared/types/vmaf'
+import { createModuleLogger } from '../utils/logger'
 import { AudioPool } from './pools/audio-pool'
 import { type LogEntry, VideoPool } from './pools/video-pool'
+
+const log = createModuleLogger('ParallelTranscode')
 
 export class ParallelTranscodeManager extends EventEmitter {
   private static instance: ParallelTranscodeManager | null = null
@@ -98,11 +101,12 @@ export class ParallelTranscodeManager extends EventEmitter {
    * Сбрасывает все состояния пулов и очередей
    */
   reset(): void {
-    console.warn(
-      `[ParallelTranscode] RESET called! importQueue=${this.importQueue.size}, completedVideo=${this.completedVideoTasks.size}, completedAudio=${this.completedAudioTasks.size}`
-    )
-    // Выводим stack trace для отладки кто вызвал reset
-    console.warn('[ParallelTranscode] reset() stack:', new Error().stack)
+    log.warn('RESET called', {
+      importQueue: this.importQueue.size,
+      completedVideo: this.completedVideoTasks.size,
+      completedAudio: this.completedAudioTasks.size,
+    })
+    log.debug('reset() stack trace', { stack: new Error().stack })
     this.videoPool.clear()
     this.audioPool.clear()
     this.importQueue.clear()
@@ -113,7 +117,7 @@ export class ParallelTranscodeManager extends EventEmitter {
     this.currentBatchItems.clear()
     this.vmafProgressMap.clear()
     this.processingItemId = null
-    console.warn('[ParallelTranscode] Reset completed')
+    log.warn('Reset completed')
   }
 
   /**
@@ -164,7 +168,7 @@ export class ParallelTranscodeManager extends EventEmitter {
    */
   setAudioMaxConcurrent(value: number): void {
     this.audioPool.setMaxConcurrent(value)
-    console.warn(`[ParallelTranscode] Audio max concurrent set to ${this.audioPool.getMaxConcurrent()}`)
+    log.info('Audio max concurrent updated', { value: this.audioPool.getMaxConcurrent() })
   }
 
   /**
@@ -180,7 +184,7 @@ export class ParallelTranscodeManager extends EventEmitter {
    */
   setVideoMaxConcurrent(value: number): void {
     this.videoPool.setMaxConcurrent(value)
-    console.warn(`[ParallelTranscode] Video max concurrent set to ${this.videoPool.getMaxConcurrent()}`)
+    log.info('Video max concurrent updated', { value: this.videoPool.getMaxConcurrent() })
   }
 
   /**
@@ -283,15 +287,16 @@ export class ParallelTranscodeManager extends EventEmitter {
     // Если уже обрабатывается этот же item — не запускаем повторно!
     // Это защита от перезагрузки страницы и навигации
     if (this.processingItemId === itemId) {
-      console.warn(`[ParallelTranscode] Item ${itemId} is already processing, rejecting duplicate start`)
+      log.warn('Item already processing, rejecting duplicate', { itemId })
       return false
     }
 
     // Если обрабатывается другой item — не разрешаем
     if (this.processingItemId !== null) {
-      console.warn(
-        `[ParallelTranscode] Cannot set processing item ${itemId}, already processing ${this.processingItemId}`
-      )
+      log.warn('Cannot set processing item, another item already processing', {
+        requestedItem: itemId,
+        currentItem: this.processingItemId,
+      })
       return false
     }
 
@@ -312,7 +317,7 @@ export class ParallelTranscodeManager extends EventEmitter {
   addImportItem(item: BatchImportItem): void {
     // Защита от дублей — не добавлять item который уже существует
     if (this.importQueue.has(item.id)) {
-      console.warn(`[ParallelTranscode] Item ${item.id} already exists in queue, skipping`)
+      log.warn('Item already exists in queue, skipping', { itemId: item.id })
       return
     }
 
@@ -348,7 +353,22 @@ export class ParallelTranscodeManager extends EventEmitter {
       progress: null,
       // Флаг для кодирования напрямую из исходного MKV (нужен -map 0:a:N)
       useStreamMapping: track.useStreamMapping,
+      // Режим passthrough — копировать без транскодирования
+      passthrough: track.passthrough,
+      originalCodec: track.originalCodec,
     }))
+
+    // DEBUG: Логируем аудио-задачи с passthrough
+    log.info('Creating audio tasks', {
+      itemId: item.id,
+      audioTracksCount: audioTasks.length,
+      tracks: audioTasks.map((t) => ({
+        trackId: t.trackId,
+        passthrough: t.passthrough,
+        originalCodec: t.originalCodec,
+        inputPath: t.inputPath?.slice(-50),
+      })),
+    })
 
     // Сохраняем в очередь импорта
     const importItem: ImportQueueItem = {
@@ -489,8 +509,8 @@ export class ParallelTranscodeManager extends EventEmitter {
 
   /** Отменить все */
   cancelAll(): void {
-    console.warn(`[ParallelTranscode] CANCEL ALL called! importQueue=${this.importQueue.size}`)
-    console.warn('[ParallelTranscode] cancelAll() stack:', new Error().stack)
+    log.warn('CANCEL ALL called', { importQueue: this.importQueue.size })
+    log.debug('cancelAll() stack trace', { stack: new Error().stack })
     this.videoPool.clear()
     this.audioPool.clear()
 
@@ -581,13 +601,14 @@ export class ParallelTranscodeManager extends EventEmitter {
   private handleVideoCompleted(task: VideoPoolTask): void {
     const item = this.importQueue.get(task.queueItemId)
     if (!item) {
-      console.warn(`[ParallelTranscode] handleVideoCompleted: item ${task.queueItemId} not found in queue!`)
+      log.warn('handleVideoCompleted: item not found in queue', { itemId: task.queueItemId })
       return
     }
 
-    console.warn(
-      `[ParallelTranscode] handleVideoCompleted: ${task.queueItemId}, videoTask.status=${item.videoTask.status}`
-    )
+    log.info('Video task completed', {
+      itemId: task.queueItemId,
+      videoStatus: item.videoTask.status,
+    })
 
     item.videoCompleted = true
     // Передаём все данные о кодировании для сохранения в БД
@@ -602,18 +623,27 @@ export class ParallelTranscodeManager extends EventEmitter {
 
   /** Обработка завершения аудио */
   private handleAudioCompleted(task: AudioPoolTask): void {
-    this.emit('audioTrackCompleted', task.trackId, task.outputPath, task.episodeId)
+    this.emit(
+      'audioTrackCompleted',
+      task.trackId,
+      task.outputPath,
+      task.episodeId,
+      task.passthrough,
+      task.originalCodec
+    )
 
     const item = this.importQueue.get(task.queueItemId)
     if (item) {
       const audioStatuses = item.audioTasks.map((t) => t.status).join(', ')
-      console.warn(
-        `[ParallelTranscode] handleAudioCompleted: ${task.queueItemId}, trackId=${task.trackId}, audioStatuses=[${audioStatuses}]`
-      )
+      log.info('Audio track completed', {
+        itemId: task.queueItemId,
+        trackId: task.trackId,
+        audioStatuses,
+      })
       this.emitAggregatedProgress() // Обновить счётчики
       this.checkItemCompletion(item)
     } else {
-      console.warn(`[ParallelTranscode] handleAudioCompleted: item ${task.queueItemId} not found!`)
+      log.warn('handleAudioCompleted: item not found', { itemId: task.queueItemId })
     }
   }
 
@@ -624,10 +654,11 @@ export class ParallelTranscodeManager extends EventEmitter {
       return
     }
 
-    // Если хотя бы одна задача завершилась с ошибкой, помечаем весь элемент
-    item.status = 'error'
     this.emit('itemError', itemId, item.episodeId)
     this.emitAggregatedProgress()
+
+    // Проверяем завершение элемента — ошибочная задача тоже считается "finished"
+    this.checkItemCompletion(item)
   }
 
   /** Проверка полного завершения элемента */
@@ -649,21 +680,24 @@ export class ParallelTranscodeManager extends EventEmitter {
     const audioStatuses = item.audioTasks.map((t) => t.status)
     const audioCompleted = audioStatuses.filter((s) => s === 'completed').length
     const audioTotal = item.audioTasks.length
-    console.warn(
-      `[ParallelTranscode] checkItemCompletion: ${item.id} - ` +
-        `video=${item.videoTask.status}(finished=${videoFinished}), ` +
-        `audio=${audioCompleted}/${audioTotal}(allFinished=${allAudioFinished})`
-    )
+    log.debug('checkItemCompletion progress', {
+      itemId: item.id,
+      videoStatus: item.videoTask.status,
+      videoFinished,
+      audioCompleted,
+      audioTotal,
+      allAudioFinished,
+    })
 
     if (videoFinished && allAudioFinished) {
       if (videoSuccessful && allAudioSuccessful) {
         item.status = 'completed'
-        console.warn(`[ParallelTranscode] Item ${item.id} completed successfully, emitting itemCompleted event`)
+        log.info('Item completed successfully', { itemId: item.id, episodeId: item.episodeId })
         this.emit('itemCompleted', item.id, item.episodeId, true)
       } else {
         item.status = 'error'
         const errorMessage = item.videoTask.error || item.audioTasks.find((t) => t.error)?.error || 'Unknown error'
-        console.warn(`[ParallelTranscode] Item ${item.id} completed with error: ${errorMessage}`)
+        log.error('Item completed with error', { itemId: item.id, error: errorMessage })
         this.emit('itemCompleted', item.id, item.episodeId, false, errorMessage)
         this.emit('itemError', item.id, item.episodeId)
       }
@@ -702,7 +736,7 @@ export class ParallelTranscodeManager extends EventEmitter {
 
     if (allCompleted) {
       const batchId = this.currentBatchId
-      console.warn(`[ParallelTranscode] Batch ${batchId} completed. Has errors: ${hasErrors}`)
+      log.info('Batch completed', { batchId, hasErrors })
 
       // Сбрасываем batch данные
       this.currentBatchId = null
@@ -733,7 +767,7 @@ export class ParallelTranscodeManager extends EventEmitter {
 
     // DEBUG: Логируем прогресс видео-задач (только при наличии активных)
     if (progress.videoTasks.tasks.length > 0) {
-      const videoProgress = progress.videoTasks.tasks.map((t) => ({
+      const _videoProgress = progress.videoTasks.tasks.map((t) => ({
         id: t.id.slice(-6),
         status: t.status,
         percent: t.progress?.percent?.toFixed(1) ?? 'null',

@@ -19,277 +19,81 @@
  * - transcode:queueChange — изменение очереди
  */
 
-import { ipcMain } from 'electron'
-import type {
-  DemuxResult,
-  PerFileTranscodeSettings,
-  QueueItem,
-  QueueItemStatus,
-  TranscodeProgressExtended,
-} from '../../shared/types'
+import type { DemuxResult, PerFileTranscodeSettings, TranscodeProgressExtended } from '../../shared/types'
 import { transcodeManager } from '../services/transcode-manager'
 import { broadcastToWindows } from '../src/utils/broadcast'
+import { createHandler, createThrottledBroadcaster } from '../utils/ipc-handler-factory'
 
-// === THROTTLED PROGRESS BROADCAST ===
-
-/** Интервал throttling для progress событий (мс) */
-const PROGRESS_THROTTLE_MS = 100
-
-/** Буфер для накопления progress событий */
-const progressBuffer = new Map<string, TranscodeProgressExtended>()
-
-/** Таймер для отправки буфера */
-let progressFlushTimer: ReturnType<typeof setTimeout> | null = null
-
-/**
- * Добавляет progress в буфер и отправляет с throttling
- * Последнее значение для каждого id всегда отправляется
- */
-function throttledProgressBroadcast(id: string, progress: TranscodeProgressExtended): void {
-  // Сохраняем последнее значение (перезаписывает предыдущее)
-  progressBuffer.set(id, progress)
-
-  // Если таймер уже запущен — ждём его
-  if (progressFlushTimer) {
-    return
-  }
-
-  // Запускаем таймер для отправки буфера
-  progressFlushTimer = setTimeout(() => {
-    // Отправляем все накопленные progress события
-    for (const [bufferedId, bufferedProgress] of progressBuffer) {
-      broadcastToWindows('transcode:progress', bufferedId, bufferedProgress)
-    }
-    // Очищаем буфер
-    progressBuffer.clear()
-    progressFlushTimer = null
-  }, PROGRESS_THROTTLE_MS)
-}
+/** Throttled broadcaster для progress событий (буферизация 100мс) */
+const throttledProgressBroadcast = createThrottledBroadcaster<TranscodeProgressExtended>('transcode:progress', 100)
 
 /**
  * Регистрирует IPC handlers для очереди транскодирования
  */
 export function registerTranscodeQueueHandlers(): void {
   // Подписываемся на события менеджера и транслируем их в renderer
-  // Progress события throttled для снижения нагрузки на IPC
-  transcodeManager.on('progress', (id: string, progress: TranscodeProgressExtended) => {
-    throttledProgressBroadcast(id, progress)
-  })
-
-  transcodeManager.on('statusChange', (id: string, status: QueueItemStatus, error?: string) => {
+  transcodeManager.on('progress', (id, progress) => throttledProgressBroadcast(id, progress))
+  transcodeManager.on('statusChange', (id, status, error) =>
     broadcastToWindows('transcode:statusChange', id, status, error)
-  })
-
-  transcodeManager.on('queueChange', (queue: QueueItem[]) => {
-    broadcastToWindows('transcode:queueChange', queue)
-  })
-
-  transcodeManager.on('processingStarted', () => {
-    broadcastToWindows('transcode:processingStarted')
-  })
-
-  transcodeManager.on('processingCompleted', () => {
-    broadcastToWindows('transcode:processingCompleted')
-  })
+  )
+  transcodeManager.on('queueChange', (queue) => broadcastToWindows('transcode:queueChange', queue))
+  transcodeManager.on('processingStarted', () => broadcastToWindows('transcode:processingStarted'))
+  transcodeManager.on('processingCompleted', () => broadcastToWindows('transcode:processingCompleted'))
 
   // === Handlers ===
 
   // Добавить файл в очередь
-  ipcMain.handle('transcode:addToQueue', async (_event, filePath: string, settings?: PerFileTranscodeSettings) => {
-    try {
-      const id = transcodeManager.addToQueue(filePath, settings)
-      return { success: true, id }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:addToQueue', (filePath: string, settings?: PerFileTranscodeSettings) =>
+    transcodeManager.addToQueue(filePath, settings)
+  )
 
   // Удалить из очереди
-  ipcMain.handle('transcode:removeFromQueue', async (_event, id: string) => {
-    try {
-      const success = transcodeManager.removeFromQueue(id)
-      return { success }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:removeFromQueue', (id: string) => transcodeManager.removeFromQueue(id))
 
   // Начать обработку очереди
-  ipcMain.handle('transcode:start', async () => {
-    try {
-      // Не await — запускаем асинхронно
-      transcodeManager.startProcessing()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
+  createHandler('transcode:start', () => {
+    transcodeManager.startProcessing()
   })
 
   // Приостановить элемент
-  ipcMain.handle('transcode:pauseItem', async (_event, id: string) => {
-    try {
-      const success = transcodeManager.pauseItem(id)
-      return { success }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:pauseItem', (id: string) => transcodeManager.pauseItem(id))
 
   // Возобновить элемент
-  ipcMain.handle('transcode:resumeItem', async (_event, id: string) => {
-    try {
-      const success = transcodeManager.resumeItem(id)
-      return { success }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:resumeItem', (id: string) => transcodeManager.resumeItem(id))
 
   // Отменить элемент
-  ipcMain.handle('transcode:cancelItem', async (_event, id: string) => {
-    try {
-      const success = transcodeManager.cancelItem(id)
-      return { success }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:cancelItem', (id: string) => transcodeManager.cancelItem(id))
 
   // Изменить порядок очереди
-  ipcMain.handle('transcode:reorderQueue', async (_event, orderedIds: string[]) => {
-    try {
-      transcodeManager.reorderQueue(orderedIds)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:reorderQueue', (orderedIds: string[]) => transcodeManager.reorderQueue(orderedIds))
 
   // Обновить настройки элемента
-  ipcMain.handle('transcode:updateSettings', async (_event, id: string, settings: PerFileTranscodeSettings) => {
-    try {
-      const success = transcodeManager.updateSettings(id, settings)
-      return { success }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:updateSettings', (id: string, settings: PerFileTranscodeSettings) =>
+    transcodeManager.updateSettings(id, settings)
+  )
 
   // Получить текущую очередь
-  ipcMain.handle('transcode:getQueue', async () => {
-    try {
-      const queue = transcodeManager.getQueue()
-      return { success: true, queue }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        queue: [],
-      }
-    }
-  })
+  createHandler('transcode:getQueue', () => transcodeManager.getQueue())
 
   // Получить элемент по ID
-  ipcMain.handle('transcode:getItem', async (_event, id: string) => {
-    try {
-      const item = transcodeManager.getItem(id)
-      return { success: true, item }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:getItem', (id: string) => transcodeManager.getItem(id))
 
   // Анализировать элемент
-  ipcMain.handle('transcode:analyzeItem', async (_event, id: string, demuxResult: DemuxResult) => {
-    try {
-      await transcodeManager.analyzeItem(id, demuxResult)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:analyzeItem', (id: string, demuxResult: DemuxResult) =>
+    transcodeManager.analyzeItem(id, demuxResult)
+  )
 
   // Проверить возможность паузы
-  ipcMain.handle('transcode:getPauseCapabilities', async () => {
-    try {
-      const capabilities = transcodeManager.getPauseCapabilities()
-      return { success: true, ...capabilities }
-    } catch (error) {
-      return {
-        success: false,
-        available: false,
-        method: 'none' as const,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:getPauseCapabilities', () => transcodeManager.getPauseCapabilities())
 
   // Приостановить всю обработку
-  ipcMain.handle('transcode:pauseAll', async () => {
-    try {
-      transcodeManager.pauseAll()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:pauseAll', () => transcodeManager.pauseAll())
 
   // Возобновить всю обработку
-  ipcMain.handle('transcode:resumeAll', async () => {
-    try {
-      transcodeManager.resumeAll()
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:resumeAll', () => transcodeManager.resumeAll())
 
   // Установить путь к библиотеке
-  ipcMain.handle('transcode:setLibraryPath', async (_event, libraryPath: string) => {
-    try {
-      transcodeManager.setDefaultLibraryPath(libraryPath)
-      return { success: true }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-  })
+  createHandler('transcode:setLibraryPath', (libraryPath: string) =>
+    transcodeManager.setDefaultLibraryPath(libraryPath)
+  )
 }

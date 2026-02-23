@@ -7,6 +7,7 @@
 import type { UseMutationResult } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import type { TranscodeProgress } from '../../../../shared/types'
+import { uploadToIpfs } from '../ipfs-upload'
 import type { ImportAction, ImportRefs } from './types'
 
 type Dispatch = React.Dispatch<ImportAction>
@@ -78,7 +79,11 @@ export function useImportProgressEvents(dispatch: Dispatch, refs: ImportRefs) {
  * @param updateAudioTrack - мутация для обновления аудиодорожки в БД
  * @param refs - refs для хранения ffmpegCommands
  */
-export function useParallelTranscodeEvents(dispatch: Dispatch, updateAudioTrack: UpdateAudioTrackMutation, refs?: ImportRefs) {
+export function useParallelTranscodeEvents(
+  dispatch: Dispatch,
+  updateAudioTrack: UpdateAudioTrackMutation,
+  refs?: ImportRefs,
+) {
   useEffect(() => {
     const api = window.electronAPI
     if (!api?.parallelTranscode) {
@@ -91,29 +96,76 @@ export function useParallelTranscodeEvents(dispatch: Dispatch, updateAudioTrack:
     })
 
     // Видео завершено — сохраняем метаданные кодирования для использования в пост-обработке
-    const unsubscribeVideoCompleted = api.parallelTranscode.onVideoCompleted((_itemId, episodeId, _outputPath, meta) => {
-      console.warn('[ParallelImport] Video completed:', episodeId, meta)
-      if (meta && refs?.videoEncodingMeta) {
-        refs.videoEncodingMeta.current.set(episodeId, meta)
-      }
-    })
+    const unsubscribeVideoCompleted = api.parallelTranscode.onVideoCompleted(
+      (_itemId, episodeId, _outputPath, meta) => {
+        console.warn('[ParallelImport] Video completed:', episodeId, meta)
+        if (meta && refs?.videoEncodingMeta) {
+          refs.videoEncodingMeta.current.set(episodeId, meta)
+        }
+      },
+    )
 
     // Аудиодорожка завершена — обновляем БД
     const unsubscribeAudioCompleted = api.parallelTranscode.onAudioTrackCompleted(
-      async (trackId, outputPath, _episodeId) => {
-        console.warn('[ParallelImport] Audio track completed:', trackId, outputPath)
+      async (trackId, outputPath, episodeId, passthrough, originalCodec) => {
+        console.warn('[ParallelImport] Audio track completed:', {
+          trackId,
+          outputPath,
+          episodeId,
+          passthrough,
+          originalCodec,
+        })
 
         // Обновить путь в БД (с проверкой существования — может быть удалена при отмене импорта)
         try {
+          // Проверяем, существует ли файл
+          const fileExists = await api.fs.exists(outputPath)
+          if (!fileExists) {
+            console.error('[ParallelImport] Audio file not found:', outputPath)
+            // Всё равно обновляем codec, но без CID
+            // Для passthrough — сохраняем оригинальный кодек, иначе 'aac'
+            const codec = passthrough && originalCodec ? originalCodec : 'aac'
+            await updateAudioTrack.mutateAsync({
+              where: { id: trackId },
+              data: { codec },
+            })
+            return
+          }
+
+          // Загружаем аудио в IPFS
+          console.warn('[ParallelImport] Uploading audio to IPFS:', outputPath)
+          const transcodedCid = await uploadToIpfs(outputPath)
+
+          if (!transcodedCid) {
+            console.error('[ParallelImport] IPFS upload failed for:', outputPath)
+          }
+
+          // Для passthrough — сохраняем оригинальный кодек, иначе 'aac'
+          const codec = passthrough && originalCodec ? originalCodec : 'aac'
+
           await updateAudioTrack.mutateAsync({
             where: { id: trackId },
             data: {
-              transcodedPath: outputPath,
-              transcodeStatus: 'COMPLETED',
-              codec: 'aac',
+              codec,
+              transcodedCid: transcodedCid ?? undefined,
             },
           })
-          console.warn('[ParallelImport] Audio track updated in DB:', trackId)
+          console.warn(
+            '[ParallelImport] Audio track updated in DB:',
+            trackId,
+            `codec: ${codec}`,
+            transcodedCid ? `CID: ${transcodedCid}` : 'NO CID',
+          )
+
+          // Удаляем локальный файл после успешной загрузки в IPFS (экономия диска)
+          if (transcodedCid) {
+            try {
+              await api.fs.delete(outputPath, false)
+              console.warn('[ParallelImport] Local audio deleted:', outputPath)
+            } catch {
+              // Игнорируем ошибки удаления
+            }
+          }
         } catch (err) {
           // P2025 = запись не найдена — это нормально если импорт был отменён
           const prismaError = err as { code?: string }
@@ -123,7 +175,7 @@ export function useParallelTranscodeEvents(dispatch: Dispatch, updateAudioTrack:
             console.error('[ParallelImport] Failed to update audio track:', err)
           }
         }
-      }
+      },
     )
 
     // Item полностью завершён

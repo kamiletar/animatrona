@@ -24,9 +24,9 @@ import {
   Separator,
   Spinner,
   Text,
+  VisuallyHidden,
   VStack,
 } from '@chakra-ui/react'
-import { VisuallyHidden } from '@chakra-ui/react'
 import { NativeSelectField, NativeSelectRoot } from '@chakra-ui/react/native-select'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
@@ -116,19 +116,18 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
     return items.filter((item) => {
       // Фильтр по статусу
       if (statusFilter !== 'all') {
-        if (statusFilter === 'pending' && item.status !== 'pending') {return false}
-        if (
-          statusFilter === 'processing' && !['vmaf', 'preparing', 'transcoding', 'postprocess'].includes(item.status)
-        ) {return false}
-        if (statusFilter === 'completed' && item.status !== 'completed') {return false}
-        if (statusFilter === 'error' && item.status !== 'error' && item.status !== 'cancelled') {return false}
+        if (statusFilter === 'pending' && item.status !== 'pending') return false
+        if (statusFilter === 'processing' && !['vmaf', 'preparing', 'transcoding', 'postprocess'].includes(item.status))
+          return false
+        if (statusFilter === 'completed' && item.status !== 'completed') return false
+        if (statusFilter === 'error' && item.status !== 'error' && item.status !== 'cancelled') return false
       }
 
       // Фильтр по поиску
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
         const animeName = (item.selectedAnime.russian || item.selectedAnime.name).toLowerCase()
-        if (!animeName.includes(query)) {return false}
+        if (!animeName.includes(query)) return false
       }
 
       return true
@@ -138,7 +137,7 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
   // Drag & drop сенсоры
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
   // Обработчик drag end
@@ -149,25 +148,22 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
         reorderItems(active.id as string, over.id as string)
       }
     },
-    [reorderItems],
+    [reorderItems]
   )
 
   // Вычисляемые значения через useMemo (используем filteredItems для поиска/фильтра)
   const pendingItems = useMemo(
     () => filteredItems.filter((i) => i.status === 'pending').sort((a, b) => a.priority - b.priority),
-    [filteredItems],
+    [filteredItems]
   )
 
   const completedItems = useMemo(
     () => filteredItems.filter((i) => ['completed', 'error', 'cancelled'].includes(i.status)),
-    [filteredItems],
+    [filteredItems]
   )
 
   // Все элементы для навигации (pending + completed, без текущего)
-  const allNavigableItems = useMemo(
-    () => [...pendingItems, ...completedItems],
-    [pendingItems, completedItems],
-  )
+  const allNavigableItems = useMemo(() => [...pendingItems, ...completedItems], [pendingItems, completedItems])
 
   // Keyboard navigation в очереди
   useEffect(() => {
@@ -183,9 +179,7 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
         return
       }
 
-      const currentIndex = focusedItemId
-        ? allNavigableItems.findIndex((i) => i.id === focusedItemId)
-        : -1
+      const currentIndex = focusedItemId ? allNavigableItems.findIndex((i) => i.id === focusedItemId) : -1
 
       switch (event.key) {
         case 'ArrowDown':
@@ -207,9 +201,11 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
           if (focusedItemId) {
             const item = allNavigableItems.find((i) => i.id === focusedItemId)
             if (
-              item
-              && (item.status === 'pending' || item.status === 'completed' || item.status === 'error'
-                || item.status === 'cancelled')
+              item &&
+              (item.status === 'pending' ||
+                item.status === 'completed' ||
+                item.status === 'error' ||
+                item.status === 'cancelled')
             ) {
               event.preventDefault()
               removeItem(focusedItemId)
@@ -288,8 +284,8 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
   const totalEta = useMemo(() => {
     // Вспомогательная функция для расчёта ETA воркера
     const calculateWorkerEta = (elapsedMs: number | undefined, progress: number): number => {
-      if (!elapsedMs || elapsedMs <= 0 || progress <= 0 || progress >= 100) {return 0}
-      return Math.round(elapsedMs * (100 - progress) / progress)
+      if (!elapsedMs || elapsedMs <= 0 || progress <= 0 || progress >= 100) return 0
+      return Math.round((elapsedMs * (100 - progress)) / progress)
     }
 
     // 1. ETA активных видео воркеров (реальное оставшееся время)
@@ -308,9 +304,7 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
     const queuedVideos = Math.max(0, videoTotal - videoCompleted - activeWorkerCount)
 
     // 3. Среднее время на видео из истории
-    const completedWithTime = items.filter(
-      (i) => i.status === 'completed' && i.startedAt && i.completedAt,
-    )
+    const completedWithTime = items.filter((i) => i.status === 'completed' && i.startedAt && i.completedAt)
 
     let avgTimePerVideo: number
     if (completedWithTime.length > 0) {
@@ -331,13 +325,8 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
     const queuedVideosEta = (queuedVideos / maxConcurrentWorkers) * avgTimePerVideo
 
     // 5. ETA для pending элементов (ещё не начались)
-    const pendingItems = items.filter(
-      (i) => i.status === 'pending' || i.status === 'vmaf' || i.status === 'preparing',
-    )
-    const pendingEpisodes = pendingItems.reduce(
-      (sum, i) => sum + i.files.filter((f) => f.selected).length,
-      0,
-    )
+    const pendingItems = items.filter((i) => i.status === 'pending' || i.status === 'vmaf' || i.status === 'preparing')
+    const pendingEpisodes = pendingItems.reduce((sum, i) => sum + i.files.filter((f) => f.selected).length, 0)
     const pendingEta = (pendingEpisodes / maxConcurrentWorkers) * avgTimePerVideo
 
     // Итого: активные воркеры + очередь + pending
@@ -346,7 +335,7 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
 
   // Форматирование ETA
   const formatEta = (ms: number): string => {
-    if (ms <= 0) {return ''}
+    if (ms <= 0) return ''
     const hours = Math.floor(ms / (1000 * 60 * 60))
     const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
     if (hours > 0) {
@@ -355,10 +344,11 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
     return `~${minutes}м`
   }
 
-  // Рассчитываем общий прогресс
+  // Рассчитываем общий прогресс (включая прогресс текущего элемента)
   const totalItems = items.length
   const completedCount = completedItems.length
-  const overallProgress = totalItems > 0 ? (completedCount / totalItems) * 100 : 0
+  const currentProgress = currentItem?.progress ?? 0
+  const overallProgress = totalItems > 0 ? ((completedCount * 100 + currentProgress) / (totalItems * 100)) * 100 : 0
 
   // Можем ли начать обработку
   const canStart = pendingItems.length > 0 && !currentItem && !isPaused
@@ -545,45 +535,43 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
             <Icon as={LuClock} boxSize={4} />
             <Text fontWeight="medium">Ожидают ({pendingItems.length})</Text>
           </HStack>
-          {isCompactView
-            ? (
-              // Компактный вид — без drag & drop
-              <VStack gap={1} align="stretch" role="list" aria-label="Очередь импорта">
-                {pendingItems.map((item) => (
-                  <CompactQueueItem
-                    key={item.id}
-                    item={item}
-                    onRemove={() => removeItem(item.id)}
-                    isFocused={focusedItemId === item.id}
-                    onFocus={() => setFocusedItemId(item.id)}
-                  />
-                ))}
-              </VStack>
-            )
-            : (
-              // Развёрнутый вид — с drag & drop
-              <VStack gap={2} align="stretch" pl={8} role="list" aria-label="Очередь импорта">
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  modifiers={[restrictToVerticalAxis]}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext items={pendingItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-                    {pendingItems.map((item) => (
-                      <SortableQueueItem
-                        key={item.id}
-                        item={item}
-                        onRemove={() => removeItem(item.id)}
-                        onUpdate={updateItem}
-                        isFocused={focusedItemId === item.id}
-                        onFocus={() => setFocusedItemId(item.id)}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              </VStack>
-            )}
+          {isCompactView ? (
+            // Компактный вид — без drag & drop
+            <VStack gap={1} align="stretch" role="list" aria-label="Очередь импорта">
+              {pendingItems.map((item) => (
+                <CompactQueueItem
+                  key={item.id}
+                  item={item}
+                  onRemove={() => removeItem(item.id)}
+                  isFocused={focusedItemId === item.id}
+                  onFocus={() => setFocusedItemId(item.id)}
+                />
+              ))}
+            </VStack>
+          ) : (
+            // Развёрнутый вид — с drag & drop
+            <VStack gap={2} align="stretch" pl={8} role="list" aria-label="Очередь импорта">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis]}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={pendingItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                  {pendingItems.map((item) => (
+                    <SortableQueueItem
+                      key={item.id}
+                      item={item}
+                      onRemove={() => removeItem(item.id)}
+                      onUpdate={updateItem}
+                      isFocused={focusedItemId === item.id}
+                      onFocus={() => setFocusedItemId(item.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            </VStack>
+          )}
         </Box>
       )}
 
@@ -597,38 +585,36 @@ export function ImportQueueView({ onAddImport }: ImportQueueViewProps) {
             <Icon as={LuCheck} boxSize={4} />
             <Text fontWeight="medium">Завершено ({completedItems.length})</Text>
           </HStack>
-          {isCompactView
-            ? (
-              // Компактный вид
-              <VStack gap={1} align="stretch" opacity={0.85} role="list" aria-label="Завершённые импорты">
-                {completedItems.map((item) => (
-                  <CompactQueueItem
-                    key={item.id}
-                    item={item}
-                    onRemove={() => removeItem(item.id)}
-                    onRetry={(id) => retryItem(id)}
-                    isFocused={focusedItemId === item.id}
-                    onFocus={() => setFocusedItemId(item.id)}
-                  />
-                ))}
-              </VStack>
-            )
-            : (
-              // Развёрнутый вид
-              <VStack gap={2} align="stretch" opacity={0.85} role="list" aria-label="Завершённые импорты">
-                {completedItems.map((item) => (
-                  <ImportQueueItem
-                    key={item.id}
-                    item={item}
-                    isFocused={focusedItemId === item.id}
-                    onFocus={() => setFocusedItemId(item.id)}
-                    isCurrent={false}
-                    onRemove={() => removeItem(item.id)}
-                    onRetry={(id) => retryItem(id)}
-                  />
-                ))}
-              </VStack>
-            )}
+          {isCompactView ? (
+            // Компактный вид
+            <VStack gap={1} align="stretch" opacity={0.85} role="list" aria-label="Завершённые импорты">
+              {completedItems.map((item) => (
+                <CompactQueueItem
+                  key={item.id}
+                  item={item}
+                  onRemove={() => removeItem(item.id)}
+                  onRetry={(id) => retryItem(id)}
+                  isFocused={focusedItemId === item.id}
+                  onFocus={() => setFocusedItemId(item.id)}
+                />
+              ))}
+            </VStack>
+          ) : (
+            // Развёрнутый вид
+            <VStack gap={2} align="stretch" opacity={0.85} role="list" aria-label="Завершённые импорты">
+              {completedItems.map((item) => (
+                <ImportQueueItem
+                  key={item.id}
+                  item={item}
+                  isFocused={focusedItemId === item.id}
+                  onFocus={() => setFocusedItemId(item.id)}
+                  isCurrent={false}
+                  onRemove={() => removeItem(item.id)}
+                  onRetry={(id) => retryItem(id)}
+                />
+              ))}
+            </VStack>
+          )}
         </Box>
       )}
     </VStack>
